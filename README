@@ -1,0 +1,38 @@
+This is a simple python-only implementation of a Perspectives network notary server. 
+
+Contact: perspectives-project@cs.cmu.edu  
+Website: http://www.cs.cmu.edu/~perspectives 
+Primary Author: Dan Wendlandt (danwent@gmail.com) 
+
+The implementation relies on the following third-party python libraries:
+* sqlite3
+* M2Crypto
+* cherrypy 
+
+On debian you can install these using: 
+
+apt-get install python-sqlite python-m2crypto python-cherrypy
+
+To run the webserver, see: notary_httpy.py .  Default port is 8080.  
+
+To run a scan for an SSL service, see:  ssl_scan.py 
+To run a scan for an SSH service, see:  ssh_scan.py 
+
+Commonly, you do not run scans explicitly using these tools, but rather set a cron job to 
+periodically run a scan of the whole database.  For example, list_by_last_obs.py can be 
+used to generate a list of likely 'live' services to query, then this list
+can be passed simple_scanner.py as in the following example: 
+
+python list_by_last_obs.py notary.sqlite newer 5 > foo.txt
+python simple_scanner.py notary.sqlite foo.txt 20 20
+
+Running a scan can take a long time, depending on the size of your database.  
+
+Unlike the original C implementation of the notary server, this implementation performs
+signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
+cost of making reuests heavy-weight and subject to DoS.  We could implement a caching scheme
+for the signatures if it proves valuable.  
+
+This implementation does not yet implement on demand probing by the webserver, but this should be
+very easy to add.  Also, this code needs some clean-up and less hard-coded configuration.  
+
