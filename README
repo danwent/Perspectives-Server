@@ -23,8 +23,7 @@ periodically run a scan of the whole database.  For example, list_by_last_obs.py
 used to generate a list of likely 'live' services to query, then this list
 can be passed simple_scanner.py as in the following example: 
 
-python list_by_last_obs.py notary.sqlite newer 5 > foo.txt
-python simple_scanner.py notary.sqlite foo.txt 20 20
+python list_by_last_obs.py notary.sqlite newer 5 | python simple_scanner.py notary.sqlite - 20 20
 
 Running a scan can take a long time, depending on the size of your database.  
 

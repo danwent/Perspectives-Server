@@ -26,7 +26,11 @@ if len(sys.argv) != 5:
   sys.exit(1)
 
 notary_db=sys.argv[1]
-f = open(sys.argv[2])
+if sys.argv[2] == "-": 
+	f = sys.stdin
+else: 
+	f = open(sys.argv[2])
+
 to_probe = [ line.rstrip() for line in f ] 
 
 total_count = len(to_probe)
