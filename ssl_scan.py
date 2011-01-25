@@ -30,8 +30,6 @@ if not fp_regex.match(output):
 	exit(1)
 
 fp = output.split("=")[1].lower()
-dns_name, port = dns_and_port.split(":")
-
-
 notary_common.report_observation(sys.argv[2], service_id, fp) 
 
+print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)

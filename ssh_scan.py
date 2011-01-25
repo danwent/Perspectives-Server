@@ -38,7 +38,7 @@ for key_type in ("rsa","dsa","rsa1"):
 	p2.wait()
 
 	if p2.returncode != 0:
-		print >> sys.stderr, "ERROR: error converting ssh key of type '%s' for '%s'" % (key_type,dns_and_port)
+		print >> sys.stderr, "ERROR: error fetching ssh key of type '%s' for '%s'" % (key_type,dns_and_port)
 		continue
 
 	fp = output.split()[1]
@@ -48,6 +48,7 @@ for key_type in ("rsa","dsa","rsa1"):
 		continue
 	
 	notary_common.report_observation(sys.argv[2], service_id, fp) 
+	print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)
 	break
 
 os.remove(fname)
