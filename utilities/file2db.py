@@ -45,9 +45,7 @@ class SQLiteImportAnalyzer:
 		self.conn = sqlite3.connect(filename)
 
 	def start(self): 
-		self.conn.execute('''create table observations 
-			(service_id text, key text, start integer, end integer)''') 
-		self.conn.execute('''create index sid_index on observations (service_id)''')
+		pass 
 
 	def on_service(self, service_id):  		
 		self.service_id = service_id
