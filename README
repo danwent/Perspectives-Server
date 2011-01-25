@@ -1,10 +1,15 @@
+
+ ==== INFO ====
+
 This is a simple python-only implementation of a Perspectives network notary server. 
 
 Contact: perspectives-project@cs.cmu.edu  
 Website: http://www.cs.cmu.edu/~perspectives 
 Primary Author: Dan Wendlandt (danwent@gmail.com) 
 
-The implementation relies on the following third-party python libraries:
+ ==== PREREQUISITES ====
+
+The implementation relies on python >= 2.5 and the following third-party python libraries:
 * sqlite3
 * M2Crypto
 * cherrypy 
@@ -13,25 +18,63 @@ On debian you can install these using:
 
 apt-get install python-sqlite python-m2crypto python-cherrypy
 
-To run the webserver, see: notary_httpy.py .  Default port is 8080.  
+ ===== SETUP ====
 
-To run a scan for an SSL service, see:  ssl_scan.py 
-To run a scan for an SSH service, see:  ssh_scan.py 
+First, create a database: 
+
+% python utilities/create_tables.py notary.sqlite
+
+Then create the notary server key pair (private key is needed by the server, and 
+the public key should be used by the notary client): 
+
+% bash utilities/create_key_pair.sh notary.priv notary.pub
+ 
+ ===== RUNNING ====
+
+Run the webserver in its own window (or in the background): 
+
+% python notary_http.py notary.sqlite notary.priv 
+
+To run a scan for an SSL service:  
+
+% python ssl_scan.py www.google.com:443,2 notary.sqlite
+
+To run a scan for an SSH service:  
+
+% python ssh_scan.py shell.sourceforge.net:22,1 notary.sqlite
+
+To test, run a query for a service-id you have scanned:
+
+% python utilities/notary_client.py www.google.com:443,2 localhost 8080 notary.pub
+
+You could also fetch the results with a webbrowser, though you will need to 'view source'
+to see the XML:  http://localhost:8080/?host=www.google.com&port=443&service_type=2
 
 Commonly, you do not run scans explicitly using these tools, but rather set a cron job to 
-periodically run a scan of the whole database.  For example, list_by_last_obs.py can be 
-used to generate a list of likely 'live' services to query, then this list
-can be passed simple_scanner.py as in the following example: 
+periodically run a scan of all service-ids in the database.  For example, list_by_last_obs.py can be 
+used to generate a list of likely 'live' services to query (i.e., those that have responded in the 
+last five days), then this list can be passed simple_scanner.py as in the following example: 
 
-python list_by_last_obs.py notary.sqlite newer 5 | python simple_scanner.py notary.sqlite - 20 20
+% python utilities/list_by_last_obs.py notary.sqlite newer 5 | python simple_scanner.py notary.sqlite - 20 20
 
-Running a scan can take a long time, depending on the size of your database.  
+Running a scan can take a long time, depending on the size of your database and the rate you
+specify to simple_scanner.py .  
+
+ ==== Notes ====
+
+The server implements "on-demand probing", so if you query for a service-id that is not
+in the database, the notary will automatically kick-off a probe for that service.  The 
+notary will respond with an HTTP 404, and the client should requery to get the results.
+The Perspectives Firefox client will requery appropriately.  
 
 Unlike the original C implementation of the notary server, this implementation performs
 signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
 cost of making reuests heavy-weight and subject to DoS.  We could implement a caching scheme
 for the signatures if it proves valuable.  
 
-This implementation does not yet implement on demand probing by the webserver, but this should be
-very easy to add.  Also, this code needs some clean-up and less hard-coded configuration.  
+This code still needs some clean-up and less hard-coded configuration, but its good enough 
+for use.  Please visit the github page to submit changes and suggest improvments: 
+
+https://github.com/danwent/Perspectives-Server
+
 
