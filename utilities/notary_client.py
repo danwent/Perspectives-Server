@@ -6,50 +6,60 @@ from subprocess import *
 import time 
 import os 
 import tempfile 
-import sys 
+import sys
+import traceback  
+from M2Crypto import BIO, RSA, EVP
 
-if len(sys.argv) != 5: 
-	print "usage: %s <service-hostname> <service-port> <notary-server> <notary-port>" % sys.argv[0]
+
+if len(sys.argv) != 4 and len(sys.argv) != 5: 
+	print "usage: %s <service-id> <notary-server> <notary-port> [notary-pubkey]" % sys.argv[0]
 	exit(1)  
 
-host = sys.argv[1]
-port = int(sys.argv[2]) 
-notary_server = sys.argv[3]
-notary_port = int(sys.argv[4]) 
+service_id = sys.argv[1]
+host = service_id.split(":")[0] 
+port = service_id.split(":")[1].split(",")[0] 
+service_type = service_id.split(",")[1]
 
-# this is the perspectives notary server we will contact and its public key 
-# a real perspectives client would query multiple notaries
-notary_pub_key="""-----BEGIN PUBLIC KEY-----
-MIHKMA0GCSqGSIb3DQEBAQUAA4G4ADCBtAKBrAGXsegzE6E/6j4vgzi3NqGSn2dz
-W6gRxkuAL7PB8QmRqtG9ieSQjFB6cTYvkmp7x/LtHqlr9Fa6+/mT4Ma5oKU0RpgY
-MyfYnEk0iiNWG2fj4mRpTscHfcEJfKP13OGAYP1ZuHksTXSYsaKfIwiVKMLgQ/hA
-FHBSCs9X+bvVMgPOiEpxZXfaynOQ3TLGYtVywLRwW5yvlRq4E9z0rtvwR1bn1hVd
-JaJ2Lw7kRVMCAwEAAQ==
------END PUBLIC KEY-----"""
+notary_server = sys.argv[2]
+notary_port = int(sys.argv[3]) 
+
+notary_pub_key = None
+
+if len(sys.argv) == 5: 
+	notary_pub_key_file = sys.argv[4] 
+	notary_pub_key = open(notary_pub_key_file,'r').read() 
 
 # querying the notaries over the HTTP webservice interface
-url = "http://%s:%s?host=%s&port=%s&service_type=2" % (notary_server, notary_port, host,port)
-print "fetching '%s'" % url
-xml_text = urllib.urlopen(url).read()
+url = "http://%s:%s?host=%s&port=%s&service_type=%s" % (notary_server, notary_port, host,port,service_type)
+print "\nFetching '%s'" % url
+
+try: 
+	url_file = urllib.urlopen(url)
+	xml_text = url_file.read()
+	code = url_file.getcode()
+	if code != 200: 
+		print "Notary server returned error code: %s" % code
+		exit(1) 
+except Exception, e:
+	print "Exception contacting notary server:" 
+	traceback.print_exc(e)
+	exit(1) 
 
 # if you want to see the XML format, uncomment the line below 
 # keys are represented by their MD5 hash.  This is still secure, as MD5 pre-image 
 # resistence is not broken 
 # Each key is associated with one or more 'timespans', which represent blocks of 
 # time when that notary observed only that key. 
+print 50 * "-"
+print "XML Response:" 
 print xml_text
 
 notary_reply = parseString(xml_text).documentElement
 
 # most of the code below is for verifying the signature on the data returned by the notary
 # we need to parse the XML and convert it to the binary format that is required for 
-# verifying the signature.  We use the openssl command line utility to verify the signature. 
-(sig_fd, sig_file_name) = tempfile.mkstemp() 
-sig_raw = base64.standard_b64decode(notary_reply.getAttribute("sig"))
-os.write(sig_fd, sig_raw)
-os.close(sig_fd)
+# verifying the signature.  
 
-service_id = host + ":" + str(port) + ",2" 
 packed_data = ""
 
 keys = notary_reply.getElementsByTagName("key")
@@ -78,34 +88,25 @@ for k in keys:
 
 packed_data = service_id +  struct.pack("B",0) + packed_data
 
-(data_fd, data_file_name) = tempfile.mkstemp() 
-os.write(data_fd,packed_data)
-os.close(data_fd)
+print 50 * "-"
+print "Results:" 
 
-(pubkey_fd, pubkey_file_name) = tempfile.mkstemp() 
-os.write(pubkey_fd, notary_pub_key)
-os.close(pubkey_fd)
+if notary_pub_key:
+	sig_raw = base64.standard_b64decode(notary_reply.getAttribute("sig")) 
+	bio = BIO.MemoryBuffer(notary_pub_key)
+	rsa_pub = RSA.load_pub_key_bio(bio)
+	pubkey = EVP.PKey()
+	pubkey.assign_rsa(rsa_pub)
 
-# run openssl, specifying the temp files we've written above. 
-cmd_arr = [ "openssl", "dgst", "-verify", 
-	    pubkey_file_name, "-signature", 
-	    sig_file_name, data_file_name ]
+	pubkey.reset_context(md='md5')
+	pubkey.verify_init()
+	pubkey.verify_update(packed_data)
+	if not pubkey.verify_final(sig_raw):
+		print "Signature verify failed.  Results are not valid"
+		exit(1)  
+else: 
+	print "Warning: no public key specified, not verifying notary signature" 
 
-proc = Popen( cmd_arr , stdout=PIPE, stderr=PIPE)
-retcode = proc.wait()
-output = proc.communicate()[0]
-
-# remove temp files
-#os.remove(sig_file_name) 
-#os.remove(data_file_name) 
-#os.remove(pubkey_file_name) 
-
-# if signature verify fails, openssl will return non-zero 
-if retcode != 0: 
-	print "Signature verify failed: '%s'" % output
-	exit(1)  
-
-print "Results for host = '%s' port = '%s'" % (host,port) 
 
 # now just print everything out
 # a real perspectives client would check the consistency of results returned from 
