@@ -1,5 +1,20 @@
 import time 
 import sqlite3 
+from subprocess import Popen,PIPE,STDOUT 
+
+SSL_SCAN="ssl_scan.py" 
+SSH_SCAN="ssh_scan.py"
+
+def start_scan_probe(sid, notary_db): 
+  host_and_port, service_type = sid.split(",")
+  if service_type == "2": 
+    first_arg = SSL_SCAN 
+  elif service_type == "1": 
+    first_arg = SSH_SCAN 
+  else: 
+    print >> sys.stderr, "ERROR: invalid service_type for '%s'" % sid
+    return  
+  return Popen(["python", first_arg, sid, notary_db ] , stdout=PIPE, stderr=STDOUT, shell=False)
 
 def parse_config(conf_fname): 
 	config = {} 

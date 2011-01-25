@@ -2,24 +2,10 @@
 
 import os
 import sys
-from subprocess import Popen,PIPE,STDOUT 
 import time 
 import notary_common
 
 
-SSL_SCAN="ssl_scan.py" 
-SSH_SCAN="ssh_scan.py"
-
-def start_probe(sid, notary_db): 
-  host_and_port, service_type = sid.split(",")
-  if service_type == "2": 
-    first_arg = SSL_SCAN 
-  elif service_type == "1": 
-    first_arg = SSH_SCAN 
-  else: 
-    print >> sys.stderr, "ERROR: invalid service_type for '%s'" % sid
-    return  
-  return Popen(["python", first_arg, sid, notary_db ] , stdout=PIPE, stderr=STDOUT, shell=False)
    
 if len(sys.argv) != 5: 
   print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <max simultaneous> <timeout sec> " 
@@ -53,7 +39,7 @@ while True:
     if (l % 1000 == 0): 
       print >> sys.stderr, "INFO: %s probes remaining" % l
     sid = to_probe.pop()
-    active_sids[sid] = (start_probe(sid, notary_db), time.time()) 
+    active_sids[sid] = (notary_common.start_scan_probe(sid, notary_db), time.time()) 
 
   if(len(active_sids) == 0): 
     break # all done
