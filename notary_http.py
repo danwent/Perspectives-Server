@@ -88,6 +88,7 @@ class NotaryHTTPServer:
 	def index(self, host=None, port=None, service_type=None):
 		if (host == None or port == None or service_type == None): 
 			raise cherrypy.HTTPError(400)
+		print "Request for %s:%s,%s" % (host,port,service_type)
       		return self.get_xml(host + ":" + port + "," + service_type)
  
     	index.exposed = True
