@@ -88,7 +88,6 @@ class NotaryHTTPServer:
 	def index(self, host=None, port=None, service_type=None):
 		if (host == None or port == None or service_type == None): 
 			raise cherrypy.HTTPError(400)
-		print "Request for %s:%s,%s" % (host,port,service_type)
       		return self.get_xml(host + ":" + port + "," + service_type)
  
     	index.exposed = True
@@ -97,5 +96,9 @@ if len(sys.argv) != 3:
 	print "usage: <notary-database-file> <private-key-file>" 
 	exit(1) 
 
+cherrypy.config.update({ 'server.socket_port' : 8080, 
+                        'log.access_file' : 'access.log', 
+                        'log.error_file' : 'error.log', 
+                        'log.screen' : False } ) 
 cherrypy.quickstart(NotaryHTTPServer(sys.argv[1], sys.argv[2]))
 
