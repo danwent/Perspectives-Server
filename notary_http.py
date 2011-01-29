@@ -32,7 +32,7 @@ class NotaryHTTPServer:
 		
 		if num_rows == 0: 
 			# we may want to rate-limit on-demand probes
-			notary_common.start_scan_probe(service_id, DB_FILE) 
+			notary_common.start_scan_probe(service_id, self.db_file) 
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
 	
