@@ -98,7 +98,6 @@ class NotaryHTTPServer:
 		sig = base64.standard_b64encode(sig_before_raw) 
 	
 		top_element.setAttribute("sig",sig)
-		print top_element.toprettyxml() 
 		return top_element.toprettyxml() 
 
 	def index(self, host=None, port=None, service_type=None):
