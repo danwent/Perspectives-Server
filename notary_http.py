@@ -96,7 +96,8 @@ if len(sys.argv) != 3:
 	print "usage: <notary-database-file> <private-key-file>" 
 	exit(1) 
 
-cherrypy.config.update({ 'server.socket_port' : 8080, 
+cherrypy.config.update({ 'server.socket_port' : 8080,
+			'server.socket_host' : '0.0.0.0',  
                         'log.access_file' : 'access.log', 
                         'log.error_file' : 'error.log', 
                         'log.screen' : False } ) 
