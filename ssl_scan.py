@@ -19,15 +19,24 @@ import re
 import sys
 import notary_common 
 
+# By default, we do not probe using TLS 'Server Name Indication' (SNI) 
+# as it was only compiled into openssl by default since 0.9.8j .  
+# If you have a version of openssl with SNI support, change the value of
+# this variable, as your notary probing will be more accurate.
+USE_SNI = False 
+
 if len(sys.argv) != 3:
 	print >> sys.stderr, "ERROR: usage: <service-id> <notary-db-file>"
 	exit(1)
 
 service_id = sys.argv[1]
 dns_and_port = service_id.split(",")[0]
+dns = dns_and_port.split(":")[0] 
 
-p1 = Popen(["openssl","s_client","-connect", dns_and_port],
-		stdin=file("/dev/null", "r"), stdout=PIPE, stderr=None)
+cmd1_args = ["openssl","s_client","-connect", dns_and_port ] 
+if (USE_SNI): 
+	cmd1_args += [ "-servername", dns ]  
+p1 = Popen(cmd1_args, stdin=file("/dev/null", "r"), stdout=PIPE, stderr=None)
 p2 = Popen(["openssl","x509","-fingerprint","-md5", "-noout"],
 		stdin=p1.stdout, stdout=PIPE, stderr=None)
 output = p2.communicate()[0].strip()
