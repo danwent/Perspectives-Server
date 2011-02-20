@@ -32,25 +32,31 @@ import sqlite3
 # Thus, the script can be used to either generate a list of all services
 # considered 'live' and of all services considered 'dead'.
 
-
-if len(sys.argv) != 4:
-  print >> sys.stderr, "ERROR: usage: <notary-db-file> <older|newer> <days>"
+def usage_and_exit(): 
+  print >> sys.stderr, "ERROR: usage: <notary-db-file> <all|older|newer> <days>"
   exit(1)
 
-is_older = True
-if sys.argv[2] == "newer":
-	is_older = False
+if len(sys.argv) == 4: 
+	if not (sys.argv[2] == "older" or sys.argv[2] == "newer"): 
+		usage_and_exit()
+	cur_time = int(time.time()) 
+	threshold_sec = int(int(time.time()) - (3600 * 24 * int(sys.argv[3])))
+elif len(sys.argv) == 3: 
+	if not sys.argv[2] == "all": 
+		usage_and_exit()
+else: 
+	usage_and_exit()
 	
-cur_time = int(time.time()) 
-threshold_sec = int(int(time.time()) - (3600 * 24 * int(sys.argv[3])))
 
 conn = sqlite3.connect(sys.argv[1])
 cur = conn.cursor()
 
-if is_older: 
-	cur.execute("select distinct service_id from observations where service_id not in (select distinct service_id from observations where end > %s)" % threshold_sec)
+if sys.argv[2] == "all": 
+	cur.execute("select distinct service_id from observations")
+elif sys.argv[2] == "older": 
+	cur.execute("select distinct service_id from observations where service_id not in (select distinct service_id from observations where end > ?)", [ threshold_sec ])
 else: 
-	cur.execute("select distinct service_id from observations where end > %s" %threshold_sec)
+	cur.execute("select distinct service_id from observations where end > ?", [ threshold_sec ] )
 	
 for row in cur:
 	print row[0] 

@@ -44,20 +44,24 @@ print >> sys.stderr, "INFO: *** Starting scan of %s services at %s" % \
 print >> sys.stderr, "INFO: *** Timeout = %s sec  Max-Simultaneous = %s" % \
     (timeout_sec, max_sim) 
 
+num_completed = 0
 while True:
-  while( len(active_sids) < max_sim ): 
+  while( len(active_sids) < max_sim and len(to_probe) > 0): 
     l = len(to_probe)
-    if (l == 0):
-      break
     if (l % 1000 == 0): 
       print >> sys.stderr, "INFO: %s probes remaining" % l
+      sys.stdout.flush()
+      sys.stderr.flush()
     sid = to_probe.pop()
+    #probe_start = time.time()
     active_sids[sid] = (notary_common.start_scan_probe(sid, notary_db), time.time()) 
+    #print "started probe for '%s' at %s (took %s)" % (sid, int(time.time() - start_time), time.time() - probe_start)
 
   if(len(active_sids) == 0): 
     break # all done
     
   now = time.time() 
+  print "# %s seconds elapsed, %s active, %s complete, %s failures" % (int(now - start_time), len(active_sids), num_completed, failure_count)
   for sid,(p,t) in active_sids.items():
     code = p.poll()
     if code != None:
@@ -65,14 +69,17 @@ while True:
         print >> sys.stderr, "WARNING: failed: %s %s" % (sid,code)
         failure_count += 1
       p.wait() # apparently this is needed on FreeBSD?
+      num_completed += 1
       del active_sids[sid]
     else:
       run_time = now - t
       if run_time > timeout_sec:
-        os.kill(p.pid,9) # p.kill() required python 2.6
-  sys.stdout.flush()
-  sys.stderr.flush()
-  time.sleep(1)
+	print "timeout for: '%s'" % sid
+        #os.kill(p.pid,9) 
+	p.kill() # requires python 2.6
+	time.sleep(1.0) 
+
+  time.sleep(0.5)
 
 duration = time.time() - start_time
 print >> sys.stderr, "INFO: *** Finished scan at %s. Scan took %s seconds" % (time.ctime(), duration) 

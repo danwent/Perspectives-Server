@@ -33,7 +33,7 @@ class NotaryHTTPServer:
 	def get_xml(self, service_id): 
 		conn = sqlite3.connect(self.db_file)
 		cur = conn.cursor()
-		cur.execute("select * from observations where service_id = ?", (service_id,))
+		cur.execute("select * from observations where service_id = ? and key not NULL", (service_id,))
 		timestamps_by_key = {}
 		keys = []
 
@@ -113,9 +113,9 @@ if len(sys.argv) != 3:
 	exit(1) 
 
 cherrypy.config.update({ 'server.socket_port' : 8080,
-			'server.socket_host' : '0.0.0.0',  
-                        'log.access_file' : 'access.log', 
-                        'log.error_file' : 'error.log', 
-                        'log.screen' : False } ) 
+			 'server.socket_host' : "0.0.0.0", 
+			 'log.access_file' : 'access.log', 
+			 'log.error_file' : 'error.log', 
+			 'log.screen' : False } ) 
 cherrypy.quickstart(NotaryHTTPServer(sys.argv[1], sys.argv[2]))
 

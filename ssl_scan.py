@@ -25,8 +25,8 @@ import notary_common
 # this variable, as your notary probing will be more accurate.
 USE_SNI = False 
 
-if len(sys.argv) != 3:
-	print >> sys.stderr, "ERROR: usage: <service-id> <notary-db-file>"
+if len(sys.argv) != 3 and len(sys.argv) != 2:
+	print >> sys.stderr, "ERROR: usage: <service-id> [notary-db-file>]"
 	exit(1)
 
 service_id = sys.argv[1]
@@ -53,6 +53,10 @@ if not fp_regex.match(output):
 	exit(1)
 
 fp = output.split("=")[1].lower()
-notary_common.report_observation(sys.argv[2], service_id, fp) 
+
+if len(sys.argv) == 3: 
+	notary_common.report_observation(sys.argv[2], service_id, fp) 
+else: 
+	print "INFO: no database specified, not saving observation"
 
 print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)

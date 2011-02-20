@@ -65,6 +65,11 @@ class SQLiteImportAnalyzer:
 
 	def on_service(self, service_id):  		
 		self.service_id = service_id
+		print "service-id = '%s'" % service_id
+		# create null key entry for service with no observations.  This is useful when
+		# bootstrapping a notary database from the list of service-ids from another notary
+		ret = self.conn.execute("insert into observations values (?,NULL,NULL,NULL)", 
+			 (self.service_id,))
 
 	def on_key(self, key_type, key_hash): 
 		self.cur_key = key_hash 
