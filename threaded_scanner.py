@@ -105,7 +105,7 @@ def get_all_handshake_protocols(rec_data):
 # rfc 2246 says the server cert if the first one
 # in the chain, so ignore everything else 
 def get_server_cert_from_protocol(proto_data): 
-
+	proto_data = proto_data[3:] # get rid of 3-bytes describing length of all certs
 	(b1,b2,b3) = struct.unpack("!BBB",proto_data[0:3])
 	cert_len = (b1 << 16) | (b2 << 8) | b3
 	cert = proto_data[3: 3 + cert_len]
@@ -138,6 +138,7 @@ def attempt_observation_for_service(service_id, timeout_sec):
 					if p[0] == 11: 
 						# server certificate message
 						fp = get_server_cert_from_protocol(p[1])
+						print "%s has key %s" % (service_id, fp) 
 						res_list.append((service_id, fp)) 	
 						done = True
 						break
@@ -223,9 +224,10 @@ for line in f:
 	except KeyboardInterrupt: 
 		exit(1)	
 
+if stats.active_threads > 0: 
+	time.sleep(timeout_sec)
+
 duration = int(time.time() - start_time)
 print "Scan of %s services took %s seconds.  %s Failures" % (stats.num_started,duration, stats.failures)
-if stats.active_threads > 0: 
-	sleep(timeout_sec)
 exit(0) 
 
