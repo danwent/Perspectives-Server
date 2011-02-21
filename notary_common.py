@@ -16,7 +16,8 @@
 
 import time 
 import sqlite3 
-from subprocess import Popen,PIPE,STDOUT 
+import os
+import subprocess
 
 SSL_SCAN="ssl_scan.py" 
 SSH_SCAN="ssh_scan.py"
@@ -29,8 +30,10 @@ def start_scan_probe(sid, notary_db):
     first_arg = SSH_SCAN 
   else: 
     print >> sys.stderr, "ERROR: invalid service_type for '%s'" % sid
-    return  
-  return Popen(["python", first_arg, sid, notary_db ] , stdout=PIPE, stderr=STDOUT, shell=False)
+    return
+	
+  nul_f = open(os.devnull,'w') 
+  return subprocess.Popen(["python", first_arg, sid, notary_db], stdout=nul_f , stderr=subprocess.STDOUT )
 
 def parse_config(conf_fname): 
 	config = {} 
@@ -45,9 +48,15 @@ def parse_config(conf_fname):
 
 def report_observation(notary_db_file, service_id, fp): 
 
-	cur_time = int(time.time()) 
 
 	conn = sqlite3.connect(notary_db_file)
+	report_observation_with_conn(conn, service_id, fp)
+	conn.commit()
+	conn.close() 
+
+def report_observation_with_conn(conn, service_id, fp): 
+
+	cur_time = int(time.time()) 
 	cur = conn.cursor()
 	cur.execute("select * from observations where service_id = ?", (service_id,))
 	most_recent_time_by_key = {}
@@ -80,7 +89,5 @@ def report_observation(notary_db_file, service_id, fp):
 			# time minus one seconds 
 			conn.execute("update observations set end = ? where service_id = ? and key = ? and end = ?", 
 				(cur_time - 1, service_id, most_recent_key, most_recent_time))
-	conn.commit()
-	conn.close() 
 
 

@@ -59,13 +59,16 @@ class SQLiteImportAnalyzer:
  	
 	def __init__(self, filename):
 		self.conn = sqlite3.connect(filename)
+		self.num_services = 0
 
 	def start(self): 
 		pass 
 
-	def on_service(self, service_id):  		
+	def on_service(self, service_id):
+		self.num_services += 1
+		if self.num_services % 1000 == 0: 
+			print "%s services seen" % self.num_services  		
 		self.service_id = service_id
-		print "service-id = '%s'" % service_id
 		# create null key entry for service with no observations.  This is useful when
 		# bootstrapping a notary database from the list of service-ids from another notary
 		ret = self.conn.execute("insert into observations values (?,NULL,NULL,NULL)", 

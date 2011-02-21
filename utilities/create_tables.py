@@ -25,5 +25,6 @@ conn = sqlite3.connect(sys.argv[1])
 conn.execute('''create table observations 
 	(service_id text, key text, start integer, end integer)''') 
 conn.execute('''create index sid_index on observations (service_id)''')
+conn.execute('''create index sid_key_end_index on observations (service_id,key,end)''')
 conn.commit()
 conn.close()
