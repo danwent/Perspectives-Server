@@ -200,9 +200,12 @@ start_time = time.time()
 print >> sys.stderr, "INFO: *** Timeout = %s sec  Max-Simultaneous = %s" % \
     (timeout_sec, max_sim) 
 
-for line in f:  
+# read all sids to start, otherwise sqlite locks up 
+# if you start scanning before list_services_ids.py is not done
+all_sids = [ line.rstrip() for line in f ]
+
+for sid in all_sids:  
 	try: 	
-		sid = line.rstrip() 
 		if sid.split(",")[1] == "2": 
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
