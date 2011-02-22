@@ -132,13 +132,11 @@ def attempt_observation_for_service(service_id, timeout_sec):
 		while not done: 
 			t,rec_data = read_record(sock,timeout_sec)
 			if t == 22: # handshake message
-				#print "reading all handshakes for %s" % service_id
 				all_hs_protos = get_all_handshake_protocols(rec_data) 
 				for p in all_hs_protos: 
 					if p[0] == 11: 
 						# server certificate message
 						fp = get_server_cert_from_protocol(p[1])
-						print "%s has key %s" % (service_id, fp) 
 						res_list.append((service_id, fp)) 	
 						done = True
 						break
