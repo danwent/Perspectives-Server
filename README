@@ -45,7 +45,7 @@ To run a scan for an SSH service:
 
 To test, run a query for a service-id you have scanned:
 
-% python utilities/notary_client.py www.google.com:443,2 localhost 8080 notary.pub
+% python utilities/simple_client.py www.google.com:443,2 localhost 8080 notary.pub
 
 You could also fetch the results with a webbrowser, though you will need to 'view source'
 to see the XML:  http://localhost:8080/?host=www.google.com&port=443&service_type=2
