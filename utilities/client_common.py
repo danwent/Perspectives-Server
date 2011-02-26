@@ -74,19 +74,20 @@ def verify_notary_signature(service_id, notary_xml_text, notary_pub_key_text):
 	pubkey.verify_update(packed_data)
 	return pubkey.verify_final(sig_raw)
 
-def print_notary_reply(notary_xml_text): 
-
+def notary_reply_as_text(notary_xml_text): 
+	t = ""
 	notary_reply = parseString(notary_xml_text).documentElement
 	keys = notary_reply.getElementsByTagName("key")
 	for k in keys:
         	timespans = k.getElementsByTagName("timestamp")
         	fingerprint = k.getAttribute("fp")
-		print "Key = %s" % fingerprint
+		t += "Key = %s\n" % fingerprint
         	for ts in timespans:
                 	ts_start = int(ts.getAttribute("start"))
                 	ts_end  = int(ts.getAttribute("end"))
-			print "\tstart: %s" % time.ctime(ts_start) 
-			print "\tend  : %s" % time.ctime(ts_end)
+			t += "\tstart: %s\n" % time.ctime(ts_start) 
+			t += "\tend  : %s\n" % time.ctime(ts_end)
+	return t
 
 # returns list of entries containing host and key as strings
 def parse_http_notary_list(file_name): 

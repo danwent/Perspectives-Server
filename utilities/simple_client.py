@@ -16,7 +16,7 @@
 
 import sys
 import traceback  
-from client_common import verify_notary_signature, print_notary_reply,fetch_notary_xml 
+from client_common import verify_notary_signature, notary_reply_as_text,fetch_notary_xml 
 
 if len(sys.argv) != 4 and len(sys.argv) != 5: 
 	print "usage: %s <service-id> <notary-server> <notary-port> [notary-pubkey]" % sys.argv[0]
@@ -54,4 +54,4 @@ else:
 
 print "Results:" 
 
-print_notary_reply(xml_text) 
+print notary_reply_as_text(xml_text) 

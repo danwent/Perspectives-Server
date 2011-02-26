@@ -1,7 +1,7 @@
 import time
 import sys
 import traceback  
-from client_common import verify_notary_signature, print_notary_reply,fetch_notary_xml, parse_http_notary_list
+from client_common import verify_notary_signature, fetch_notary_xml, parse_http_notary_list
 from generate_svg import get_svg_graph 
 
 if len(sys.argv) != 4: 
