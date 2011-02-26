@@ -24,15 +24,15 @@ def setup_color_info(server_result_list,cutoff,color_info):
 				most_recent_list.append({ "key" : key, "ts" : most_recent_ts })
 		
 		def most_recent_ts_cmp(a, b): 
-			return b.ts - a.ts
+			return b["ts"] - a["ts"]
  
 		most_recent_list.sort(cmp=most_recent_ts_cmp)
 		color_count = 0
 		while color_count < len(most_recent_list) and color_count < len(colors):
 			fp = most_recent_list[color_count]["key"]  
 			color_info[fp] = colors[color_count] 
-			color_count += 1 
-		return color_count
+			color_count += 1
+	return color_count
 	
  
 
