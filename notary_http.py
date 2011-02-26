@@ -114,7 +114,7 @@ if len(sys.argv) != 3:
 
 cherrypy.config.update({ 'server.socket_port' : 8080,
 			 'server.socket_host' : "0.0.0.0", 
-			 'log.access_file' : 'access.log', 
+			 'log.access_file' : None,  # default for production 
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
 cherrypy.quickstart(NotaryHTTPServer(sys.argv[1], sys.argv[2]))
