@@ -32,7 +32,7 @@ def fetch_notary_xml(notary_server, notary_port, service_id):
 	code = url_file.getcode()
 	return (code,xml_text)
 	
-def verify_notary_signature(notary_xml_text, notary_pub_key_text): 
+def verify_notary_signature(service_id, notary_xml_text, notary_pub_key_text): 
  
 	notary_reply = parseString(notary_xml_text).documentElement
 	packed_data = ""
@@ -86,4 +86,35 @@ def print_notary_reply(notary_xml_text):
                 	ts_start = int(ts.getAttribute("start"))
                 	ts_end  = int(ts.getAttribute("end"))
 			print "\tstart: %s" % time.ctime(ts_start) 
-			print "\tend  : %s" % time.ctime(ts_end) 
+			print "\tend  : %s" % time.ctime(ts_end)
+
+# returns list of entries containing host and key as strings
+def parse_http_notary_list(file_name): 
+	f = open(file_name,'r') 
+	notary_list = [] 
+	filtered_arr = [] 
+	for line in f: 
+		if not line.startswith("#"): 
+			filtered_arr.append(line) 
+	i = 0 
+	while i < len(filtered_arr): 
+		notary_server = { "host" : filtered_arr[i].strip("\n") }
+		i += 1
+
+		key = ""
+		if (i >= len(filtered_arr) or filtered_arr[i].find("BEGIN PUBLIC KEY") == -1):
+			raise Exception("invalid notary list file, line: '%s'" % filtered_arr[i])
+
+		key = ""
+		key += filtered_arr[i]
+		i +=1
+		while (i < len(filtered_arr) and filtered_arr[i].find("END PUBLIC KEY") == -1): 
+			key += filtered_arr[i]
+			i += 1
+
+		key += filtered_arr[i]
+		i += 1 # consume the 'END PUBLIC KEY' line
+		notary_server["public_key"] = key
+		notary_list.append(notary_server)
+	return notary_list
+
