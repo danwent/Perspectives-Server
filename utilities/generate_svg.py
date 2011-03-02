@@ -7,6 +7,8 @@ colors = [ "blue","purple","yellow","orange","cyan", "red", "brown" ]
 def setup_color_info(server_result_list,cutoff,color_info): 
 	key_to_ts_list = {} 
 	for s in server_result_list:
+		if s["results"] is None: 
+			continue
 		notary_reply = parseString(s["results"]).documentElement
 		for k in notary_reply.getElementsByTagName("key"): 
         		fingerprint = k.getAttribute("fp")
@@ -61,13 +63,19 @@ def get_svg_graph(service_id, server_result_list, len_days,cur_secs):
 
 	y_cord += 20
 	for s in server_result_list:
-		notary_reply = parseString(s["results"]).documentElement
 		most_recent_color = "white" # none
 		most_recent_end = 0
 		y_cord += 20
 		res += '<text x="4" y="' + str(y_cord + 8) + '" font-size="10">' + \
 				s["host"] + '</text>\n'
 		
+		if s["results"] is None: 
+			# print "current key" circle as empty white   
+			res += """<rect x="%s" y="%s" width="10" height="10" 
+				fill="%s" rx="5" stroke="black" stroke-width="1px" />\n""" % \
+  				((x_offset - 30), y_cord, "white")
+			continue
+		notary_reply = parseString(s["results"]).documentElement
 		for obs in notary_reply.getElementsByTagName("key"): 
         		fingerprint = obs.getAttribute("fp")
 			color = color_info.get(fingerprint,"grey")
