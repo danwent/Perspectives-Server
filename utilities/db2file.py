@@ -35,9 +35,7 @@ cur = conn.cursor()
 
 # fancy group-by might work better, but I'm justing going
 # to be lazy and load it all into memory.
-print "starting select" 
 cur.execute("select * from observations group by service_id")
-print "done with select" 
 cur_sid = None
 key_to_obs  = {} 
 num_sids = 0
@@ -53,7 +51,9 @@ for row in cur:
 		print >> output_file, "Start Host: '%s'" % sid
 	
 		key_type_text = service_type_to_key_type[cur_sid.split(",")[1]]
-		for key in key_to_obs: 
+		for key in key_to_obs:
+			if key is None: 
+				continue 
 			print >> output_file, "%s key: %s" % (key_type_text,key)
 			for ts in key_to_obs[key]: 
 				print >> output_file, "start:\t%s - %s" % (ts[0],time.ctime(ts[0]))
