@@ -29,18 +29,18 @@ import traceback
 import threading
 import sqlite3
 
-# This is a lightweight version of the ssl scanner that does not invoke openssl at all.
-# Instead, it executes the initial steps of the SSL handshake directly using a TCP socket
-# and parses the data itself
-# 
-# NOTE: this scanner is still somewhat experimental
+# This is a lightweight version of the ssl scanner that does not invoke openssl
+# at all.  Instead, it executes the initial steps of the SSL handshake directly
+# using a TCP socket and parses the data itself
 
 
-# TODO: extend this to work with Server Name Indication (http://www.ietf.org/rfc/rfc4366.txt)
+# TODO: extend this to work with Server Name Indication
+# (http://www.ietf.org/rfc/rfc4366.txt)
 
 # TODO: more fine-grained error accounting to distinguish different failures
-# (dns lookups, conn refused, timeouts).  Particularly interesting would be those
-# that fail or hang after making some progress, as they could indicate logic bugs
+# (dns lookups, conn refused, timeouts).  Particularly interesting would be
+# those that fail or hang after making some progress, as they could indicate
+# logic bugs
 
 class SSLScanTimeoutException(Exception): 
 	pass
@@ -197,7 +197,9 @@ stats = GlobalStats()
 max_sim = int(sys.argv[3])
 timeout_sec = int(sys.argv[4]) 
 start_time = time.time()
-print >> sys.stderr, "INFO: *** Timeout = %s sec  Max-Simultaneous = %s" % \
+localtime = time.asctime( time.localtime(start_time) )
+print "Starting scan at: %s" % localtime
+print "INFO: *** Timeout = %s sec  Max-Simultaneous = %s" % \
     (timeout_sec, max_sim) 
 
 # read all sids to start, otherwise sqlite locks up 
@@ -222,6 +224,8 @@ for sid in all_sids:
 			print "%s second passed.  %s complete, %s failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
+			sys.stdout.flush()
+
 	except KeyboardInterrupt: 
 		exit(1)	
 
@@ -229,6 +233,8 @@ if stats.active_threads > 0:
 	time.sleep(timeout_sec)
 
 duration = int(time.time() - start_time)
+localtime = time.asctime( time.localtime(start_time) )
+print "Ending scan at: %s" % localtime
 print "Scan of %s services took %s seconds.  %s Failures" % (stats.num_started,duration, stats.failures)
 exit(0) 
 
