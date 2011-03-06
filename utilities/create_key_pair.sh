@@ -31,6 +31,7 @@ echo "INFO: initializing key pair" >&2
 
 echo "INFO: generating private key" >&2
 openssl genrsa -out "$1" "$len"
+chmod 600 $1 
 
 echo "INFO: generating public key" >&2
 openssl rsa -in "$1" -out "$2" -outform PEM -pubout
