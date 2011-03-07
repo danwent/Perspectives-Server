@@ -69,7 +69,7 @@ class GlobalStats():
 		self.num_started = 0 
 
 if len(sys.argv) != 5: 
-  print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <max simultaneous> <timeout sec> " 
+  print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <scans-per-sec> <timeout sec> " 
   sys.exit(1)
 
 notary_db=sys.argv[1]
@@ -80,13 +80,16 @@ else:
 
 res_list = [] 
 stats = GlobalStats()
-max_sim = int(sys.argv[3])
+rate = int(sys.argv[3])
 timeout_sec = int(sys.argv[4]) 
 start_time = time.time()
 localtime = time.asctime( time.localtime(start_time) )
 print "Starting scan at: %s" % localtime
-print "INFO: *** Timeout = %s sec  Max-Simultaneous = %s" % \
-    (timeout_sec, max_sim) 
+print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
+    (timeout_sec, rate) 
+
+# arbitrary ceiling of allowed number of threads
+max_threads = 6 * rate
 
 # read all sids to start, otherwise sqlite locks up 
 # if you start scanning before list_services_ids.py is not done
@@ -97,8 +100,9 @@ for sid in all_sids:
 		if sid.split(",")[1] == "2": 
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
-			t.start() 
-		if (stats.num_started % max_sim) == 0: 
+			t.start()
+ 
+		if (stats.num_started % rate) == 0: 
 			time.sleep(1)
 			conn = sqlite3.connect(notary_db)
 			for r in res_list: 
@@ -111,6 +115,11 @@ for sid in all_sids:
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
 			sys.stdout.flush()
+
+		while (stats.active_threads >= max_threads): 
+			time.sleep(1)
+			print "%s seconds passed.  Pausing due to max_thread limit of %s" % \
+				(so_far, max_threads)
 
 	except KeyboardInterrupt: 
 		exit(1)	
