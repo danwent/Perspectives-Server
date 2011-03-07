@@ -134,7 +134,6 @@ def attempt_observation_for_service(service_id, timeout_sec):
 
 		sock.shutdown(socket.SHUT_RDWR) 
 		sock.close()
-		print service_id + " got fp: " + fp
 		if not fp: 
 			raise SSLScanTimeoutException("timeout waiting for data")
 		return fp 	
