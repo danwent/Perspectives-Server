@@ -3,7 +3,9 @@ import struct
 import time
 import binascii
 import hashlib 
-
+import traceback 
+import sys
+import errno 
 
 # This is a lightweight version of SSL scanning that does not invoke openssl
 # at all.  Instead, it executes the initial steps of the SSL handshake directly
@@ -24,11 +26,13 @@ def read_data(s,data_len, timeout_sec):
 			buf_str += s.recv(data_len - len(buf_str))
 			if len(buf_str) == data_len:
 				break
-		except socket.error:
-			pass 
-		if time.time() - start_time > timeout_sec: 
-			raise SSLScanTimeoutException("timeout in read_data")
-		time.sleep(1) 
+		except socket.error, e:
+			if is_nonblocking_exception(e): 
+				if time.time() - start_time > timeout_sec: 
+					raise SSLScanTimeoutException("timeout in read_data")
+				time.sleep(1)
+			else: 
+				raise e 
 	return buf_str
 
 def send_data(s, data, timeout_sec): 
@@ -37,21 +41,34 @@ def send_data(s, data, timeout_sec):
 		try:
 			s.send(data)
 			break 
-		except socket.error: 
-			if time.time() - start_time > timeout_sec: 
-				raise SSLScanTimeoutException("timeout in send_data")
-			time.sleep(1)
+		except socket.error, e: 
+			if is_nonblocking_exception(e): 
+				if time.time() - start_time > timeout_sec: 
+					raise SSLScanTimeoutException("timeout in send_data")
+				time.sleep(1)
+			else: 
+				raise e
 
+def is_nonblocking_exception(e): 
+	try: 
+		return e.args[0] == errno.EAGAIN or \
+		       e.args[0] == errno.EINPROGRESS 
+	except: 
+		return False
+	
 def do_connect(s, host, port, timeout_sec): 
 	start_time = time.time() 
 	while(True): 
 		try:
 			s.connect((host, port))
 			break 
-		except socket.error: 
-			if time.time() - start_time > timeout_sec: 
-				raise SSLScanTimeoutException("timeout in send_data")
-			time.sleep(1) 
+		except socket.error, e:
+			if is_nonblocking_exception(e): 
+				if time.time() - start_time > timeout_sec: 
+					raise SSLScanTimeoutException("timeout in do_connect")
+				time.sleep(1) 
+			else: 
+				raise e
 
 def read_record(sock,timeout_sec): 
 	rec_start = read_data(sock,5,timeout_sec)
@@ -117,4 +134,7 @@ def attempt_observation_for_service(service_id, timeout_sec):
 
 		sock.shutdown(socket.SHUT_RDWR) 
 		sock.close()
+		print service_id + " got fp: " + fp
+		if not fp: 
+			raise SSLScanTimeoutException("timeout waiting for data")
 		return fp 	

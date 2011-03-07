@@ -43,20 +43,23 @@ class ScanThread(threading.Thread):
 	def run(self): 
 		try: 
 			fp = attempt_observation_for_service(self.sid, timeout_sec)
-			if fp is not None: 
-				res_list.append((self.sid,fp))
+			res_list.append((self.sid,fp))
+
 		# note: separating logical here doesn't work, as many errors
 		# are swallowed by the try/except blocks added to handle the
 		# async sockets.  Needs more attention
 		except socket.gaierror:
 			stats.failures += 1
+			#print "gaierror failure for '%s'" % self.sid 
+			#traceback.print_exc(file=sys.stdout)
 		except SSLScanTimeoutException: 
 			stats.failures += 1
+			#print "timeout failure for '%s'" % self.sid 
+			#traceback.print_exc(file=sys.stdout)
 		except: 
-			print "Error scanning '%s'" % self.sid 
-			traceback.print_exc(file=sys.stdout)
 			stats.failures += 1
-
+			#print "Error scanning '%s'" % self.sid 
+			#traceback.print_exc(file=sys.stdout)
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
 
@@ -125,7 +128,7 @@ for sid in all_sids:
 		exit(1)	
 
 if stats.active_threads > 0: 
-	time.sleep(timeout_sec)
+	time.sleep(2 * timeout_sec)
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
