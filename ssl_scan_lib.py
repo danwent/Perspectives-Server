@@ -30,9 +30,9 @@ def read_data(s,data_len, timeout_sec):
 			if is_nonblocking_exception(e): 
 				if time.time() - start_time > timeout_sec: 
 					raise SSLScanTimeoutException("timeout in read_data")
-				time.sleep(1)
 			else: 
 				raise e 
+		time.sleep(1)
 	return buf_str
 
 def send_data(s, data, timeout_sec): 
