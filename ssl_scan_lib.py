@@ -52,7 +52,8 @@ def send_data(s, data, timeout_sec):
 def is_nonblocking_exception(e): 
 	try: 
 		return e.args[0] == errno.EAGAIN or \
-		       e.args[0] == errno.EINPROGRESS 
+		       e.args[0] == errno.EINPROGRESS or \
+		       e.args[0] == errno.EALREADY 
 	except: 
 		return False
 	
