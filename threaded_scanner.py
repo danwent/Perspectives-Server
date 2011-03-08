@@ -91,9 +91,6 @@ print "Starting scan at: %s" % localtime
 print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
     (timeout_sec, rate) 
 
-# arbitrary ceiling of allowed number of threads
-max_threads = 6 * rate
-
 # read all sids to start, otherwise sqlite locks up 
 # if you start scanning before list_services_ids.py is not done
 all_sids = [ line.rstrip() for line in f ]
@@ -118,11 +115,6 @@ for sid in all_sids:
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
 			sys.stdout.flush()
-
-		while (stats.active_threads >= max_threads): 
-			time.sleep(1)
-			print "%s seconds passed.  Pausing due to max_thread limit of %s" % \
-				(so_far, max_threads)
 
 	except KeyboardInterrupt: 
 		exit(1)	
