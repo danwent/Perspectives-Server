@@ -23,6 +23,7 @@ import notary_common
 import traceback 
 import threading
 import sqlite3
+import errno
 from ssl_scan_lib import attempt_observation_for_service, SSLScanTimeoutException
 
 # TODO: more fine-grained error accounting to distinguish different failures
@@ -39,29 +40,45 @@ class ScanThread(threading.Thread):
 		self.global_stats.active_threads += 1
 		threading.Thread.__init__(self)
 		self.timeout_sec = timeout_sec
+		self.global_stats.threads[sid] = time.time() 
+
+	def get_errno(self, e): 
+		try: 
+			return e.args[0]
+		except: 
+			return 0 # no error
+
+	def record_failure(self, e,): 
+		stats.failures += 1
+		if type(e) == type(SSLScanTimeoutException()): 
+			stats.failure_timeouts += 1
+			return
+
+		err = self.get_errno(e) 
+		if err == errno.ECONNREFUSED:
+			stats.failure_conn_refused += 1
+		elif err == errno.EHOSTUNREACH or err == errno.ENETUNREACH: 
+			stats.failure_no_route += 1
+		elif err == errno.ECONNRESET: 
+			stats.failure_conn_reset += 1
+		elif err == -2 or err == -3: 
+			stats.failure_dns += 1
+		else: 	
+			stats.failure_other += 1 
+			print "Unknown error scanning '%s'" % self.sid 
+			traceback.print_exc(file=sys.stdout)
 
 	def run(self): 
 		try: 
 			fp = attempt_observation_for_service(self.sid, timeout_sec)
 			res_list.append((self.sid,fp))
+		except Exception, e:
+			self.record_failure(e) 
 
-		# note: separating logical here doesn't work, as many errors
-		# are swallowed by the try/except blocks added to handle the
-		# async sockets.  Needs more attention
-		except socket.gaierror:
-			stats.failures += 1
-			#print "gaierror failure for '%s'" % self.sid 
-			#traceback.print_exc(file=sys.stdout)
-		except SSLScanTimeoutException: 
-			stats.failures += 1
-			#print "timeout failure for '%s'" % self.sid 
-			#traceback.print_exc(file=sys.stdout)
-		except: 
-			stats.failures += 1
-			#print "Error scanning '%s'" % self.sid 
-			#traceback.print_exc(file=sys.stdout)
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
+		
+		del self.global_stats.threads[self.sid]
 
 class GlobalStats(): 
 
@@ -70,7 +87,16 @@ class GlobalStats():
 		self.num_completed = 0
 		self.active_threads = 0 
 		self.num_started = 0 
+		self.threads = {} 
 
+		# individual failure counts
+		self.failure_timeouts = 0
+		self.failure_no_route = 0
+		self.failure_conn_refused = 0
+		self.failure_conn_reset = 0
+		self.failure_dns = 0 
+		self.failure_other = 0 
+	
 if len(sys.argv) != 5: 
   print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <scans-per-sec> <timeout sec> " 
   sys.exit(1)
@@ -111,9 +137,25 @@ for sid in all_sids:
 			conn.close() 
 			res_list = [] 
 			so_far = int(time.time() - start_time)
-			print "%s second passed.  %s complete, %s failures.  %s Active threads" % \
+			print "%s seconds passed.  %s complete, %s failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
+			print "failure details: timeouts = %s, no-route = %s, conn-refused = %s, conn-reset = %s, dns = %s, other = %s" % \
+				(stats.failure_timeouts,
+				stats.failure_no_route,
+				stats.failure_conn_refused,
+				stats.failure_conn_reset,
+				stats.failure_dns, 
+				stats.failure_other)
+			sys.stdout.flush()
+
+		if stats.num_started  % 1000 == 0: 
+			print "long running threads" 
+			cur_time = time.time() 
+			for sid in stats.threads.keys(): 
+				duration = cur_time - stats.threads.get(sid,cur_time)
+				if duration > 20: 
+					print "'%s' has been running for %s" % (sid,duration) 
 			sys.stdout.flush()
 
 	except KeyboardInterrupt: 
