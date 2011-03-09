@@ -24,7 +24,7 @@ import traceback
 import threading
 import sqlite3
 import errno
-from ssl_scan_lib import attempt_observation_for_service, SSLScanTimeoutException
+from ssl_scan_lw import attempt_observation_for_service, SSLScanTimeoutException
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
