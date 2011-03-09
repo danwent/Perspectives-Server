@@ -27,11 +27,10 @@ def read_data(s,data_len, timeout_sec):
 			if len(buf_str) == data_len:
 				break
 		except socket.error, e:
-			if is_nonblocking_exception(e): 
-				if time.time() - start_time > timeout_sec: 
-					raise SSLScanTimeoutException("timeout in read_data")
-			else: 
+			if not is_nonblocking_exception(e): 
 				raise e 
+		if time.time() - start_time > timeout_sec: 
+			raise SSLScanTimeoutException("timeout in read_data")
 		time.sleep(1)
 	return buf_str
 
