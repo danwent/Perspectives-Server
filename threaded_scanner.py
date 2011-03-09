@@ -122,7 +122,8 @@ print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
 all_sids = [ line.rstrip() for line in f ]
 
 for sid in all_sids:  
-	try: 	
+	try: 
+		# ignore non SSL services	
 		if sid.split(",")[1] == "2": 
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
