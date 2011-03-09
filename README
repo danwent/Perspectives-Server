@@ -35,13 +35,9 @@ Run the webserver in its own window (or in the background):
 
 % python notary_http.py notary.sqlite notary.priv 
 
-To run a scan for an SSL service:  
+To run a scan:  
 
-% python ssl_scan.py www.google.com:443,2 notary.sqlite
-
-To run a scan for an SSH service:  
-
-% python ssh_scan.py shell.sourceforge.net:22,1 notary.sqlite
+% python ssl_scan_sock.py www.google.com:443,2 notary.sqlite
 
 To test, run a query for a service-id you have scanned:
 
@@ -52,20 +48,20 @@ to see the XML:  http://localhost:8080/?host=www.google.com&port=443&service_typ
 
 Commonly, you do not run scans explicitly using these tools, but rather set a cron job to 
 periodically run a scan of all service-ids in the database, then pass this list 
-to simple_scanner.py: 
+to threaded_scanner.py: 
 
-% python utilities/list_service_ids.py notary.sqlite all | python simple_scanner.py notary.sqlite - 5 10
+% python utilities/list_service_ids.py notary.sqlite all | python threaded_scanner.py notary.sqlite - 10 10
 
 Running a scan can take a long time, depending on the size of your database and the rate you
-specify to simple_scanner.py .  
+specify to threaded_scanner.py .  
 
 Here is an example crontab file to run scans twice a day (1 am and 1 pm) on all services in the database
 that have been seen in the past 5 days, with a rate of 20 simultaneous probes and a timeout of 20 seconds
 per probe.  It also contains an entry to restart the server if the machine reboots: 
 
-0 1,13 * * * cd /home/ubuntu/Perspectives-Server && python utilities/list_service_ids.py notary.sqlite all | python simple_scanner.py notary.sqlite - 5 10
+0 1,13 * * * cd /root/Perspectives-Server && python utilities/list_service_ids.py notary.sqlite all | python threaded_scanner.py notary.sqlite - 10 10
 
-@reboot cd /home/ubuntu/Perspectives-Server && python notary_http.py notary.sqlite notary.priv
+@reboot cd /root/Perspectives-Server && python notary_http.py notary.sqlite notary.priv
 
  ==== Notes ====
 
@@ -78,6 +74,11 @@ Unlike the original C implementation of the notary server, this implementation p
 signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
 cost of making reuests heavy-weight and subject to DoS.  We could implement a caching scheme
 for the signatures if it proves valuable.  
+
+The only service-type that is currently fully supported is SSL (service-type 2).  There is 
+still code for SSH (service-type 1) but since we no longer maintain any notary clients of
+this type, we do not regularly test it.  Currently, the threaded_scanner.py will only scan
+for SSL services, though work to have it scan for SSH services is pretty minor.  
 
 This code still needs some clean-up and less hard-coded configuration, but its good enough 
 for use.  Please visit the github page to submit changes and suggest improvments: 

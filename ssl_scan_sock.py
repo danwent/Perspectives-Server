@@ -136,4 +136,27 @@ def attempt_observation_for_service(service_id, timeout_sec):
 		sock.close()
 		if not fp: 
 			raise SSLScanTimeoutException("timeout waiting for data")
-		return fp 	
+		return fp 
+
+
+if __name__ == "__main__":
+
+
+	if len(sys.argv) != 3 and len(sys.argv) != 2:
+		print >> sys.stderr, "ERROR: usage: <service-id> [notary-db-file>]"
+		exit(1)
+
+	service_id = sys.argv[1]
+	try: 
+		fp = attempt_observation_for_service(service_id, 10) 
+	
+		if len(sys.argv) == 3: 
+			notary_common.report_observation(sys.argv[2], service_id, fp) 
+		else: 
+			print "INFO: no database specified, not saving observation"
+
+		print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)
+	except:
+		print "Error scanning for %s" % service_id 
+		traceback.print_exc(file=sys.stdout)
+		

@@ -19,8 +19,8 @@ import sqlite3
 import os
 import subprocess
 
-SSL_SCAN="ssl_scan.py" 
-SSH_SCAN="ssh_scan.py"
+SSL_SCAN="ssl_scan_openssl.py" 
+SSH_SCAN="ssh_scan_openssh.py"
 
 def start_scan_probe(sid, notary_db): 
   host_and_port, service_type = sid.split(",")

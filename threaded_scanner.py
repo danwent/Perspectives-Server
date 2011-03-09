@@ -24,7 +24,7 @@ import traceback
 import threading
 import sqlite3
 import errno
-from ssl_scan_lw import attempt_observation_for_service, SSLScanTimeoutException
+from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
@@ -70,7 +70,7 @@ class ScanThread(threading.Thread):
 
 	def run(self): 
 		try: 
-			fp = attempt_observation_for_service(self.sid, timeout_sec)
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
 			res_list.append((self.sid,fp))
 		except Exception, e:
 			self.record_failure(e) 
