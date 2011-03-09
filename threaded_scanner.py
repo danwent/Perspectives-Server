@@ -131,11 +131,17 @@ for sid in all_sids:
  
 		if (stats.num_started % rate) == 0: 
 			time.sleep(1)
-			conn = sqlite3.connect(notary_db)
-			for r in res_list: 
-				notary_common.report_observation_with_conn(conn, r[0], r[1]) 
-			conn.commit()
-			conn.close() 
+			try: 
+				conn = sqlite3.connect(notary_db)
+				for r in res_list: 
+					notary_common.report_observation_with_conn(conn, r[0], r[1]) 
+				conn.commit()
+				conn.close() 
+			except:
+				# TODO: we should probably retry here 
+				print "DB Error: Failed to write res_list of length %s" % len(res_list)
+				traceback.print_exc(file=sys.stdout)
+				
 			res_list = [] 
 			so_far = int(time.time() - start_time)
 			print "%s seconds passed.  %s complete, %s failures.  %s Active threads" % \
