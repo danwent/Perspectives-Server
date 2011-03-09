@@ -22,13 +22,17 @@ import hashlib
 import sqlite3
 from M2Crypto import BIO, RSA, EVP
 import sys
-import notary_common
+import threading 
+from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
+import traceback 
+import notary_common 
 
 class NotaryHTTPServer:
 
 	def __init__(self, db_file, priv_key_file): 
 		self.db_file = db_file
 		self.notary_priv_key= open(priv_key_file,'r').read() 
+		self.active_threads = 0 
 
 	def get_xml(self, service_id): 
 		conn = sqlite3.connect(self.db_file)
@@ -47,8 +51,11 @@ class NotaryHTTPServer:
 			timestamps_by_key[k].append((row[2],row[3]))
 		
 		if num_rows == 0: 
-			# we may want to rate-limit on-demand probes
-			notary_common.start_scan_probe(service_id, self.db_file) 
+			# rate-limit on-demand probes
+			if self.active_threads < 10: 
+				t = OnDemandScanThread(service_id,10,self)
+				t.start()
+				
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
 	
@@ -108,12 +115,35 @@ class NotaryHTTPServer:
  
     	index.exposed = True
 
+
+class OnDemandScanThread(threading.Thread): 
+
+	def __init__(self, sid,timeout_sec,server_obj): 
+		self.sid = sid
+		self.server_obj = server_obj
+		self.timeout_sec = timeout_sec
+		threading.Thread.__init__(self)
+		self.server_obj.active_threads += 1
+
+	def run(self): 
+		try:
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
+			notary_common.report_observation(self.server_obj.db_file, self.sid, fp)
+		except Exception, e:
+			pass 
+
+		self.server_obj.active_threads -= 1
+
+
+
+
 if len(sys.argv) != 3:
 	print "usage: <notary-database-file> <private-key-file>" 
 	exit(1) 
 
 cherrypy.config.update({ 'server.socket_port' : 8080,
-			 'server.socket_host' : "0.0.0.0", 
+			 'server.socket_host' : "0.0.0.0",
+			 'request.show_tracebacks' : False,  
 			 'log.access_file' : None,  # default for production 
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
