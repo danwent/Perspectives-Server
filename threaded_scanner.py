@@ -61,7 +61,7 @@ class ScanThread(threading.Thread):
 			stats.failure_no_route += 1
 		elif err == errno.ECONNRESET: 
 			stats.failure_conn_reset += 1
-		elif err == -2 or err == -3: 
+		elif err == -2 or err == -3 or err == -5: 
 			stats.failure_dns += 1
 		else: 	
 			stats.failure_other += 1 
