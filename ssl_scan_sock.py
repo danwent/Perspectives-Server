@@ -163,7 +163,6 @@ def get_sni_client_hello(hostname):
 	all_extensions = hn_extension #+ "00230000" 
 	the_rest = "03014d786109055e4736b93b63c371507f824c2d0f05a25b2d54b6b52a1e43c2a52c00002800390038003500160013000a00330032002f000500040015001200090014001100080006000300ff020100" + get_twobyte_hexstr(len(all_extensions)/2) + all_extensions 
 	proto_len = (len(the_rest) / 2)
-	print "proto_len = %s" % proto_len
 	rec_len = proto_len + 4
 	return "160301" + get_twobyte_hexstr(rec_len) + "01" + get_threebyte_hexstr(proto_len) + the_rest 
 
