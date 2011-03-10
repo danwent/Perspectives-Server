@@ -11,9 +11,7 @@ import errno
 # at all.  Instead, it executes the initial steps of the SSL handshake directly
 # using a TCP socket and parses the data itself
 
-# TODO: extend this to work with Server Name Indication
-# (http://www.ietf.org/rfc/rfc4366.txt)
-
+USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
 
 class SSLScanTimeoutException(Exception): 
 	pass
@@ -111,8 +109,13 @@ def attempt_observation_for_service(service_id, timeout_sec):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.setblocking(0) 
 		do_connect(sock, dns, int(port),timeout_sec)
-		# this is just a hex-representation of a valid client hello message
-		client_hello = binascii.a2b_hex("""8077010301004e0000002000003900003800003500001600001300000a0700c000003300003200002f0300800000050000040100800000150000120000090600400000140000110000080000060400800000030200800000ff9c82ce1e4bc89df2c726b7cebe211ef80a611945d140834eede5674b597be487""") 
+		if USE_SNI and dns[-1:].isalpha():
+			# only do SNI query for DNS names, per RFC
+			client_hello_hex = get_sni_client_hello(dns)
+		else: 
+			client_hello_hex = get_standard_client_hello()
+		
+		client_hello = binascii.a2b_hex(client_hello_hex)
 		send_data(sock, client_hello,timeout_sec)
 	
 		fp = None
@@ -138,6 +141,31 @@ def attempt_observation_for_service(service_id, timeout_sec):
 			raise SSLScanTimeoutException("timeout waiting for data")
 		return fp 
 
+def get_standard_client_hello(): 
+	return "8077010301004e0000002000003900003800003500001600001300000a0700c000003300003200002f0300800000050000040100800000150000120000090600400000140000110000080000060400800000030200800000ff9c82ce1e4bc89df2c726b7cebe211ef80a611945d140834eede5674b597be487" 
+	
+
+def get_twobyte_hexstr(intval): 
+	return "%0.2X" % (intval & 0xff00) + "%0.2X" % (intval & 0xff)
+
+def get_threebyte_hexstr(intval): 
+	return "%0.2X" % (intval & 0xff0000) + "%0.2X" % (intval & 0xff00) + "%0.2X" % (intval & 0xff) 
+
+def get_hostname_extension(hostname): 
+	
+	hex_hostname = binascii.b2a_hex(hostname)
+	hn_len = len(hostname) 
+	return "0000" + get_twobyte_hexstr(hn_len + 5) +  get_twobyte_hexstr(hn_len + 3) + \
+				"00" + get_twobyte_hexstr(hn_len) + hex_hostname
+
+def get_sni_client_hello(hostname): 
+	hn_extension = get_hostname_extension(hostname)
+	all_extensions = hn_extension #+ "00230000" 
+	the_rest = "03014d786109055e4736b93b63c371507f824c2d0f05a25b2d54b6b52a1e43c2a52c00002800390038003500160013000a00330032002f000500040015001200090014001100080006000300ff020100" + get_twobyte_hexstr(len(all_extensions)/2) + all_extensions 
+	proto_len = (len(the_rest) / 2)
+	print "proto_len = %s" % proto_len
+	rec_len = proto_len + 4
+	return "160301" + get_twobyte_hexstr(rec_len) + "01" + get_threebyte_hexstr(proto_len) + the_rest 
 
 if __name__ == "__main__":
 
@@ -147,7 +175,8 @@ if __name__ == "__main__":
 		exit(1)
 
 	service_id = sys.argv[1]
-	try: 
+	try:
+ 
 		fp = attempt_observation_for_service(service_id, 10) 
 	
 		if len(sys.argv) == 3: 
