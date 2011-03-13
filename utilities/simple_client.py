@@ -46,7 +46,7 @@ print xml_text
 print 50 * "-"
 
 if notary_pub_key:
-	if not verify_notary_signature(xml_text, notary_pub_key):
+	if not verify_notary_signature(sys.argv[1], xml_text, notary_pub_key):
 		print "Signature verify failed.  Results are not valid"
 		exit(1)  
 else: 
