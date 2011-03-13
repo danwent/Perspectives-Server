@@ -16,6 +16,11 @@ USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf
 class SSLScanTimeoutException(Exception): 
 	pass
 
+class SSLAlertException(Exception): 
+	
+	def __init__(self,value): 
+		self.value = value
+
 def read_data(s,data_len, timeout_sec): 
 	buf_str = ""
 	start_time = time.time()
@@ -106,15 +111,26 @@ def get_server_cert_from_protocol(proto_data):
 def attempt_observation_for_service(service_id, timeout_sec): 
 
 		dns, port = service_id.split(",")[0].split(":")
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		sock.setblocking(0) 
-		do_connect(sock, dns, int(port),timeout_sec)
-		if USE_SNI and dns[-1:].isalpha():
+		# if we want to try SNI, do such a scan but if that
+		# scan fails with an SSL alert, retry with a non SNI request
+		if USE_SNI and dns[-1:].isalpha(): 
+			try: 
+				return run_scan(dns,port,timeout_sec,True)
+			except SSLAlertException: 
+				pass
+
+		run_scan(dns,port,timeout_sec,False) 
+		
+def run_scan(dns, port, timeout_sec, sni_query): 
+	
+		if sni_query:
 			# only do SNI query for DNS names, per RFC
 			client_hello_hex = get_sni_client_hello(dns)
 		else: 
 			client_hello_hex = get_standard_client_hello()
-		
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.setblocking(0) 
+		do_connect(sock, dns, int(port),timeout_sec)
 		client_hello = binascii.a2b_hex(client_hello_hex)
 		send_data(sock, client_hello,timeout_sec)
 	
@@ -129,13 +145,17 @@ def attempt_observation_for_service(service_id, timeout_sec):
 						# server certificate message
 						fp = get_server_cert_from_protocol(p[1])
 						break
-			
+			elif t == 21: # alert message
+				raise SSLAlertException(rec_data) 
+	
 			if not fp: 
 				time.sleep(1)
 				if time.time() - start_time > timeout_sec: 
 					break
-
-		sock.shutdown(socket.SHUT_RDWR) 
+		try: 
+			sock.shutdown(socket.SHUT_RDWR) 
+		except: 
+			pass
 		sock.close()
 		if not fp: 
 			raise SSLScanTimeoutException("timeout waiting for data")
@@ -160,7 +180,7 @@ def get_hostname_extension(hostname):
 
 def get_sni_client_hello(hostname): 
 	hn_extension = get_hostname_extension(hostname)
-	all_extensions = hn_extension #+ "00230000" 
+	all_extensions = hn_extension 
 	the_rest = "03014d786109055e4736b93b63c371507f824c2d0f05a25b2d54b6b52a1e43c2a52c00002800390038003500160013000a00330032002f000500040015001200090014001100080006000300ff020100" + get_twobyte_hexstr(len(all_extensions)/2) + all_extensions 
 	proto_len = (len(the_rest) / 2)
 	rec_len = proto_len + 4

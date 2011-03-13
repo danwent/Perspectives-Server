@@ -24,7 +24,7 @@ import traceback
 import threading
 import sqlite3
 import errno
-from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
+from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
@@ -41,6 +41,8 @@ class ScanThread(threading.Thread):
 		threading.Thread.__init__(self)
 		self.timeout_sec = timeout_sec
 		self.global_stats.threads[sid] = time.time() 
+		self.timeout_exc = SSLScanTimeoutException() 
+		self.alert_exc = SSLAlertException("foo")
 
 	def get_errno(self, e): 
 		try: 
@@ -50,8 +52,11 @@ class ScanThread(threading.Thread):
 
 	def record_failure(self, e,): 
 		stats.failures += 1
-		if type(e) == type(SSLScanTimeoutException()): 
+		if type(e) == type(self.timeout_exc): 
 			stats.failure_timeouts += 1
+			return
+		if type(e) == type(self.alert_exc): 
+			stats.failure_ssl_alert += 1
 			return
 
 		err = self.get_errno(e) 
@@ -95,6 +100,7 @@ class GlobalStats():
 		self.failure_conn_refused = 0
 		self.failure_conn_reset = 0
 		self.failure_dns = 0 
+		self.failure_ssl_alert = 0
 		self.failure_other = 0 
 	
 if len(sys.argv) != 5: 
@@ -147,8 +153,9 @@ for sid in all_sids:
 			print "%s seconds passed.  %s complete, %s failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
-			print "failure details: timeouts = %s, no-route = %s, conn-refused = %s, conn-reset = %s, dns = %s, other = %s" % \
+			print "failure details: timeouts = %s, ssl-alerts = %s, no-route = %s, conn-refused = %s, conn-reset = %s, dns = %s, other = %s" % \
 				(stats.failure_timeouts,
+				stats.failure_ssl_alert,
 				stats.failure_no_route,
 				stats.failure_conn_refused,
 				stats.failure_conn_reset,
