@@ -120,7 +120,7 @@ def attempt_observation_for_service(service_id, timeout_sec):
 			except SSLAlertException: 
 				pass
 
-		run_scan(dns,port,timeout_sec,False) 
+		return run_scan(dns,port,timeout_sec,False) 
 		
 def run_scan(dns, port, timeout_sec, sni_query): 
 	
