@@ -6,6 +6,7 @@ import hashlib
 import traceback 
 import sys
 import errno 
+import notary_common
 
 # This is a lightweight version of SSL scanning that does not invoke openssl
 # at all.  Instead, it executes the initial steps of the SSL handshake directly

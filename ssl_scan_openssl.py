@@ -28,7 +28,6 @@ USE_SNI = False
 
 # note: timeout is ignored for now
 def attempt_observation_for_service(service_id, timeout):  
-	service_id = sys.argv[1]
 	dns_and_port = service_id.split(",")[0]
 	dns = dns_and_port.split(":")[0] 
 

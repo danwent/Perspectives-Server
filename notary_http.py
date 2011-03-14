@@ -95,7 +95,7 @@ class NotaryHTTPServer:
 	                                                   ts_end & 255)
 			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
 	
-		packed_data = service_id + struct.pack("B", 0) + packed_data 
+		packed_data = service_id.encode() + struct.pack("B", 0) + packed_data 
 	
 		m = hashlib.md5()
 		m.update(packed_data)
