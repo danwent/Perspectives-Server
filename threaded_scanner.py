@@ -60,7 +60,7 @@ class ScanThread(threading.Thread):
 			return
 
 		err = self.get_errno(e) 
-		if err == errno.ECONNREFUSED:
+		if err == errno.ECONNREFUSED or err == errno.EINVAL:
 			stats.failure_conn_refused += 1
 		elif err == errno.EHOSTUNREACH or err == errno.ENETUNREACH: 
 			stats.failure_no_route += 1

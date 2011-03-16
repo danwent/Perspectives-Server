@@ -128,9 +128,10 @@ class OnDemandScanThread(threading.Thread):
 	def run(self): 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
+			# should we be retrying here? 
 			notary_common.report_observation(self.server_obj.db_file, self.sid, fp)
 		except Exception, e:
-			pass 
+			traceback.print_exc(file=sys.stdout) 
 
 		self.server_obj.active_threads -= 1
 

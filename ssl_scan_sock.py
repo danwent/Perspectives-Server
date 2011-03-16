@@ -70,7 +70,10 @@ def do_connect(s, host, port, timeout_sec):
 			if is_nonblocking_exception(e): 
 				if time.time() - start_time > timeout_sec: 
 					raise SSLScanTimeoutException("timeout in do_connect")
-				time.sleep(1) 
+				time.sleep(1)
+			elif e.args[0] == errno.EISCONN: 
+				# for BSD, non-blocking connect
+				break  
 			else: 
 				raise e
 
