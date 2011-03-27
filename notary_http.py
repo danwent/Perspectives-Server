@@ -35,6 +35,8 @@ class NotaryHTTPServer:
 		self.active_threads = 0 
 
 	def get_xml(self, service_id): 
+		print "Request for '%s'" % service_id
+		sys.stdout.flush()
 		conn = sqlite3.connect(self.db_file)
 		cur = conn.cursor()
 		cur.execute("select * from observations where service_id = ? and key not NULL", (service_id,))
@@ -53,9 +55,11 @@ class NotaryHTTPServer:
 		if num_rows == 0: 
 			# rate-limit on-demand probes
 			if self.active_threads < 10: 
+				print "on demand probe for '%s'" % service_id  
 				t = OnDemandScanThread(service_id,10,self)
 				t.start()
-				
+			else: 
+				print "Exceeded on demand threshold, not probing '%s'" % service_id  
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
 	
@@ -111,14 +115,14 @@ class NotaryHTTPServer:
 		if (host == None or port == None or service_type == None): 
 			raise cherrypy.HTTPError(400)
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
-      		return self.get_xml(host + ":" + port + "," + service_type)
+      		return self.get_xml(str(host + ":" + port + "," + service_type))
  
     	index.exposed = True
 
 
 class OnDemandScanThread(threading.Thread): 
 
-	def __init__(self, sid,timeout_sec,server_obj): 
+	def __init__(self, sid,timeout_sec,server_obj):
 		self.sid = sid
 		self.server_obj = server_obj
 		self.timeout_sec = timeout_sec
@@ -128,10 +132,9 @@ class OnDemandScanThread(threading.Thread):
 	def run(self): 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
-			# should we be retrying here? 
 			notary_common.report_observation(self.server_obj.db_file, self.sid, fp)
 		except Exception, e:
-			traceback.print_exc(file=sys.stdout) 
+			traceback.print_exc(file=sys.stdout)
 
 		self.server_obj.active_threads -= 1
 
