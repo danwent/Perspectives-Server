@@ -95,7 +95,7 @@ def get_svg_graph(service_id, server_result_list, len_days,cur_secs):
 				time_since = cur_secs - t_end 
 				duration = t_end - t_start 
 				x_cord = x_offset + int(pixels_per_day * (time_since / (24 * 3600)))
-				span_width = pixels_per_day * (duration / (24 * 3600)) 
+				span_width = pixels_per_day * (float(duration) / (24 * 3600)) 
 				# a timespan with no width is not shown        
 				if span_width > 0:          
 					res += """<rect 	x="%s" y="%s" width="%s" height="%s" fill="%s" rx="1" 
