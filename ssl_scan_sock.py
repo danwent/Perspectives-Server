@@ -14,6 +14,8 @@ import notary_common
 
 USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
 
+SLEEP_LEN_SEC = 0.2
+
 class SSLScanTimeoutException(Exception): 
 	pass
 
@@ -35,7 +37,7 @@ def read_data(s,data_len, timeout_sec):
 				raise e 
 		if time.time() - start_time > timeout_sec: 
 			raise SSLScanTimeoutException("timeout in read_data")
-		time.sleep(1)
+		time.sleep(SLEEP_LEN_SEC)
 	return buf_str
 
 def send_data(s, data, timeout_sec): 
@@ -48,7 +50,7 @@ def send_data(s, data, timeout_sec):
 			if is_nonblocking_exception(e): 
 				if time.time() - start_time > timeout_sec: 
 					raise SSLScanTimeoutException("timeout in send_data")
-				time.sleep(1)
+				time.sleep(SLEEP_LEN_SEC)
 			else: 
 				raise e
 
@@ -72,7 +74,7 @@ def do_connect(s, host, port, timeout_sec):
 			if is_nonblocking_exception(e):
 				if time.time() - start_time > timeout_sec: 
 					raise SSLScanTimeoutException("timeout in do_connect")
-				time.sleep(1) 
+				time.sleep(SLEEP_LEN_SEC) 
 			else: 
 				raise e
 
@@ -152,7 +154,7 @@ def run_scan(dns, port, timeout_sec, sni_query):
 				raise SSLAlertException(rec_data) 
 	
 			if not fp: 
-				time.sleep(1)
+				time.sleep(SLEEP_LEN_SEC)
 				if time.time() - start_time > timeout_sec: 
 					break
 		try: 
