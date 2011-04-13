@@ -144,12 +144,13 @@ def attempt_observation_for_service(service_id, timeout_sec):
 		return run_scan(dns,port,timeout_sec,False) 
 		
 def run_scan(dns, port, timeout_sec, sni_query): 
-	
+	try: 	
 		if sni_query:
 			# only do SNI query for DNS names, per RFC
 			client_hello_hex = get_sni_client_hello(dns)
 		else: 
 			client_hello_hex = get_standard_client_hello()
+
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.setblocking(0) 
 		do_connect(sock, dns, int(port),timeout_sec)
@@ -178,10 +179,18 @@ def run_scan(dns, port, timeout_sec, sni_query):
 			sock.shutdown(socket.SHUT_RDWR) 
 		except: 
 			pass
-		sock.close()
 		if not fp: 
 			raise SSLScanTimeoutException("timeout waiting for data")
+		sock.close()
 		return fp 
+
+	# make sure we always close the socket, but still propogate the exception
+	except Exception, e: 
+		try: 
+			sock.close()
+		except: 
+			pass
+		raise e
 
 def get_standard_client_hello(): 
 	return "8077010301004e0000002000003900003800003500001600001300000a0700c000003300003200002f0300800000050000040100800000150000120000090600400000140000110000080000060400800000030200800000ff9c82ce1e4bc89df2c726b7cebe211ef80a611945d140834eede5674b597be487" 
