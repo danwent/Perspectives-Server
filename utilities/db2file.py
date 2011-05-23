@@ -33,9 +33,7 @@ if len(sys.argv) == 3:
 conn = sqlite3.connect(sys.argv[1])
 cur = conn.cursor()
 
-# fancy group-by might work better, but I'm justing going
-# to be lazy and load it all into memory.
-cur.execute("select * from observations group by service_id")
+cur.execute("select * from observations order by service_id")
 cur_sid = None
 key_to_obs  = {} 
 num_sids = 0
@@ -48,7 +46,7 @@ for row in cur:
 		num_sids += 1
 		if num_sids % 1000 == 0: 
 			print "processed %s service-ids" % num_sids
-		print >> output_file, "Start Host: '%s'" % sid
+		print >> output_file, "Start Host: '%s'" % cur_sid
 	
 		key_type_text = service_type_to_key_type[cur_sid.split(",")[1]]
 		for key in key_to_obs:
