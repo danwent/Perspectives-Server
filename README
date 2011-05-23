@@ -1,4 +1,3 @@
-
  ==== INFO ====
 
 This is a simple python-only implementation of a Perspectives network notary server. 
@@ -45,6 +44,8 @@ To test, run a query for a service-id you have scanned:
 
 You could also fetch the results with a webbrowser, though you will need to 'view source'
 to see the XML:  http://localhost:8080/?host=www.google.com&port=443&service_type=2
+(Note the first time you query for a particular service, it's normal to get a 404 error,
+see Notes section following for an explanation.)
 
 Commonly, you do not run scans explicitly using these tools, but rather set a cron job to 
 periodically run a scan of all service-ids in the database, then pass this list 
