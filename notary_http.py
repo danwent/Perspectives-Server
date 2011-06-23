@@ -114,6 +114,9 @@ class NotaryHTTPServer:
 	def index(self, host=None, port=None, service_type=None):
 		if (host == None or port == None or service_type == None): 
 			raise cherrypy.HTTPError(400)
+		if service_type != "1" and service_type != "2": 
+			raise cherrypy.HTTPError(404)
+			
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
       		return self.get_xml(str(host + ":" + port + "," + service_type))
  

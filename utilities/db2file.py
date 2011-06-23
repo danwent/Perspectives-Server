@@ -20,6 +20,23 @@ import re
 import time
 import sqlite3 
 
+def print_sid_info(sid, key_to_obs): 
+	print >> output_file, "Start Host: '%s'" % sid
+	s_type = sid.split(",")[1]
+	
+	if s_type not in service_type_to_key_type:
+		return	
+	key_type_text = service_type_to_key_type[s_type]
+	for key in key_to_obs:
+		if key is None: 
+			continue 
+		print >> output_file, "%s key: %s" % (key_type_text,key)
+		for ts in key_to_obs[key]: 
+			print >> output_file, "start:\t%s - %s" % (ts[0],time.ctime(ts[0]))
+			print >> output_file, "end:\t%s - %s" % (ts[1],time.ctime(ts[1]))
+		print >> output_file, ""
+	print >> output_file, "End Host"
+
 service_type_to_key_type = { "1" : "ssh", "2" : "ssl" } 
 
 if len(sys.argv) != 2 and len(sys.argv) != 3: 
@@ -34,32 +51,19 @@ conn = sqlite3.connect(sys.argv[1])
 cur = conn.cursor()
 
 cur.execute("select * from observations order by service_id")
-cur_sid = None
-key_to_obs  = {} 
+old_sid = None
 num_sids = 0
 
+key_to_obs  = {} 
 for row in cur:
 	sid = row[0]
-	if cur_sid is None: 
-		cur_sid = sid
-	elif cur_sid != sid: 
+	if old_sid != sid and old_sid is not None: 
 		num_sids += 1
 		if num_sids % 1000 == 0: 
 			print "processed %s service-ids" % num_sids
-		print >> output_file, "Start Host: '%s'" % cur_sid
-	
-		key_type_text = service_type_to_key_type[cur_sid.split(",")[1]]
-		for key in key_to_obs:
-			if key is None: 
-				continue 
-			print >> output_file, "%s key: %s" % (key_type_text,key)
-			for ts in key_to_obs[key]: 
-				print >> output_file, "start:\t%s - %s" % (ts[0],time.ctime(ts[0]))
-				print >> output_file, "end:\t%s - %s" % (ts[1],time.ctime(ts[1]))
-			print >> output_file, ""
-		print >> output_file, "End Host"
-		cur_sid = sid
+		print_sid_info(old_sid, key_to_obs)
 		key_to_obs = {}
+		old_sid = sid 
  
 	key = row[1]
 	if key not in key_to_obs:
@@ -67,4 +71,5 @@ for row in cur:
 	key_to_obs[key].append((row[2],row[3]))
 
 
+print_sid_info(sid, key_to_obs)
 conn.close()  
