@@ -57,11 +57,12 @@ num_sids = 0
 key_to_obs  = {} 
 for row in cur:
 	sid = row[0]
-	if old_sid != sid and old_sid is not None: 
+	if old_sid != sid: 
 		num_sids += 1
 		if num_sids % 1000 == 0: 
 			print "processed %s service-ids" % num_sids
-		print_sid_info(old_sid, key_to_obs)
+		if old_sid is not None: 
+			print_sid_info(old_sid, key_to_obs)
 		key_to_obs = {}
 		old_sid = sid 
  
