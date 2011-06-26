@@ -137,13 +137,14 @@ rate = int(sys.argv[3])
 timeout_sec = int(sys.argv[4]) 
 start_time = time.time()
 localtime = time.asctime( time.localtime(start_time) )
-print "Starting scan at: %s" % localtime
-print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
-    (timeout_sec, rate) 
 
 # read all sids to start, otherwise sqlite locks up 
 # if you start scanning before list_services_ids.py is not done
 all_sids = [ line.rstrip() for line in f ]
+
+print "Starting scan of %s service-ids at: %s" % (len(all_sids), localtime)
+print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
+    (timeout_sec, rate) 
 
 for sid in all_sids:  
 	try: 
@@ -179,9 +180,11 @@ for sid in all_sids:
 			print "long running threads" 
 			cur_time = time.time() 
 			for sid in stats.threads.keys(): 
-				duration = cur_time - stats.threads.get(sid,cur_time)
+				start_time = stats.threads.get(sid,cur_time)
+				duration = cur_time - start_time
 				if duration > 20: 
-					print "'%s' has been running for %s" % (sid,duration) 
+					print "'%s' has been running for %s" %\
+					 (sid,duration) 
 			sys.stdout.flush()
 
 	except KeyboardInterrupt: 
@@ -202,6 +205,7 @@ record_observations_in_db(res_list)
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
 print "Ending scan at: %s" % localtime
-print "Scan of %s services took %s seconds.  %s Failures" % (stats.num_started,duration, stats.failures)
+print "Scan of %s services took %s seconds.  %s Failures" % \
+	(stats.num_started,duration, stats.failures)
 exit(0) 
 
