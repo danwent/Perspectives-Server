@@ -103,6 +103,24 @@ class GlobalStats():
 		self.failure_ssl_alert = 0
 		self.failure_other = 0 
 	
+
+def record_observations_in_db(res_list): 
+	if len(res_list) == 0: 
+		return
+	try: 
+		conn = sqlite3.connect(notary_db)
+		for r in res_list: 
+			notary_common.report_observation_with_conn( \
+						conn, r[0], r[1]) 
+		conn.commit()
+		conn.close() 
+	except:
+		# TODO: we should probably retry here 
+		print "DB Error: Failed to write res_list of length %s" % \
+					len(res_list)
+		traceback.print_exc(file=sys.stdout)
+
+
 if len(sys.argv) != 5: 
   print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <scans-per-sec> <timeout sec> " 
   sys.exit(1)
@@ -137,23 +155,17 @@ for sid in all_sids:
  
 		if (stats.num_started % rate) == 0: 
 			time.sleep(1)
-			try: 
-				conn = sqlite3.connect(notary_db)
-				for r in res_list: 
-					notary_common.report_observation_with_conn(conn, r[0], r[1]) 
-				conn.commit()
-				conn.close() 
-			except:
-				# TODO: we should probably retry here 
-				print "DB Error: Failed to write res_list of length %s" % len(res_list)
-				traceback.print_exc(file=sys.stdout)
-				
+			record_observations_in_db(res_list) 
 			res_list = [] 
 			so_far = int(time.time() - start_time)
-			print "%s seconds passed.  %s complete, %s failures.  %s Active threads" % \
+			print "%s seconds passed.  %s complete, %s " \
+				"failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
-			print "failure details: timeouts = %s, ssl-alerts = %s, no-route = %s, conn-refused = %s, conn-reset = %s, dns = %s, other = %s" % \
+			print "failure details: timeouts = %s, " \
+				"ssl-alerts = %s, no-route = %s, " \
+				"conn-refused = %s, conn-reset = %s,"\
+				"dns = %s, other = %s" % \
 				(stats.failure_timeouts,
 				stats.failure_ssl_alert,
 				stats.failure_no_route,
@@ -175,8 +187,17 @@ for sid in all_sids:
 	except KeyboardInterrupt: 
 		exit(1)	
 
-if stats.active_threads > 0: 
-	time.sleep(2 * timeout_sec)
+# finishing the for-loop means we kicked-off all threads, 
+# but they may not be done yet.  Wait for a bit, if needed.
+giveup_time = time.time() + (2 * timeout_sec) 
+while stats.active_threads > 0: 
+	time.sleep(1)
+	if time.time() > giveup_time: 
+		break
+
+# record any observations made since we finished the
+# main for-loop			
+record_observations_in_db(res_list) 
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
