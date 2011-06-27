@@ -21,11 +21,12 @@ import time
 import sqlite3 
 
 def print_sid_info(sid, key_to_obs): 
-	print >> output_file, "Start Host: '%s'" % sid
 	s_type = sid.split(",")[1]
 	
 	if s_type not in service_type_to_key_type:
 		return	
+	
+	print >> output_file, "Start Host: '%s'" % sid
 	key_type_text = service_type_to_key_type[s_type]
 	for key in key_to_obs:
 		if key is None: 
