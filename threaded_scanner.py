@@ -180,8 +180,8 @@ for sid in all_sids:
 			print "long running threads" 
 			cur_time = time.time() 
 			for sid in stats.threads.keys(): 
-				start_time = stats.threads.get(sid,cur_time)
-				duration = cur_time - start_time
+				spawn_time = stats.threads.get(sid,cur_time)
+				duration = cur_time - spawn_time
 				if duration > 20: 
 					print "'%s' has been running for %s" %\
 					 (sid,duration) 
