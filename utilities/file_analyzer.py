@@ -19,7 +19,6 @@
 # and call 'run_analyzer' with the name of a database dump file and an instance of the
 # analyzer class
 
-
 class NotaryFileAnalyzer: 
 	
 	def start(self): 
@@ -57,6 +56,10 @@ def run_analyzer(fname, analyzer):
 			break 
 		# otherwise, must be a key 
 		key_arr = line.split()
+		if(len(key_arr) != 3): 
+			print "Error: While parsing '%s', expected key or " \
+				"'End Host', but got '%s'" % \
+				(service_id, line)
 		analyzer.on_key(key_arr[0], key_arr[2]) 
 		
 		while True: 
