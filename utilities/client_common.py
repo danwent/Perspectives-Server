@@ -92,10 +92,12 @@ def notary_reply_as_text(notary_xml_text):
 # returns list of entries containing host and key as strings
 def parse_http_notary_list(file_name): 
 	f = open(file_name,'r') 
-	notary_list = [] 
+	notary_list = []
+
+	# remove any empty line, or comment line 
 	filtered_arr = [] 
 	for line in f: 
-		if not line.startswith("#"): 
+		if not line.startswith("#") and len(line.strip()) != 0: 
 			filtered_arr.append(line) 
 	i = 0 
 	while i < len(filtered_arr): 
@@ -104,7 +106,8 @@ def parse_http_notary_list(file_name):
 
 		key = ""
 		if (i >= len(filtered_arr) or filtered_arr[i].find("BEGIN PUBLIC KEY") == -1):
-			raise Exception("invalid notary list file, line: '%s'" % filtered_arr[i])
+			raise Exception("invalid notary list file, line: '%s'" % \
+							filtered_arr[i].strip())
 
 		key = ""
 		key += filtered_arr[i]
