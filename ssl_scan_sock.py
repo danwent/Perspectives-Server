@@ -115,7 +115,7 @@ def get_all_handshake_protocols(rec_data):
 		rec_data = rec_data[4 + l:]
 	return protos 
 
-# rfc 2246 says the server cert if the first one
+# rfc 2246 says the server cert is the first one
 # in the chain, so ignore everything else 
 def get_server_cert_from_protocol(proto_data): 
 	proto_data = proto_data[3:] # get rid of 3-bytes describing length of all certs
