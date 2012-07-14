@@ -73,7 +73,7 @@ The Perspectives Firefox client will requery appropriately.
 
 Unlike the original C implementation of the notary server, this implementation performs
 signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
-cost of making reuests heavy-weight and subject to DoS.  We could implement a caching scheme
+cost of making requests heavy-weight and subject to DoS.  We could implement a caching scheme
 for the signatures if it proves valuable.  
 
 The only service-type that is currently fully supported is SSL (service-type 2).  There is 
@@ -82,7 +82,7 @@ this type, we do not regularly test it.  Currently, the threaded_scanner.py will
 for SSL services, though work to have it scan for SSH services is pretty minor.  
 
 This code still needs some clean-up and less hard-coded configuration, but its good enough 
-for use.  Please visit the github page to submit changes and suggest improvments: 
+for use.  Please visit the github page to submit changes and suggest improvements:
 
 https://github.com/danwent/Perspectives-Server
 
