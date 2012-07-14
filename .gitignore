@@ -1,0 +1,7 @@
+#ignore keyfiles and other things we'll see while running
+*.pyc
+*.priv
+*.pub
+*.sqlite
+
+error.log
