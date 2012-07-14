@@ -29,6 +29,8 @@ import notary_common
 
 class NotaryHTTPServer:
 
+	VERSION = "2.0"
+
 	def __init__(self, db_file, priv_key_file): 
 		self.db_file = db_file
 		self.notary_priv_key= open(priv_key_file,'r').read() 
