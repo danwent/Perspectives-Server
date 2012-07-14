@@ -34,7 +34,7 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "2.0"
+	VERSION = "pre3.0a"
 
 	def __init__(self, db_file, priv_key_file): 
 		self.db_file = db_file
