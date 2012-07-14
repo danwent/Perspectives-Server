@@ -1,0 +1,19 @@
+High-level changes to Perspectives server / Network Notary code
+
+
+Format:
++ new feature
+* bug or behavior fix
+
+
+2.0
+---
+Implementation in python.
+Requires python 2.5.
++ Calculate signatures for each service inside the webserver as needed. This makes scanning lighter weight, at the cost of making requests heavy-weight and subject to DoS.
+
+
+1.0
+---
+Original implementation in C.
+Signatures for each service's data are calculated by a separate tool outside of the webserver each time the data changes.
