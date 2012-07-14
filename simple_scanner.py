@@ -14,6 +14,12 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Scan a list of services and print results.
+To run scans and update results in a network notary database instead,
+see threaded_scanner.py.
+"""
+
 import os
 import sys
 import time 

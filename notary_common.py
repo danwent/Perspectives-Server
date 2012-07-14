@@ -14,6 +14,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Notary utility functions called from many places."""
+
 import time 
 import sqlite3 
 import os
@@ -55,6 +57,7 @@ def report_observation(notary_db_file, service_id, fp):
 	conn.close() 
 
 def report_observation_with_conn(conn, service_id, fp): 
+	"""Insert or update an Observation record in the notary database."""
 
 	cur_time = int(time.time()) 
 	cur = conn.cursor()

@@ -14,6 +14,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+An SSL scanner that uses openssl.
+"""
+
 from subprocess import *
 import re
 import sys

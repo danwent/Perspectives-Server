@@ -14,6 +14,11 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+A lightweight SSL scanner that does not invoke openssl at all.
+Instead it executes the initial steps of the SSL handshake directly
+using a TCP socket and parses the data itself.
+"""
 
 import socket
 import struct 
@@ -25,9 +30,6 @@ import sys
 import errno 
 import notary_common
 
-# This is a lightweight version of SSL scanning that does not invoke openssl
-# at all.  Instead, it executes the initial steps of the SSL handshake directly
-# using a TCP socket and parses the data itself
 
 USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
 

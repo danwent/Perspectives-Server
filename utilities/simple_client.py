@@ -14,6 +14,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Ask a network notary server what keys it has seen for a particular service.
+"""
+
 import sys
 import traceback  
 from client_common import verify_notary_signature, notary_reply_as_text,fetch_notary_xml 

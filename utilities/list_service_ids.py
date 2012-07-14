@@ -14,15 +14,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Print a list of service names from a network notary database, one per line.
+Data can be filtered based on the last time the notary successfully observed
+a key from each service.
+"""
+
 import sys
 import os
 import re
 import time
 import sqlite3 
 
-# This script generates a file of services ids
-# indicating when the last time the notary successfully observed
-# a key from that service.  The first parameter points to the
+# The first parameter points to the
 # notary's database file.  The last two
 # parameters filter the set of service ids printed based on the
 # last observation date.  If 'newer'' is provided, the script will

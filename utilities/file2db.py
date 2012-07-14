@@ -14,6 +14,11 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Import data from a file to the notary database.
+Can be used to seed a notary database from another notary's list of services.
+"""
+
 import sys
 import os
 import re

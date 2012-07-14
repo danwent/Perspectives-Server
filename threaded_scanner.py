@@ -14,6 +14,11 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Scan a list of services and update Observation records in the notary database.
+For running scans without connecting to the database see simple_scanner.py.
+"""
+
 import sys
 import time 
 import socket

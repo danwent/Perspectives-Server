@@ -28,6 +28,11 @@ import traceback
 import notary_common 
 
 class NotaryHTTPServer:
+	"""
+	Network Notary server for the Perspectives project
+	( http://perspectives-project.org/ )
+	Collect and share information on website certificates from around the internet.
+	"""
 
 	VERSION = "2.0"
 
@@ -37,6 +42,9 @@ class NotaryHTTPServer:
 		self.active_threads = 0 
 
 	def get_xml(self, service_id): 
+		"""
+		Query the database and build a response containing any known keys for the given service.
+		"""
 		print "Request for '%s'" % service_id
 		sys.stdout.flush()
 		conn = sqlite3.connect(self.db_file)
