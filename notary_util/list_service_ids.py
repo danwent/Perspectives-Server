@@ -24,7 +24,7 @@ import sys
 import os
 import re
 import time
-import sqlite3 
+from notary_db import ndb
 
 # The first parameter points to the
 # notary's database file.  The last two
@@ -50,10 +50,8 @@ elif len(sys.argv) == 3:
 		usage_and_exit()
 else: 
 	usage_and_exit()
-	
 
-conn = sqlite3.connect(sys.argv[1])
-cur = conn.cursor()
+cur = ndb(sys.argv[1]).get_cursor()
 
 if sys.argv[2] == "all": 
 	cur.execute("select distinct service_id from observations")

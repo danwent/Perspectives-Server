@@ -23,13 +23,14 @@ import sys
 import os
 import re
 import time 
-import sqlite3
+from notary_db import ndb
 from file_analyzer import run_analyzer, NotaryFileAnalyzer
 
 class SQLiteImportAnalyzer(NotaryFileAnalyzer): 
  	
 	def __init__(self, filename):
-		self.conn = sqlite3.connect(filename)
+		self.ndb = ndb(notary_db)
+		self.conn = ndb.get_conn()
 		self.num_services = 0
 
 	def on_service(self, service_id):

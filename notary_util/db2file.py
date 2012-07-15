@@ -22,7 +22,7 @@ import sys
 import os
 import re
 import time
-import sqlite3 
+from notary_db import ndb
 
 def print_sid_info(sid, key_to_obs): 
 	s_type = sid.split(",")[1]
@@ -52,15 +52,13 @@ output_file = sys.stdout
 if len(sys.argv) == 3: 
 	output_file = open(sys.argv[2],'w')
 
-conn = sqlite3.connect(sys.argv[1])
-cur = conn.cursor()
-
-cur.execute("select * from observations order by service_id")
+ndb = ndb(sys.argv[1])
+obs = ndb.get_observations()
 old_sid = None
 num_sids = 0
 
 key_to_obs  = {} 
-for row in cur:
+for row in obs:
 	sid = row[0]
 	if old_sid != sid: 
 		num_sids += 1
