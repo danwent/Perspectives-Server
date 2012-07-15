@@ -14,7 +14,6 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import cherrypy
 from xml.dom.minidom import parseString, getDOMImplementation
 import struct
 import base64
@@ -22,10 +21,14 @@ import hashlib
 from M2Crypto import BIO, RSA, EVP
 import sys
 import threading 
-from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
 import traceback 
-import notary_common 
-from notary_db import ndb
+import argparse
+
+import cherrypy
+
+from notary_util.notary_db import ndb
+from notary_util import notary_common
+from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
 
 class NotaryHTTPServer:
 	"""
@@ -36,10 +39,22 @@ class NotaryHTTPServer:
 
 	VERSION = "pre3.0a"
 
-	def __init__(self, db_file, priv_key_file):
-		self.ndb = ndb(db_file)
-		self.notary_priv_key= open(priv_key_file,'r').read() 
+	def __init__(self):
+		parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=self.__doc__,
+			version=self.VERSION)
+		parser.add_argument('private_key', nargs='?', default="notary.priv",
+			help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+
+
+		args = parser.parse_args()
+
+		# pass ndb the args so it can use any relevant ones from its own parser
+		self.ndb = ndb(args)
+
+
+		self.notary_priv_key= open(args.private_key,'r').read()
 		self.active_threads = 0 
+		self.args = args
 
 	def get_xml(self, service_id): 
 		"""
@@ -64,7 +79,7 @@ class NotaryHTTPServer:
 			# rate-limit on-demand probes
 			if self.active_threads < 10: 
 				print "on demand probe for '%s'" % service_id  
-				t = OnDemandScanThread(service_id,10,self)
+				t = OnDemandScanThread(service_id, 10 , self, self.args)
 				t.start()
 			else: 
 				print "Exceeded on demand threshold, not probing '%s'" % service_id  
@@ -133,17 +148,23 @@ class NotaryHTTPServer:
 
 class OnDemandScanThread(threading.Thread): 
 
-	def __init__(self, sid,timeout_sec,server_obj):
+	def __init__(self, sid,timeout_sec,server_obj, args):
 		self.sid = sid
 		self.server_obj = server_obj
 		self.timeout_sec = timeout_sec
+		self.args = args
 		threading.Thread.__init__(self)
 		self.server_obj.active_threads += 1
 
 	def run(self): 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
-			notary_common.report_observation(self.server_obj.db_file, self.sid, fp)
+
+			# create a new db instance, since we're on a new thread
+			# pass through any args we have so we'll connect to the same database in the same way
+			db = ndb(self.args)
+
+			notary_common.report_observation_with_db(db, self.sid, fp)
 		except Exception, e:
 			traceback.print_exc(file=sys.stdout)
 
@@ -152,9 +173,9 @@ class OnDemandScanThread(threading.Thread):
 
 
 
-if len(sys.argv) != 3:
-	print "usage: <notary-database-file> <private-key-file>" 
-	exit(1) 
+# create an instance here so command-line args will be automatically passed and parsed
+# before we start the web server
+notary = NotaryHTTPServer()
 
 cherrypy.config.update({ 'server.socket_port' : 8080,
 			 'server.socket_host' : "0.0.0.0",
@@ -162,5 +183,5 @@ cherrypy.config.update({ 'server.socket_port' : 8080,
 			 'log.access_file' : None,  # default for production 
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
-cherrypy.quickstart(NotaryHTTPServer(sys.argv[1], sys.argv[2]))
+cherrypy.quickstart(notary)
 

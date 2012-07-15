@@ -28,7 +28,8 @@ import hashlib
 import traceback 
 import sys
 import errno 
-import notary_common
+
+from notary_util import notary_common
 
 
 USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
