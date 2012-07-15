@@ -21,21 +21,30 @@ For running scans without connecting to the database see simple_scanner.py.
 
 import sys
 import time 
-import socket
-import struct
-import sys
-import notary_common 
 import traceback 
 import threading
-from notary_db import ndb
+import argparse
 import errno
-from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
+
+import notary_common
+from notary_db import ndb
+
+# TODO: HACK
+# add ..\util to the import path so we can import ssl_scan_sock
+import os
+sys.path.insert(0,
+	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
+
+
+DEFAULT_SCANS = 10
+DEFAULT_WAIT = 20
+DEFAULT_INFILE = "-"
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
 # those that fail or hang after making some progress, as they could indicate
 # logic bugs
-
 
 class ScanThread(threading.Thread): 
 
@@ -113,13 +122,9 @@ def record_observations_in_db(res_list):
 	if len(res_list) == 0: 
 		return
 	try: 
-		ndb = ndb(notary_db)
-		conn = ndb.get_conn()
 		for r in res_list: 
 			notary_common.report_observation_with_db( \
-						conn, r[0], r[1]) 
-		conn.commit()
-		conn.close() 
+						ndb, r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
 		print "DB Error: Failed to write res_list of length %s" % \
@@ -127,25 +132,33 @@ def record_observations_in_db(res_list):
 		traceback.print_exc(file=sys.stdout)
 
 
-if len(sys.argv) != 5: 
-  print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <scans-per-sec> <timeout sec> " 
-  sys.exit(1)
 
-notary_db=sys.argv[1]
-if sys.argv[2] == "-": 
-	f = sys.stdin
-else: 
-	f = open(sys.argv[2])
+parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
+description=__doc__)
+
+parser.add_argument('service_id_file', type=argparse.FileType('r'), nargs='?', default=DEFAULT_INFILE,
+			help="File that contains a list of service names - one per line. Will read from stdin by default.")
+parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAULT_SCANS, const=DEFAULT_SCANS, type=int,
+			help="How many scans to run per second. Default: %(default)s.")
+parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
+			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+
+args = parser.parse_args()
+
+# pass ndb the args so it can use any relevant ones from its own parser
+ndb = ndb(args)
 
 res_list = [] 
 stats = GlobalStats()
-rate = int(sys.argv[3])
-timeout_sec = int(sys.argv[4]) 
+rate = args.scans
+timeout_sec = args.timeout
+f = args.service_id_file
 start_time = time.time()
 localtime = time.asctime( time.localtime(start_time) )
 
-# read all sids to start, otherwise sqlite locks up 
-# if you start scanning before list_services_ids.py is not done
+# read all service names to start;
+# otherwise the database can lock up
+# if we're accepting data piped from another process
 all_sids = [ line.rstrip() for line in f ]
 
 print "Starting scan of %s service-ids at: %s" % (len(all_sids), localtime)
@@ -214,4 +227,3 @@ print "Ending scan at: %s" % localtime
 print "Scan of %s services took %s seconds.  %s Failures" % \
 	(stats.num_started,duration, stats.failures)
 exit(0) 
-
