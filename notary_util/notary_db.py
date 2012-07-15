@@ -22,8 +22,49 @@ and keeps things modular for easier refactoring.
 """
 
 import time
-import sqlite3
 import argparse
+import os
+import sys
+
+
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.engine import create_engine
+from sqlalchemy.orm import sessionmaker, relationship, backref
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import Column, Integer, String, Index, ForeignKey
+
+
+# class to base ORM classes on
+ORMBase = declarative_base()
+
+# Notary database schema defined for our ORM.
+# Track observations about internet server certificates.
+class Services(ORMBase):
+	"""
+	A server that accepts secure connections.
+	Service names take the form 'host:port,servicetype' - e.g. github.com:443,2
+	"""
+	__tablename__ = 't_services'
+	service_id = Column(Integer, primary_key=True)
+	name = Column(String, nullable=False, unique=True)
+
+class Observations(ORMBase):
+	"""
+	The time ranges observed for each key used by a service.
+	"""
+	__tablename__ = 't_observations'
+	service_id = Column(Integer, ForeignKey('t_services.service_id'), primary_key=True)
+	key = Column(String, primary_key=True)			#certificate key supplied by a service - e.g. aa:bb:cc:dd:00
+	start = Column(Integer) 						#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
+	end = Column(Integer)							#another unix timestamp.  The most recent time we saw a key for a given service.
+
+	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
+
+# create indexes to speed up queries
+Index('ix_services_name', Services.name)
+Index('ix_observations_end', Observations.end)
+Index('ix_observations_service_id_key_end', Observations.service_id, Observations.key, Observations.end)
+
 
 
 class ndb:
@@ -48,6 +89,7 @@ class ndb:
 					}
 	DEFAULT_DB_TYPE = 'sqlite'
 	DB_PASSWORD_FIELD = 'NOTARY_DB_PASSWORD'
+	DEFAULT_ECHO = 0
 
 	def __init__(self, args):
 		"""
@@ -70,7 +112,8 @@ class ndb:
 	def __actual_init__(self, dbname=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultdbname'],
 						dbuser=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultusername'],
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
-						dbtype=DEFAULT_DB_TYPE):
+						dbtype=DEFAULT_DB_TYPE,
+						dbecho=DEFAULT_ECHO):
 		"""
 		Initialize a new ndb object.
 
@@ -78,9 +121,41 @@ class ndb:
 		of the extra steps we take inside __init__.
 		"""
 
-		self.db_file = dbname
-		self.conn = None
-		self.cur = None
+		if (dbtype in self.SUPPORTED_DBS):
+
+			self.DB_PASSWORD = ''
+
+			# sqlite doesn't support usernames, passwords, or host.
+			# since our connstr takes four parameters,
+			# strip out username, password, and host for sqlite databases;
+			# otherwise sqlite will create a new db file named
+			# 'dbuserpassworddbhost' rather than connecting
+			# to the intended database.
+			if (dbtype == 'sqlite'):
+				dbuser = ''
+				dbhost = ''
+			else:
+				try:
+					self.DB_PASSWORD = os.environ[self.DB_PASSWORD_FIELD]
+				except KeyError:
+					# maybe the db has no password.
+					# let the caller decide and handle it.
+					pass
+
+			if (dbecho):
+				dbecho = True
+
+			# set up sqlalchemy objects
+			self.db = create_engine(self.SUPPORTED_DBS[dbtype]['connstr'] % (dbuser, self.DB_PASSWORD, dbhost, dbname), echo=dbecho)
+			self.conn = self.db.connect()
+			ORMBase.metadata.create_all(self.db)
+			Session = sessionmaker(bind=self.db)
+			self.session = Session()
+
+		else:
+			errmsg = "'%s' is not a supported database type" % dbtype
+			print >> sys.stderr, errmsg
+			raise Exception(errmsg)
 
 
 	@classmethod
@@ -106,6 +181,11 @@ class ndb:
 		dbgroup.add_argument('--dbuser', '--db-user', '-u', default=self.SUPPORTED_DBS[self.DEFAULT_DB_TYPE]['defaultusername'],
 			help="User account to connect with. Default: \'%(default)s\'. The password for this account is read from the environment variable '" + 
 				self.DB_PASSWORD_FIELD + "', so you never have to store it in code.")
+		dbgroup.add_argument('--dbecho', '--db-echo', nargs='?',
+			# use default 0 but const 1 so we get the expected behaviour if the argument is passed with no parameter.
+			default=self.DEFAULT_ECHO, const=1,
+			metavar='0/1', type=int,
+			help='Echo all SQL statements and other database messages to stdout. If passed with no value echo defaults to true.')
 
 		return parser
 
@@ -129,31 +209,76 @@ class ndb:
 
 		return d
 
+	# actual data methods follow
 
-	def get_conn(self):
-		if (self.conn == None):
-			self.conn = sqlite3.connect(db_file)
-		return self.conn
+	def get_all_services(self):
+		"""Get all service names."""
+		return self.session.query(Services.name).all()
 
-	def get_cursor(self):
-		if (self.cur == None):
-			self.cur = gen_conn.cursor()
-		return self.cur
+	def get_newest_services(self, end_limit):
+		"""Get service names with an observation newer than end_limit."""
+		return self.session.query(Services.name).join(Observations).\
+			filter(Observations.end > end_limit)
 
-	def get_all_observations():
+	def get_oldest_services(self, end_limit):
+		"""Get service names with a MOST RECENT observation that is older than end_limit."""
+		return self.session.query(Services).join(Observations).filter(\
+			~Services.name.in_(\
+				self.get_newest_services(end_limit))).\
+			values(Services.name)
+
+	def insert_service(self, service_name):
+		"""Add a new Service to the database."""
+		# if this is too slow we could add bulk insertion
+		srv = self.session.query(Services).filter(Services.name == service_name).first()
+
+		if (srv == None):
+			srv = Services(name = service_name)
+			self.session.add(srv)
+			self.session.commit()
+
+		return srv
+
+	def get_all_observations(self):
 		"""Get all observations."""
-		return self.get_cursor().execute("select * from observations where key not NULL")
+		return self.session.query(Services).join(Observations).\
+			order_by(Services.name).\
+			values(Services.name, Observations.key, Observations.start, Observations.end)
 
-	def get_observations(service_id):
+	def get_observations(self, service):
 		"""Get all observations for a given service."""
-		return self.get_cursor().execute("select * from observations where service_id = ? and key not NULL", (service_id,))
+		return self.session.query(Services).join(Observations).\
+			filter(Services.name == service).\
+			values(Services.name, Observations.key, Observations.start, Observations.end)
 
-	def insert_observation(service_id, key, start_time, end_time):
+	def insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
-		self.get_cursor().execute("insert into observations (service_id, key, start, end) values (?,?,?,?)",
-			(service_id, key, start_time, end_time))
+		srv = self.insert_service(service)
 
-	def update_observation_end_time(service_id, fp, old_end_time, new_end_time):
+		try:
+			newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
+			self.session.add(newob)
+			self.session.commit()
+		except IntegrityError:
+			print "Error: Observation for (%s, %s) already present. If you want to update it call that function instead. Ignoring." % (service, key)
+			self.session.rollback()
+
+	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
 		"""Update the end time for a given Observation."""
-		self.get_cursor.execute("update observations set end = ? where service_id = ? and key = ? and end = ?",
-			(new_end_time, service_id, fp, most_recent_time))
+		curtime = int(time.time())
+
+		if (new_end_time == None):
+			new_end_time = curtime
+		if (old_end_time == None):
+			old_end_time = curtime
+
+		ob = self.session.query(Observations).join(Services)\
+			.filter(Services.name == service)\
+			.filter(Observations.key == fp)\
+			.filter(Observations.end == old_end_time).first()
+		if (ob != None):
+			ob.end = new_end_time
+			self.session.commit()
+		else:
+			print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
+				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
