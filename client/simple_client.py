@@ -20,22 +20,34 @@ Ask a network notary server what keys it has seen for a particular service.
 
 import sys
 import traceback  
+import argparse
+
 from client_common import verify_notary_signature, notary_reply_as_text,fetch_notary_xml 
 
-if len(sys.argv) != 4 and len(sys.argv) != 5: 
-	print "usage: %s <service-id> <notary-server> <notary-port> [notary-pubkey]" % sys.argv[0]
-	exit(1)  
 
+DEFAULT_SERVER = 'localhost'
+DEFAULT_PORT = '8080'
+DEFAULT_KEYFILE = 'notary.pub'
 
-notary_pub_key = None
-if len(sys.argv) == 5: 
-	notary_pub_key_file = sys.argv[4] 
-	notary_pub_key = open(notary_pub_key_file,'r').read() 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('service_id', default=DEFAULT_SERVER,
+			help="A remote service of the form 'hostname:port,servicetype'. Use servicetype '1' for SSH or '2' for SSL.")
+# don't use type=FileType for the key because we don't want argparse
+# to try opening it before the program runs.
+# this module should be callable without using any key at all.
+parser.add_argument('--notary_pubkey', '--key', '-k', default=DEFAULT_KEYFILE, metavar='KEYFILE',
+			help="File containing the notary's public key. If supplied the response signature from the notary will be verified. Default: \'%(default)s\'.")
+parser.add_argument('--notary-server', '--server', '-s', default=DEFAULT_SERVER, metavar='SERVER',
+			help="Notary server to contact. Default: \'%(default)s\'.")
+parser.add_argument('--notary_port', '--port', '-p', type=int, default=DEFAULT_PORT, metavar='PORT',
+			help="Port to contact the server on. Default: \'%(default)s\'.")
+
+args = parser.parse_args()
 
 try: 
-	code, xml_text = fetch_notary_xml(sys.argv[2],int(sys.argv[3]), sys.argv[1])
+	code, xml_text = fetch_notary_xml(args.notary_server, args.notary_port, args.service_id)
 	if code == 404: 
-		print "Notary has no results"
+		print "Notary has no results for '%s'." % args.service_id
 	elif code != 200: 
 		print "Notary server returned error code: %s" % code
 except Exception, e:
@@ -49,13 +61,14 @@ print xml_text
 
 print 50 * "-"
 
-if notary_pub_key:
-	if not verify_notary_signature(sys.argv[1], xml_text, notary_pub_key):
-		print "Signature verify failed.  Results are not valid"
-		exit(1)  
-else: 
-	print "Warning: no public key specified, not verifying notary signature" 
+try:
+	pub_key = open(args.notary_pubkey).read()
+	if not verify_notary_signature(args.service_id, xml_text, pub_key):
+		print "Signature verification failed. Results are not valid."
+		exit(1)
+except IOError:
+	print "Warning: no public key specified, not verifying notary signature."
 
-print "Results:" 
+print "Results:"
 
 print notary_reply_as_text(xml_text) 
