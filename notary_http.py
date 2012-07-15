@@ -42,7 +42,8 @@ class NotaryHTTPServer:
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
-			description=self.__doc__, version=self.VERSION)
+			description=self.__doc__, version=self.VERSION,
+			epilog="If the database schema or public/private keypair do not exist they will be automatically created on launch.")
 		parser.add_argument('--create-keys-only', action='store_true', default=False,
 			help='Create notary public/private key pair and exit.')
 
@@ -75,14 +76,13 @@ class NotaryHTTPServer:
 		keys = []
 
 		num_rows = 0 
-		for row in obs:
+		for (name, key, start, end) in obs:
 			num_rows += 1 
-			k = row[1]
-			if k not in keys: 
-				timestamps_by_key[k] = []
-				keys.append(k) 
-			timestamps_by_key[k].append((row[2],row[3]))
-		
+			if key not in keys:
+				timestamps_by_key[key] = []
+				keys.append(key)
+			timestamps_by_key[key].append((start, end))
+
 		if num_rows == 0: 
 			# rate-limit on-demand probes
 			if self.active_threads < 10: 
@@ -101,36 +101,39 @@ class NotaryHTTPServer:
 		top_element.setAttribute("sig_type", "rsa-md5") 
 	
 		packed_data = ""
-	
+
+		# create an XML response that we'll send back to the client
 		for k in keys:
 			key_elem = new_doc.createElement("key")
 			key_elem.setAttribute("type","ssl")
 			key_elem.setAttribute("fp", k)
 			top_element.appendChild(key_elem)
-	        	num_timespans = len(timestamps_by_key[k])
-	        	head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16,3)
-	        	fp_bytes = ""
+			num_timespans = len(timestamps_by_key[k])
+			head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16,3)
+
+			fp_bytes = ""
 			for hex_byte in k.split(":"):
-	                	fp_bytes += struct.pack("B", int(hex_byte,16))
+				fp_bytes += struct.pack("B", int(hex_byte,16))
+
 			ts_bytes = ""
-	        	for ts in sorted(timestamps_by_key[k], key=lambda t_pair: t_pair[0]):
-	                	ts_start = ts[0]
-	                	ts_end  = ts[1]
+			for ts in sorted(timestamps_by_key[k], key=lambda t_pair: t_pair[0]):
+				ts_start = ts[0]
+				ts_end  = ts[1]
 				ts_elem = new_doc.createElement("timestamp")
 				ts_elem.setAttribute("end",str(ts_end))
 				ts_elem.setAttribute("start", str(ts_start))
 				key_elem.appendChild(ts_elem) 
-	                	ts_bytes += struct.pack("BBBB", ts_start >> 24 & 255,
-	                                                   ts_start >> 16 & 255,
-	                                                   ts_start >> 8 & 255,
-	                                                   ts_start & 255)
-	                	ts_bytes += struct.pack("BBBB", ts_end >> 24 & 255,
-	                                                   ts_end >> 16 & 255,
-	                                                   ts_end >> 8 & 255,
-	                                                   ts_end & 255)
+				ts_bytes += struct.pack("BBBB", ts_start >> 24 & 255,
+											   ts_start >> 16 & 255,
+											   ts_start >> 8 & 255,
+											   ts_start & 255)
+				ts_bytes += struct.pack("BBBB", ts_end >> 24 & 255,
+											   ts_end >> 16 & 255,
+											   ts_end >> 8 & 255,
+											   ts_end & 255)
 			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
 	
-		packed_data = service_id.encode() + struct.pack("B", 0) + packed_data 
+		packed_data = service_id.encode() + struct.pack("B", 0) + packed_data
 	
 		m = hashlib.md5()
 		m.update(packed_data)
