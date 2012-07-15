@@ -85,7 +85,7 @@ def report_observation_with_db(ndb, service_id, fp):
 		# key has changed or no observations exist yet for this service_id.  Either way
 		# add a new entry for this key with timespan start and end set to the current time
 		ndb.insert_observation(service_id, fp, cur_time, cur_time)
-		if fp != most_recent_key:
+		if most_recent_key != None:
 			# if there was a previous key, set its 'end' timespan value to be current 
 			# time minus one seconds 
 			ndb.update_observation_end_time(service_id, most_recent_key, most_recent_time, cur_time -1)
