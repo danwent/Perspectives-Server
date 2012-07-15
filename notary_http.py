@@ -26,6 +26,7 @@ import argparse
 
 import cherrypy
 
+from util import keygen
 from notary_util.notary_db import ndb
 from notary_util import notary_common
 from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
@@ -40,10 +41,10 @@ class NotaryHTTPServer:
 	VERSION = "pre3.0a"
 
 	def __init__(self):
-		parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=self.__doc__,
-			version=self.VERSION)
-		parser.add_argument('private_key', nargs='?', default="notary.priv",
-			help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
+			description=self.__doc__, version=self.VERSION)
+		parser.add_argument('--create-keys-only', action='store_true', default=False,
+			help='Create notary public/private key pair and exit.')
 
 
 		args = parser.parse_args()
@@ -52,7 +53,14 @@ class NotaryHTTPServer:
 		self.ndb = ndb(args)
 
 
-		self.notary_priv_key= open(args.private_key,'r').read()
+		(pub_name, priv_name) = keygen.generate_keypair(args.private_key)
+		if (args.create_keys_only):
+			exit(0)
+
+		self.notary_priv_key= open(priv_name,'r').read()
+		self.notary_public_key = open(pub_name,'r').read()
+		print "Using public key " + pub_name + " \n" + self.notary_public_key
+
 		self.active_threads = 0 
 		self.args = args
 
