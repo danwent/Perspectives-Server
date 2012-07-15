@@ -17,49 +17,78 @@
 """
 Import data from a file to the notary database.
 Can be used to seed a notary database from another notary's list of services.
+
+File is expected to be a list of tuples, one per line.
+Tuples look like:
+  (servicename:port,servicetype, rsakey, starttime, endtime)
+
+e.g.
+  (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
 """
 
 import sys
 import os
 import re
-import time 
+import time
+import argparse
+
 from notary_db import ndb
-from file_analyzer import run_analyzer, NotaryFileAnalyzer
 
-class SQLiteImportAnalyzer(NotaryFileAnalyzer): 
- 	
-	def __init__(self, filename):
-		self.ndb = ndb(notary_db)
-		self.conn = ndb.get_conn()
-		self.num_services = 0
+DEFAULT_INFILE = "-"
 
-	def on_service(self, service_id):
-		self.num_services += 1
-		if self.num_services % 1000 == 0: 
-			print "%s services seen" % self.num_services  		
-		self.service_id = service_id
-		# create null key entry for service with no observations.  This is useful when
-		# bootstrapping a notary database from the list of service-ids from another notary
-		ret = self.conn.execute("insert into observations values (?,NULL,NULL,NULL)", 
-			 (self.service_id,))
+def import_records(infile):
+	"""Read a file of tuples and extract service and observation data."""
+	lines = infile.readlines()
+	infile.close()
 
-	def on_key(self, key_type, key_hash): 
-		self.cur_key = key_hash 
+	service_names = {}
+	observations = []
+	num_lines = 0
 
-	def on_observation(self, start_ts,end_ts): 
-		ret = self.conn.execute("insert into observations values (?,?,?,?)", 
-			(self.service_id, self.cur_key, start_ts, end_ts))
-	
-	def end(self): 
-		self.conn.commit()	
-		self.conn.close()
-		
+	# tuples will be formatted like this:
+	# (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
+	valid_tuple = re.compile("^\(([\w:,.]+), *([0-9a-fA-F:]+), *(\d)+, *(\d+)\)$")
 
-if len(sys.argv) != 3: 
-  print "usage: <obs-file> <db-file>"
-  exit(1)
+	for line in lines:
 
-a1 = SQLiteImportAnalyzer(sys.argv[2])
-run_analyzer(sys.argv[1], a1) 
+		# remember: ALL INPUT IS EVIL!
+		# test each line before passing to the database.
+		if (valid_tuple.match(line)):
+			match = valid_tuple.match(line)
+			service = str(match.group(1))
+			key = str(match.group(2))
+			start = int(match.group(3))
+			end = int(match.group(4))
 
+			if (service not in service_names):
+				service_names[service] = True
+
+			observations.append((service, key, start, end))
+
+		num_lines += 1
+		if (num_lines) % 1000 == 0:
+			print "Finished %s lines..." % num_lines
+
+	print "Found %s services. Adding to database." % (len(service_names))
+
+	for name in service_names.keys():
+		ndb.insert_service(name)
+
+	if not args.services_only:
+		print "Found %s observations. Adding to database." % len(observations)
+		for (service, key, start, end) in observations:
+			ndb.insert_observation(service, key, start, end)
+
+
+parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=__doc__,
+	formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument('input_file', type=argparse.FileType('r'), nargs='?', default=DEFAULT_INFILE,
+			help="File to read from. Use '-' to read from stdin (which is the default).")
+parser.add_argument('--services-only', '-s', action='store_true', default=False,
+			help="Only import services, not observations.")
+
+args = parser.parse_args()
+# pass ndb the args so it can use any relevant ones from its own parser
+ndb = ndb(args)
+import_records(args.input_file)
 
