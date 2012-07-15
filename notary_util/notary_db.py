@@ -81,11 +81,15 @@ class ndb:
 	"""
 
 	# add more connection info here if you need that type of db
-	# TODO: also supported: postgresql, mysql, oracle, mssql, and firebird
+	# TODO: also supported: mysql, oracle, mssql, and firebird
 	SUPPORTED_DBS = {'sqlite': {'defaultdbname': 'notary.sqlite',
 								'defaultusername': '', #not used by sqlite
 								'defaulthostname': '',
-								'connstr': 'sqlite:///%s%s%s%s'}
+								'connstr': 'sqlite:///%s%s%s%s'},
+					'postgresql': {'postgresql': 'perspectives-notary',
+								'defaultusername': 'notaryrunner',
+								'defaulthostname': 'localhost',
+								'connstr': 'postgresql://%s:%s@%s/%s'}
 					}
 	DEFAULT_DB_TYPE = 'sqlite'
 	DB_PASSWORD_FIELD = 'NOTARY_DB_PASSWORD'
