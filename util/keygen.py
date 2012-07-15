@@ -66,9 +66,33 @@ def generate_keypair(private_key_name=DEFAULT_KEY_NAME):
 	return (real_pub_name, real_priv_name)
 
 
+def get_parser():
+	"""
+	Get a parser object with the correct arguments for the keygen module.
+	Returns the correct type of parser for running as a standalone module
+	or when imported from somewhere else.
+	"""
+	parser = None
+	if __name__ == "__main__":
+		parser = argparse.ArgumentParser(description=generate_keypair.__doc__)
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('private_key', nargs='?', default=DEFAULT_KEY_NAME,
-	help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
-args = parser.parse_args()
-generate_keypair(args.private_key)
+		# when running by itself, using an optional positional argument
+		# is the expected behaviour
+		parser.add_argument('private_key', nargs='?', default=DEFAULT_KEY_NAME,
+			help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+
+	else:
+		# don't specify description or epilogue,
+		# so the module that includes us can write their own.
+		parser = argparse.ArgumentParser(add_help=False)
+
+		# when imported from another module it makes more sense to use an optional argument.
+		parser.add_argument('--private-key', '-k', default=DEFAULT_KEY_NAME, metavar='PRIVATE_KEY_FILE',
+			help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+
+	return parser
+
+
+if __name__ == "__main__":
+	args = get_parser().parse_args()
+	generate_keypair(args.private_key)
