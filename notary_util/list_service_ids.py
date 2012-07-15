@@ -20,45 +20,56 @@ Data can be filtered based on the last time the notary successfully observed
 a key from each service.
 """
 
-import sys
-import os
-import re
 import time
+import argparse
+
 from notary_db import ndb
 
-# The first parameter points to the
-# notary's database file.  The last two
-# parameters filter the set of service ids printed based on the
-# last observation date.  If 'newer'' is provided, the script will
-# only print services with an observation newer than 'days' days.
-# If 'older' is provided, the script will print only service ids
-# with a MOST RECENT observation that is older than 'days' days.
-# Thus, the script can be used to either generate a list of all services
-# considered 'live' and of all services considered 'dead'.
 
-def usage_and_exit(): 
-  print >> sys.stderr, "ERROR: usage: <notary-db-file> <all|older|newer> <days>"
-  exit(1)
+DAYS_META_NAME = 'Days'
+DEFAULT_DAYS = 10
+DEFAULT_OUTFILE = "-"
 
-if len(sys.argv) == 4: 
-	if not (sys.argv[2] == "older" or sys.argv[2] == "newer"): 
-		usage_and_exit()
-	cur_time = int(time.time()) 
-	threshold_sec = int(int(time.time()) - (3600 * 24 * int(sys.argv[3])))
-elif len(sys.argv) == 3: 
-	if not sys.argv[2] == "all": 
-		usage_and_exit()
-else: 
-	usage_and_exit()
+parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
+description=__doc__,
+epilog="This module can be used to generate a list of all services considered 'live' or 'dead'.")
 
-cur = ndb(sys.argv[1]).get_cursor()
+parser.add_argument('output_file', type=argparse.FileType('w'), nargs='?', default=DEFAULT_OUTFILE,
+			help="File to write data to. Use '-' to write to stdout. Writing to stdout is the default if no file is given.")
+listgroup = parser.add_mutually_exclusive_group()
+listgroup.add_argument('--all', '-a', action='store_true', default=False,
+			help="List all services. This is the default if no action is specified.")
+listgroup.add_argument('--newer', '--newest', '--new', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
+			help="Only list services with an observation newer than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
+listgroup.add_argument('--older', '--oldest', '--old', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
+			help="Only list services with a MOST RECENT observation that is older than than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
 
-if sys.argv[2] == "all": 
-	cur.execute("select distinct service_id from observations")
-elif sys.argv[2] == "older": 
-	cur.execute("select distinct service_id from observations where service_id not in (select distinct service_id from observations where end > ?)", [ threshold_sec ])
-else: 
-	cur.execute("select distinct service_id from observations where end > ?", [ threshold_sec ] )
-	
-for row in cur:
-	print row[0] 
+args = parser.parse_args()
+
+# pass ndb the args so it can use any relevant ones from its own parser
+ndb = ndb(args)
+
+output_file = args.output_file
+
+
+# set a default action
+if (args.all == False and args.newer == None and args.older == None):
+	args.all = True
+
+
+ids = None
+
+if args.all:
+	ids = ndb.get_all_services()
+else:
+	cur_time = int(time.time())
+
+	if args.older:
+		ids = ndb.get_oldest_services(int(cur_time - (3600 * 24 * args.older)))
+	else:
+		ids = ndb.get_newest_services(int(cur_time - (3600 * 24 * args.newer)))
+
+if (ids != None):
+	for (name) in ids:
+		# print as string instead of tuple, to make it easier to use elsewhere
+		print >> output_file, name[0]
