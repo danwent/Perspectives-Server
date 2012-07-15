@@ -17,12 +17,15 @@
 import struct
 import base64
 import urllib
-from M2Crypto import BIO, RSA, EVP
-from xml.dom.minidom import parseString
 import time 
+from xml.dom.minidom import parseString
 
-# querying the notaries over the HTTP webservice interface
+from M2Crypto import BIO, RSA, EVP
+
 def fetch_notary_xml(notary_server, notary_port, service_id): 
+	"""
+	Query a notary over HTTP.
+	"""
 	host = service_id.split(":")[0] 
 	port = service_id.split(":")[1].split(",")[0] 
 	service_type = service_id.split(",")[1]
@@ -89,8 +92,10 @@ def notary_reply_as_text(notary_xml_text):
 			t += "\tend  : %s\n" % time.ctime(ts_end)
 	return t
 
-# returns list of entries containing host and key as strings
 def parse_http_notary_list(file_name): 
+	"""
+	Return a list of entries containing host and key as strings
+	"""
 	f = open(file_name,'r') 
 	notary_list = []
 
