@@ -23,13 +23,14 @@ import sys
 import threading 
 import traceback 
 import argparse
+import os
 
 import cherrypy
 
 from util import keygen
 from notary_util.notary_db import ndb
 from notary_util import notary_common
-from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
 
 class NotaryHTTPServer:
 	"""
@@ -39,11 +40,18 @@ class NotaryHTTPServer:
 	"""
 
 	VERSION = "pre3.0a"
+	DEFAULT_WEB_PORT=8080
+	ENV_PORT_KEY_NAME='PORT'
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
 			description=self.__doc__, version=self.VERSION,
 			epilog="If the database schema or public/private keypair do not exist they will be automatically created on launch.")
+		portgroup = parser.add_mutually_exclusive_group()
+		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT,
+			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
+		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
+			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--create-keys-only', action='store_true', default=False,
 			help='Create notary public/private key pair and exit.')
 
@@ -61,6 +69,10 @@ class NotaryHTTPServer:
 		self.notary_priv_key= open(priv_name,'r').read()
 		self.notary_public_key = open(pub_name,'r').read()
 		print "Using public key " + pub_name + " \n" + self.notary_public_key
+
+		self.web_port = self.DEFAULT_WEB_PORT
+		if(args.envport):
+			self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
 
 		self.active_threads = 0 
 		self.args = args
@@ -188,7 +200,7 @@ class OnDemandScanThread(threading.Thread):
 # before we start the web server
 notary = NotaryHTTPServer()
 
-cherrypy.config.update({ 'server.socket_port' : 8080,
+cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
 			 'request.show_tracebacks' : False,  
 			 'log.access_file' : None,  # default for production 
