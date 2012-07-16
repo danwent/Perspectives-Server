@@ -98,10 +98,13 @@ class NotaryHTTPServer:
 		print >> f, lines
 		f.close()
 
-	def get_xml(self, service):
+	def get_xml(self, host, port, service_type):
 		"""
 		Query the database and build a response containing any known keys for the given service.
 		"""
+
+		service = str(host + ":" + port + "," + service_type)
+
 		print "Request for '%s'" % service
 		sys.stdout.flush()
 		obs = self.ndb.get_observations(service)
@@ -138,7 +141,7 @@ class NotaryHTTPServer:
 		# create an XML response that we'll send back to the client
 		for k in keys:
 			key_elem = new_doc.createElement("key")
-			key_elem.setAttribute("type","ssl")
+			key_elem.setAttribute("type", notary_common.SERVICE_TYPES[service_type])
 			key_elem.setAttribute("fp", k)
 			top_element.appendChild(key_elem)
 			num_timespans = len(timestamps_by_key[k])
@@ -181,11 +184,11 @@ class NotaryHTTPServer:
 		elif (host == None or port == None or service_type == None):
 			raise cherrypy.HTTPError(400)
 
-		if service_type != "1" and service_type != "2": 
+		if (service_type not in notary_common.SERVICE_TYPES):
 			raise cherrypy.HTTPError(404)
 			
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
-		return self.get_xml(str(host + ":" + port + "," + service_type))
+		return self.get_xml(host, port, service_type)
 
 
 class OnDemandScanThread(threading.Thread): 

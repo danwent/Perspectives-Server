@@ -20,6 +20,11 @@ import time
 
 from notary_db import ndb
 
+SSH_TYPE = "1"
+SSL_TYPE = "2"
+SERVICE_TYPES = {SSH_TYPE: "ssh",
+				 SSL_TYPE: "ssl"}
+
 
 def report_observation_with_db(ndb, service, fp):
 	"""Insert or update an Observation record in the notary database."""

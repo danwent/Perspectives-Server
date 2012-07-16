@@ -168,7 +168,7 @@ print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
 for sid in all_sids:  
 	try: 
 		# ignore non SSL services	
-		if sid.split(",")[1] == "2": 
+		if sid.split(",")[1] == notary_common.SSL_TYPE:
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
 			t.start()

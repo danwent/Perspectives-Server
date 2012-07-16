@@ -22,10 +22,10 @@ import time
 import argparse
 
 from notary_db import ndb
+import notary_common
 
 
 DEFAULT_OUTFILE = "-"
-service_type_to_key_type = { "1" : "ssh", "2" : "ssl" } #TODO: put in notary_common
 
 
 def print_long_output(obs):
@@ -56,12 +56,12 @@ def print_sid_info(sid, key_to_obs):
 	"""Print all of the keys for a single service."""
 	s_type = sid.split(",")[1]
 	
-	if s_type not in service_type_to_key_type:
+	if (s_type not in notary_common.SERVICE_TYPES):
 		return	
 	
 	print >> output_file, ""
 	print >> output_file, "Start Host: '%s'" % sid
-	key_type_text = service_type_to_key_type[s_type]
+	key_type_text = notary_common.SERVICE_TYPES[s_type]
 	for key in key_to_obs:
 		if key is None: 
 			continue 
