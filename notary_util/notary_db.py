@@ -25,6 +25,7 @@ import time
 import argparse
 import os
 import sys
+import ConfigParser
 
 
 from sqlalchemy.ext.declarative import declarative_base
@@ -95,6 +96,12 @@ class ndb:
 	DB_PASSWORD_FIELD = 'NOTARY_DB_PASSWORD'
 	DEFAULT_ECHO = 0
 
+	# store config in this directory,
+	# so all modules that use the database can use it
+	NOTARY_CONFIG_FILE = \
+		os.path.join(os.path.dirname(os.path.realpath(__file__)), 'notary.db.config')
+	CONFIG_SECTION = 'NotaryDB'
+
 	def __init__(self, args):
 		"""
 		Initialize a new ndb object.
@@ -117,7 +124,8 @@ class ndb:
 						dbuser=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultusername'],
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
 						dbtype=DEFAULT_DB_TYPE,
-						dbecho=DEFAULT_ECHO):
+						dbecho=DEFAULT_ECHO,
+						write_config_file=False):
 		"""
 		Initialize a new ndb object.
 
@@ -156,6 +164,9 @@ class ndb:
 			Session = sessionmaker(bind=self.db)
 			self.session = Session()
 
+			if (write_config_file):
+				self.write_db_config(locals())
+
 		else:
 			errmsg = "'%s' is not a supported database type" % dbtype
 			print >> sys.stderr, errmsg
@@ -190,6 +201,8 @@ class ndb:
 			default=self.DEFAULT_ECHO, const=1,
 			metavar='0/1', type=int,
 			help='Echo all SQL statements and other database messages to stdout. If passed with no value echo defaults to true.')
+		dbgroup.add_argument('--write-config-file', '--wcf', action='store_true', default=False,
+			help='After successfully connecting, save all database arguments to a config file.')
 
 		return parser
 
@@ -212,6 +225,31 @@ class ndb:
 			del d['self']
 
 		return d
+
+	def write_db_config(self, args):
+		"""Write all ndb args to the config file."""
+
+		good_args = ndb.filter_args(args)
+
+		# don't store keys related to config actions
+		del good_args['write_config_file']
+
+		# print a header to make file purpose clear
+		f = open(self.NOTARY_CONFIG_FILE, 'w')
+		print >> f, "# Network notary database configuration settings -"
+		print >> f, "# for easy sharing of db configs between tools."
+		print >> f, "# Run `python notary_http.py --help` for more info.\n"
+		f.close()
+
+		config = ConfigParser.SafeConfigParser()
+		config.add_section(self.CONFIG_SECTION)
+		for k, v in good_args.iteritems():
+			config.set(self.CONFIG_SECTION, k, str(v))
+
+		with open(self.NOTARY_CONFIG_FILE, 'a') as configfile:
+			config.write(configfile)
+
+		print "Notary database config saved in %s." % self.NOTARY_CONFIG_FILE
 
 	# actual data methods follow
 
