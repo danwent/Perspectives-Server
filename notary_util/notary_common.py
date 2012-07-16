@@ -20,24 +20,6 @@ import time
 
 from notary_db import ndb
 
-def parse_config(conf_fname): 
-	config = {} 
-	f = open(conf_fname,'r')
-	for line in f: 
-		try: 
-			key,value = line.strip().split("=") 
-			config[key] = value
-		except: 
-			pass
-	return config
-
-def report_observation(notary_db, service_id, fp):
-
-	ndb = ndb(notary_db)
-	conn = ndb.get_conn()
-	report_observation_with_db(ndb, service_id, fp)
-	conn.commit()
-	conn.close() 
 
 def report_observation_with_db(ndb, service_id, fp):
 	"""Insert or update an Observation record in the notary database."""
