@@ -25,6 +25,7 @@ import time
 import argparse
 import os
 import sys
+import re
 import ConfigParser
 
 
@@ -116,6 +117,10 @@ class ndb:
 		# but ensures we pass only the correct parameters,
 		# so there are no errors.
 		good_args = ndb.filter_args(vars(args))
+
+		if (good_args['read_config_file']):
+			good_args = self.set_config_args()
+
 		self.__actual_init__(**good_args)
 
 	# note: keep these arg names the same as the argparser args - see filter_args()
@@ -125,7 +130,7 @@ class ndb:
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
 						dbtype=DEFAULT_DB_TYPE,
 						dbecho=DEFAULT_ECHO,
-						write_config_file=False):
+						write_config_file=False, read_config_file=False):
 		"""
 		Initialize a new ndb object.
 
@@ -203,6 +208,8 @@ class ndb:
 			help='Echo all SQL statements and other database messages to stdout. If passed with no value echo defaults to true.')
 		dbgroup.add_argument('--write-config-file', '--wcf', action='store_true', default=False,
 			help='After successfully connecting, save all database arguments to a config file.')
+		dbgroup.add_argument('--read-config-file', '--rcf', action='store_true', default=False,
+			help='Load all database arguments from the config file. Arguments specified on the command line will override those found in the file.')
 
 		return parser
 
@@ -233,6 +240,7 @@ class ndb:
 
 		# don't store keys related to config actions
 		del good_args['write_config_file']
+		del args['read_config_file']
 
 		# print a header to make file purpose clear
 		f = open(self.NOTARY_CONFIG_FILE, 'w')
@@ -250,6 +258,82 @@ class ndb:
 			config.write(configfile)
 
 		print "Notary database config saved in %s." % self.NOTARY_CONFIG_FILE
+
+	def read_db_config(self):
+		"""Read ndb args from the config file and return as a list."""
+
+		config = ConfigParser.SafeConfigParser()
+		config.read(self.NOTARY_CONFIG_FILE)
+		try:
+			items = config.items(self.CONFIG_SECTION)
+			return items
+		except ConfigParser.NoSectionError:
+			print >> stderr, "Could not read config file. Please write one with --write-config-file before reading"
+			return ()
+
+	def set_config_args(self):
+		"""Sanitize and set up ndb arguments read from a config file."""
+
+		print "Reading config data from %s." % self.NOTARY_CONFIG_FILE
+		temp_args = self.read_db_config()
+		good_args = {}
+
+
+		# remember: ALL INPUT IS EVIL!
+		# do some safety checking on config file arguments,
+		# as well as basic type identification
+		# before we try to use them for anything.
+
+		valid_key = re.compile("^\w+$")
+		none = re.compile("^None$")
+		true = re.compile("^True$")
+		false = re.compile("^False$")
+		valid_int = re.compile("^\d+$")
+
+		for k, v in temp_args:
+			if (valid_key.match(k)):
+				key = str(valid_key.match(k).group(0))
+
+				if (none.match(v)):
+					value = None
+				elif (true.match(v)):
+					value = True
+				elif (false.match(v)):
+					value = False
+				elif (valid_int.match(v)):
+					value = int(valid_int.match(v).group(0))
+				else:
+					value = str(v)
+
+				good_args[key] = value
+
+
+		# make command line args override config file args:
+		# we need a way to differentiate switches passed on the command line
+		# from those that were simply assigned their defaults.
+		# thus: get a dict of all the possible arg names
+		possible_args = vars(ndb.get_parser().parse_args(list()))
+
+		# and set all of the values to None
+		for key in possible_args:
+			possible_args[key] = None
+
+		# now create a new parser and forcibly set all of the defaults to None.
+		noneparser = ndb.get_parser()
+		noneparser.set_defaults(**possible_args)
+
+		# calling parse_args() will now use None for the defaults
+		# instead of the regular defaults,
+		# so we can tell the difference between arguments using default values
+		# and arguments that have been specified on the command line.
+		cl_args = vars(noneparser.parse_args())
+
+		for key in cl_args:
+			if (cl_args[key] != None):
+				good_args[key] = cl_args[key]
+
+		return good_args
+
 
 	# actual data methods follow
 
