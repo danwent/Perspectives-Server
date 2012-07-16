@@ -53,6 +53,8 @@ class NotaryHTTPServer:
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--create-keys-only', action='store_true', default=False,
 			help='Create notary public/private key pair and exit.')
+		parser.add_argument('--echo-screen', action='store_true', default=False,
+			help='Send web server output to stdout rather than a log file.')
 
 
 		args = parser.parse_args()
@@ -230,6 +232,15 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'log.access_file' : None,  # default for production 
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
+
+if (notary.args.echo_screen):
+	cherrypy.config.update({
+			 'log.error_file' : None,
+			 'log.screen' : True } )
+else:
+	cherrypy.config.update({
+			 'log.error_file' : 'error.log',
+			 'log.screen' : False } )
 
 static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
 notary_config = { '/': {'tools.staticfile.root' : static_root,
