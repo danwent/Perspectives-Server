@@ -32,10 +32,9 @@ def report_observation_with_db(ndb, service, fp):
 	most_recent_time = 0
 
 	# calculate the most recently seen key
-	for row in obs:
-		k = row[1]
-		if k not in most_recent_time_by_key or row[3] > most_recent_time_by_key[k]: 
-			most_recent_time_by_key[k] = row[3]
+	for (service, key, start, end) in obs:
+		if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+			most_recent_time_by_key[key] = end
 
 		for k in most_recent_time_by_key:
 			if most_recent_time_by_key[k] > most_recent_time:
