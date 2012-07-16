@@ -43,6 +43,7 @@ class NotaryHTTPServer:
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
+	STATIC_INDEX = "index.html"
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
@@ -160,8 +161,14 @@ class NotaryHTTPServer:
 
 	@cherrypy.expose
 	def index(self, host=None, port=None, service_type=None):
-		if (host == None or port == None or service_type == None): 
+		if (host == None and port == None and service_type == None):
+			# probably a visitor that doesn't know what this server is for.
+			# serve a static explanation page
+			path = os.path.join(cherrypy.request.app.config['/']['tools.staticfile.root'], self.STATIC_INDEX)
+			return cherrypy.lib.static.serve_file(path)
+		elif (host == None or port == None or service_type == None):
 			raise cherrypy.HTTPError(400)
+
 		if service_type != "1" and service_type != "2": 
 			raise cherrypy.HTTPError(404)
 			
