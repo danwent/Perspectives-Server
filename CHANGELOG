@@ -6,6 +6,30 @@ Format:
 * bug or behavior fix
 
 
+3.0
+---
++ Separate the database interface from the notary code.
+    This lets us change the type of database much more easily,
+    and gives us a central way to organize other modules that communicate with the database.
++ Use SQLAlchemy as a database ORM, to make database abstraction and maintenance even easier (and cleaner).
++ Refactor database tables to be 3rd Normal Form.
+* Explicitly add a Primary Key of (service_id, key) for Observations.
+	This was semi-implied before, as keys could not be null, and it doesn't make sense to have a null service_id.
+	SQLAlchemy requires tables to have a Primary Key anyway.
+* Fix bug when reporting observations that would attempt to update the previous key's end time when there was no previous key.
+	(this was harmless, but saves us running an extra query that returns no results)
++ Clearly separate utility scripts and modules that do *not* rely on the notary database (in 'utils/') from those that do (in 'notary_utils/').
++ Separate client modules into client/
+* Refactor standalone modules so they can be run by themselves or when imported by another module.
+    Database functionality was removed from modules in util/ so they comply with the "Do One Thing Well" philosophy.
++ Implement clean argument parsing for all modules using argparse.
++ Add documentation and docstrings to many things that needed it
++ Explain the tasks a network notary server performs in the README
++ Add default arguments and actions wherever possible, to make it easier to set up and run a network notary server without having to read (or understand ;) anything.
++ Add --write-config-file and --read-config-file switches so all modules that connect to the database can share settings more easily.
++ Add a static index page to explain what a 'network notary' server is to visitors.
+
+
 2.0
 ---
 Implementation in python.
