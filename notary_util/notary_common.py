@@ -30,6 +30,8 @@ def report_observation_with_db(ndb, service_id, fp):
 
 	most_recent_key = None
 	most_recent_time = 0
+
+	# calculate the most recently seen key
 	for row in obs:
 		k = row[1]
 		if k not in most_recent_time_by_key or row[3] > most_recent_time_by_key[k]: 
@@ -41,17 +43,16 @@ def report_observation_with_db(ndb, service_id, fp):
 				most_recent_time = most_recent_time_by_key[k]  
 
 	if most_recent_key == fp: 
-		# this key was also the most recently seen key before this observation.
-		# just update the observation row to set the timespan 'end' value to the 
-		# current time.
+		# this key matches the most recently seen key before this observation.
+		# just update the observation 'end' time.
 		ndb.update_observation_end_time(service_id, fp, most_recent_time, cur_time)
 	else: 
-		# key has changed or no observations exist yet for this service_id.  Either way
-		# add a new entry for this key with timespan start and end set to the current time
+		# the key has changed or no observations exist yet for this service.
+		# add a new entry for this key with start and end set to the current time
 		ndb.insert_observation(service_id, fp, cur_time, cur_time)
 		if most_recent_key != None:
-			# if there was a previous key, set its 'end' timespan value to be current 
-			# time minus one seconds 
+			# if there was a previous key, set its 'end' timespan value to be
+			# the current time minus one second (ending just before the new key)
 			ndb.update_observation_end_time(service_id, most_recent_key, most_recent_time, cur_time -1)
 
 
