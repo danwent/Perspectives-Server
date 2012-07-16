@@ -28,6 +28,7 @@ Format:
 + Add default arguments and actions wherever possible, to make it easier to set up and run a network notary server without having to read (or understand ;) anything.
 + Add --write-config-file and --read-config-file switches so all modules that connect to the database can share settings more easily.
 + Add a static index page to explain what a 'network notary' server is to visitors.
++ Add AUTHORS and CHANGELOG files
 
 
 2.0
