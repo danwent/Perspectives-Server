@@ -16,9 +16,6 @@
 
 from xml.dom.minidom import parseString, getDOMImplementation
 import struct
-import base64
-import hashlib
-from M2Crypto import BIO, RSA, EVP
 import sys
 import threading 
 import traceback 
@@ -27,7 +24,7 @@ import os
 
 import cherrypy
 
-from util import keygen
+from util import keygen, crypto
 from notary_util.notary_db import ndb
 from notary_util import notary_common
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
@@ -168,14 +165,7 @@ class NotaryHTTPServer:
 			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
 	
 		packed_data = service_id.encode() + struct.pack("B", 0) + packed_data
-	
-		m = hashlib.md5()
-		m.update(packed_data)
-		bio = BIO.MemoryBuffer(self.notary_priv_key)
-		rsa_priv = RSA.load_key_bio(bio)
-		sig_before_raw = rsa_priv.sign(m.digest(),'md5') 
-		sig = base64.standard_b64encode(sig_before_raw) 
-	
+		sig = crypto.sign_content(packed_data, self.notary_priv_key)
 		top_element.setAttribute("sig",sig)
 		return top_element.toprettyxml() 
 
