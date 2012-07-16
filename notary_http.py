@@ -72,12 +72,32 @@ class NotaryHTTPServer:
 		self.notary_public_key = open(pub_name,'r').read()
 		print "Using public key " + pub_name + " \n" + self.notary_public_key
 
+		self.create_static_index()
+
 		self.web_port = self.DEFAULT_WEB_PORT
 		if(args.envport):
 			self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
 
 		self.active_threads = 0 
 		self.args = args
+
+	def create_static_index(self):
+		"""Create a static index page."""
+		# right now this is VERY simple - copy the template file and insert some variables.
+		STATIC_TEMPLATE = "static_template.html"
+
+		template = os.path.join(self.STATIC_DIR, STATIC_TEMPLATE)
+		f = open(template,'r')
+		lines = str(f.read())
+		f.close()
+
+		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
+		lines = lines.replace('<!-- ::PUBLIC_KEY:: -->', self.notary_public_key)
+
+		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
+		f = open (index, 'w')
+		print >> f, lines
+		f.close()
 
 	def get_xml(self, service_id): 
 		"""

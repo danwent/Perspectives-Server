@@ -5,3 +5,7 @@
 *.sqlite
 
 error.log
+
+#static index is created from a template;
+#ignore the output file that is created.
+notary_static/index.html

@@ -29,6 +29,11 @@
 						.section.info .box a {
 							color: #6666cc; }
 
+					.section.info .key {
+						background-color: #cccccc;
+						padding: 10px 10px 10px 10px;
+						width: 75ex; /* openssl wraps at 65 chars, plus our padding */}
+
 					.section.info img {
 						vertical-align: text-bottom;}
 			}
@@ -38,13 +43,16 @@
 <body>
 	<div class='container'>
 	  <div class='section info'>
-		<h1><IMG SRC="img/perspectives-logo.png" TITLE="Perspectives" width="32" heigh="32" />&nbsp;Perspectives Network Notary Server</h1>
+		<h1><IMG SRC="img/perspectives-logo.png" TITLE="Perspectives" width="32" heigh="32" />&nbsp;Perspectives Network Notary Server <!-- ::VERSION:: --></h1>
 		<div class='box'>
 			<p>This is a Perspectives 'network notary' server. It collects and shares information on SSL certificates from around the internet.</p>
 			<p>For more information see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.</p>
+			<p>You can add this server to your Perspectives client with the following public key:</p>
+			<div class='key'>
+				<p><pre><!-- ::PUBLIC_KEY:: --></pre></p>
+			</div>
 		</div>
 	  </div>
 	</div>
 </body>
 </html>
-
