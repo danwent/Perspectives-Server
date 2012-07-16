@@ -96,13 +96,13 @@ class NotaryHTTPServer:
 		print >> f, lines
 		f.close()
 
-	def get_xml(self, service_id): 
+	def get_xml(self, service):
 		"""
 		Query the database and build a response containing any known keys for the given service.
 		"""
-		print "Request for '%s'" % service_id
+		print "Request for '%s'" % service
 		sys.stdout.flush()
-		obs = self.ndb.get_observations(service_id)
+		obs = self.ndb.get_observations(service)
 		timestamps_by_key = {}
 		keys = []
 
@@ -117,11 +117,11 @@ class NotaryHTTPServer:
 		if num_rows == 0: 
 			# rate-limit on-demand probes
 			if self.active_threads < 10: 
-				print "on demand probe for '%s'" % service_id  
-				t = OnDemandScanThread(service_id, 10 , self, self.args)
+				print "on demand probe for '%s'" % service
+				t = OnDemandScanThread(service, 10 , self, self.args)
 				t.start()
 			else: 
-				print "Exceeded on demand threshold, not probing '%s'" % service_id  
+				print "Exceeded on demand threshold, not probing '%s'" % service
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
 	
@@ -164,7 +164,7 @@ class NotaryHTTPServer:
 											   ts_end & 255)
 			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
 	
-		packed_data = service_id.encode() + struct.pack("B", 0) + packed_data
+		packed_data = service.encode() + struct.pack("B", 0) + packed_data
 		sig = crypto.sign_content(packed_data, self.notary_priv_key)
 		top_element.setAttribute("sig",sig)
 		return top_element.toprettyxml() 

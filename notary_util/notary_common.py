@@ -21,11 +21,11 @@ import time
 from notary_db import ndb
 
 
-def report_observation_with_db(ndb, service_id, fp):
+def report_observation_with_db(ndb, service, fp):
 	"""Insert or update an Observation record in the notary database."""
 
 	cur_time = int(time.time()) 
-	obs = ndb.get_observations(service_id)
+	obs = ndb.get_observations(service)
 	most_recent_time_by_key = {}
 
 	most_recent_key = None
@@ -45,14 +45,14 @@ def report_observation_with_db(ndb, service_id, fp):
 	if most_recent_key == fp: 
 		# this key matches the most recently seen key before this observation.
 		# just update the observation 'end' time.
-		ndb.update_observation_end_time(service_id, fp, most_recent_time, cur_time)
+		ndb.update_observation_end_time(service, fp, most_recent_time, cur_time)
 	else: 
 		# the key has changed or no observations exist yet for this service.
 		# add a new entry for this key with start and end set to the current time
-		ndb.insert_observation(service_id, fp, cur_time, cur_time)
+		ndb.insert_observation(service, fp, cur_time, cur_time)
 		if most_recent_key != None:
 			# if there was a previous key, set its 'end' timespan value to be
 			# the current time minus one second (ending just before the new key)
-			ndb.update_observation_end_time(service_id, most_recent_key, most_recent_time, cur_time -1)
+			ndb.update_observation_end_time(service, most_recent_key, most_recent_time, cur_time -1)
 
 
