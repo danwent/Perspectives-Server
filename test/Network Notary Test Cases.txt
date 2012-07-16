@@ -1,0 +1,24 @@
+Test cases for Perspectives Server code. Feel free to add more!
+
+Each utility module can be unit-tested on its own as well.
+
+
+- Does the server start up?
+	- Even in a hosted environment where cherrypy can't rely on the PORT?
+- Does it automatically create a private key if none exists?
+- Does it connect to the database?
+	- sqlite
+	- postgresql
+- Does it automatically create tables if none exist?
+
+
+While Running:
+--------------
+- If we get a request for an unknown service, does the server spawn a query process to ask about it?
+	- Are the results properly reported back to the database?
+- If we have data do we display the results?
+	- Including multiple keys for a given service?
+- If the visitor simply goes to the index do they get the HTML explanation page?
+	- Are the public key and version number displayed?
+- If the service_type is unknown do they get a 404 error?
+- Does the favicon work?
