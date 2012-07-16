@@ -42,6 +42,7 @@ class NotaryHTTPServer:
 	VERSION = "pre3.0a"
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
+	STATIC_DIR = "notary_static"
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
@@ -157,6 +158,7 @@ class NotaryHTTPServer:
 		top_element.setAttribute("sig",sig)
 		return top_element.toprettyxml() 
 
+	@cherrypy.expose
 	def index(self, host=None, port=None, service_type=None):
 		if (host == None or port == None or service_type == None): 
 			raise cherrypy.HTTPError(400)
@@ -164,9 +166,7 @@ class NotaryHTTPServer:
 			raise cherrypy.HTTPError(404)
 			
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
-      		return self.get_xml(str(host + ":" + port + "," + service_type))
- 
-    	index.exposed = True
+		return self.get_xml(str(host + ":" + port + "," + service_type))
 
 
 class OnDemandScanThread(threading.Thread): 
@@ -213,5 +213,18 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'log.access_file' : None,  # default for production 
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
-cherrypy.quickstart(notary)
+
+static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
+notary_config = { '/': {'tools.staticfile.root' : static_root,
+						'tools.staticdir.root' : static_root }}
+
+app = cherrypy.tree.mount(notary, '/', config=notary_config)
+app.merge("notary.cherrypy.config")
+
+if hasattr(cherrypy.engine, "signal_handler"):
+	cherrypy.engine.signal_handler.subscribe()
+if hasattr(cherrypy.engine, "console_control_handler"):
+	cherrypy.engine.console_control_handler.subscribe()
+cherrypy.engine.start()
+cherrypy.engine.block()
 
