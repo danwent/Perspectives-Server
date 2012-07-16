@@ -47,7 +47,8 @@ to see the XML:
 
 
 The first time you query for a particular service, it's normal to get a 404 error
-(see the Details section below for an explanation). Just wait a few seconds and try again.
+(see the Technical Details section below for an explanation).
+Just wait a few seconds and try again.
 
 After waiting a few seconds, test that the service has been added to the database:
 
@@ -70,15 +71,17 @@ as it covers step 3, allowing the server to generate a history of keys for each 
 
 ==== SCHEDULED SCANS ====
 
-Usually you do not run scans explicitly using notary tools, but rather set a scheduled task to
+Usually you do not run scans manually but rather set a scheduled task to
 periodically scan all services in the database, using something like:
 
 % python notary_util/list_services.py | python notary_util/threaded_scanner.py
 
-If you are using a database other than sqlite you can share the database config
-by launching the server with --write-config-file and running utils with:
+If you are using a more complex database setup and don't want to type out the
+arguments every time, you can share the database config by launching the server
+with '--write-config-file' and then running utils with:
 
 % python notary_util/list_services.py --read-config-file | python notary_util/threaded_scanner.py --read-config-file
+
 
 Scanning can take a long time, depending on the size of your database and the rate you
 specify to threaded_scanner.py .
