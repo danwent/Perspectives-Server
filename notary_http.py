@@ -19,13 +19,13 @@ from xml.dom.minidom import parseString, getDOMImplementation
 import struct
 import base64
 import hashlib
-import sqlite3
 from M2Crypto import BIO, RSA, EVP
 import sys
 import threading 
 from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
 import traceback 
 import notary_common 
+from notary_db import ndb
 
 class NotaryHTTPServer:
 	"""
@@ -36,8 +36,8 @@ class NotaryHTTPServer:
 
 	VERSION = "pre3.0a"
 
-	def __init__(self, db_file, priv_key_file): 
-		self.db_file = db_file
+	def __init__(self, db_file, priv_key_file):
+		self.ndb = ndb(db_file)
 		self.notary_priv_key= open(priv_key_file,'r').read() 
 		self.active_threads = 0 
 
@@ -47,14 +47,12 @@ class NotaryHTTPServer:
 		"""
 		print "Request for '%s'" % service_id
 		sys.stdout.flush()
-		conn = sqlite3.connect(self.db_file)
-		cur = conn.cursor()
-		cur.execute("select * from observations where service_id = ? and key not NULL", (service_id,))
+		obs = self.ndb.get_observations(service_id)
 		timestamps_by_key = {}
 		keys = []
 
 		num_rows = 0 
-		for row in cur:
+		for row in obs:
 			num_rows += 1 
 			k = row[1]
 			if k not in keys: 

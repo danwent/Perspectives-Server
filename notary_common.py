@@ -16,10 +16,11 @@
 
 """Notary utility functions called from many places."""
 
-import time 
-import sqlite3 
+import time
 import os
 import subprocess
+
+from notary_db import ndb
 
 SSL_SCAN="ssl_scan_openssl.py" 
 SSH_SCAN="ssh_scan_openssh.py"
@@ -48,25 +49,24 @@ def parse_config(conf_fname):
 			pass
 	return config
 
-def report_observation(notary_db_file, service_id, fp): 
+def report_observation(notary_db, service_id, fp):
 
-
-	conn = sqlite3.connect(notary_db_file)
-	report_observation_with_conn(conn, service_id, fp)
+	ndb = ndb(notary_db)
+	conn = ndb.get_conn()
+	report_observation_with_db(ndb, service_id, fp)
 	conn.commit()
 	conn.close() 
 
-def report_observation_with_conn(conn, service_id, fp): 
+def report_observation_with_db(ndb, service_id, fp):
 	"""Insert or update an Observation record in the notary database."""
 
 	cur_time = int(time.time()) 
-	cur = conn.cursor()
-	cur.execute("select * from observations where service_id = ?", (service_id,))
+	obs = ndb.get_observations(service_id)
 	most_recent_time_by_key = {}
 
 	most_recent_key = None
 	most_recent_time = 0
-	for row in cur: 
+	for row in obs:
 		k = row[1]
 		if k not in most_recent_time_by_key or row[3] > most_recent_time_by_key[k]: 
 			most_recent_time_by_key[k] = row[3]
@@ -80,17 +80,14 @@ def report_observation_with_conn(conn, service_id, fp):
 		# this key was also the most recently seen key before this observation.
 		# just update the observation row to set the timespan 'end' value to the 
 		# current time.
-		conn.execute("update observations set end = ? where service_id = ? and key = ? and end = ?", 
-			(cur_time, service_id, fp, most_recent_time))
+		ndb.update_observation_end_time(service_id, fp, most_recent_time, cur_time)
 	else: 
 		# key has changed or no observations exist yet for this service_id.  Either way
 		# add a new entry for this key with timespan start and end set to the current time
-		conn.execute("insert into observations values (?,?,?,?)", 
-			(service_id, fp, cur_time, cur_time))
+		ndb.insert_observation(service_id, fp, cur_time, cur_time)
 		if fp != most_recent_key:
 			# if there was a previous key, set its 'end' timespan value to be current 
 			# time minus one seconds 
-			conn.execute("update observations set end = ? where service_id = ? and key = ? and end = ?", 
-				(cur_time - 1, service_id, most_recent_key, most_recent_time))
+			ndb.update_observation_end_time(service_id, most_recent_key, most_recent_time, cur_time -1)
 
 

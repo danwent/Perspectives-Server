@@ -27,7 +27,7 @@ import sys
 import notary_common 
 import traceback 
 import threading
-import sqlite3
+from notary_db import ndb
 import errno
 from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
@@ -113,9 +113,10 @@ def record_observations_in_db(res_list):
 	if len(res_list) == 0: 
 		return
 	try: 
-		conn = sqlite3.connect(notary_db)
+		ndb = ndb(notary_db)
+		conn = ndb.get_conn()
 		for r in res_list: 
-			notary_common.report_observation_with_conn( \
+			notary_common.report_observation_with_db( \
 						conn, r[0], r[1]) 
 		conn.commit()
 		conn.close() 
