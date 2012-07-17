@@ -17,26 +17,8 @@
 """Notary utility functions called from many places."""
 
 import time
-import os
-import subprocess
 
 from notary_db import ndb
-
-SSL_SCAN="ssl_scan_openssl.py" 
-SSH_SCAN="ssh_scan_openssh.py"
-
-def start_scan_probe(sid, notary_db): 
-  host_and_port, service_type = sid.split(",")
-  if service_type == "2": 
-    first_arg = SSL_SCAN 
-  elif service_type == "1": 
-    first_arg = SSH_SCAN 
-  else: 
-    print >> sys.stderr, "ERROR: invalid service_type for '%s'" % sid
-    return
-	
-  nul_f = open(os.devnull,'w') 
-  return subprocess.Popen(["python", first_arg, sid, notary_db], stdout=nul_f , stderr=subprocess.STDOUT )
 
 def parse_config(conf_fname): 
 	config = {} 
