@@ -51,8 +51,6 @@ class NotaryHTTPServer:
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
-		parser.add_argument('--create-keys-only', action='store_true', default=False,
-			help='Create notary public/private key pair and exit.')
 		parser.add_argument('--echo-screen', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
 
@@ -64,9 +62,6 @@ class NotaryHTTPServer:
 
 
 		(pub_name, priv_name) = keygen.generate_keypair(args.private_key)
-		if (args.create_keys_only):
-			exit(0)
-
 		self.notary_priv_key= open(priv_name,'r').read()
 		self.notary_public_key = open(pub_name,'r').read()
 		print "Using public key " + pub_name + " \n" + self.notary_public_key
