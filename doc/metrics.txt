@@ -1,0 +1,147 @@
+An explanation of Network Notary metrics
+========================================
+
+The --metrics switches give you the option of tracking statistics on certain information and events that happen while running a notary server. Here is our explanation of what gets recorded and why.
+
+
+
+What is a metric?
+=================
+
+A "metric" is a specific piece of information that is measured or counted to help you understand how software behaves. In our case metrics are used to better understand how well a notary is performing - whether it is healthy and keeping up with demand or having difficulty. Performance metrics for network notaries can either be written to your database or printed to stdout with a special prefix.
+
+
+
+Ground rules for metrics
+========================
+
+1) Metrics should have a purpose
+
+When taking any measurement it is important to decide what you want to know and what you will do with the information before you consider what to track. Don't track information simply because "it might be interesting later" - that leads to wasting time measuring the wrong thing, negatively influencing people's behaviour[1], and hunting for faults that don't exist. Track things with a purpose.
+
+2) User privacy is of paramount importance. Don't track anything that could be abused or that would reveal sensitive user information. (If you spot something that has the potential for abuse please let us know!)
+
+
+
+Desired notary information
+==========================
+
+With our rules in mind, we want to know:
+
+a) What kind of demand a notary receives every day, and at what time(s) of day, so we can keep servers up and running.
+
+This may include data like:
+	- How many requests a notary receives
+	- What the average load is
+	- Which services are requested most often
+
+This data gives us a target when testing so we can make sure notaries can handle real-life demand. It also helps us gauge what kind of resources are required to run a notary - useful both for planning ahead and so anyone considering running a notary knows what they'll need.
+
+Strategies for improving notary performance and uptime may change depending on how a notary is used - e.g. if most requests are for a small pool of services vs requests being distributed evenly the notary may need a different size of cache.
+
+b) How quickly new services are added.
+
+This helps us predict future demand - it is useful to know if e.g. the list of services is stable and a new notary will consume a constant amount of resources; if the service pool is growing slowly and tolerably; or if it's growing rapidly and running a notary is a large undertaking. It also keeps us aware of sudden spikes in growth so owners can make sure notaries stay online.
+
+c) How long it takes to scan all known services. This helps us gauge what kind of resources are needed to run a notary server, and if/when scanning becomes infeasible.
+
+d) Failures from scanning services. If some services are no longer working they could be removed to save time and resources.
+
+
+
+What we track and why
+=====================
+
+To give us a high-level overview, enabling notary metrics tracks the following specific things:
+
+1. When observations are requested for any service (GetObservationsForService)
+1a. If caching is enabled, whether the service existed in the cache (CacheHit) or not (CacheMiss).
+
+	We increment a request counter and note the service name.
+
+	This metric is the basic 'hit'/use of the notary server (question a) - it lets us measure notary demand and how effective our cache is (if cache misses happen frequently the cache size may need to be increased). Tracking the service name lets us understand the size of the active service pool.
+
+	Technical Note: Total requests can be calculated by using GetObservationsForService (if you do not use caching) or GetObservationsForService + CacheHit (if you do use caching).
+
+
+2. When observations are requested for a service we don't know about (ScanForNewService).
+
+	When this happens a background task is created to scan the new service. We increment a request counter and note the service name.
+
+	This metric helps us understand how frequently new services are requested (question b).
+
+
+3. When the limit of background scans is exceeded (ProbeLimitExceeded).
+
+	This indicates that a server is receiving requests for unknown services faster than it can handle (question b). The probe limit may need to be increased.
+
+	Technical Note: we do not explicitly track the event when a request service is not found. To calculate this just add ScanForNewService and ProbeLimitExceeded.
+
+
+4. When scanning services for new certificate data starts and stops (ServiceScanStart, ServiceScanStop)
+
+	This helps us answer question c. We note the total number of services that will be scanned.
+
+
+5. The results of scanning a service (ServiceScanKeyUpdated, ServiceScanPrevKeyUpdated)
+
+	To make sure scans are working.
+
+
+6. Failures from scanning services (ServiceScanFailure).
+
+	For question d. We note the error type, message, and info.
+
+
+
+Other benefits of metrics
+=========================
+
+Having a framework in place to track metrics is also useful because:
+
+a) Metrics can be a good way of measuring the impact of a new feature during testing. e.g. when adding support for data caching you can create a new metric to see how often it helps.
+
+b) Metrics can be a good way to identify whether a problem exists, to help find the code that needs to be fixed, and to verify that the changes work. If you find a bug you can add a new metric to measure program behavior and then test and measure a fix. Once the problem is fixed you can either remove the metric or continue monitoring to ensure the problem does not return.
+
+c) Having the metric framework makes troubleshooting easier. Metrics are easy to add with 1 line of code.
+
+d) Metrics make it easy to extract useful information without having to trawl through a large amount of log data.
+
+
+
+FAQ
+==============
+
+Why track metrics in such a specific way? Why not just look at the server logs?
+
+	These are specific, targeted events that serve a purpose. We're extracting them in a controlled way so they're easy to analyze later. If we simply printed everything to a log we'd still have to filter through the logs, compile/sum the results, and then do the analysis anyway. Tracking metrics in a database makes analysis faster and easier.
+
+	If you still prefer to not write to a database use the --metricslog switch. This prints metric events to stdout with a standard prefix, so you can filter or extract them in whatever makes sense for your system (e.g. a syslog drain on a hosted system).
+
+
+What about performance? Won't tracking metrics slow down the server?
+
+	Based on our tests: with caching turned off tracking metrics roughly halves performance when writing to the database. With caching turned on there is very little noticible difference in performance. If you are not caching data you may not want to track performance metrics on production systems.
+
+
+Will using a notary that tracks metrics affect my privacy?
+
+	*NO IT WILL NOT*! Privacy is extremely important to us. Servers that track performance metrics still do not track any information about users in any way. The goal of this document is to outline exactly what we're doing so it's transparent, so you can decide for yourself whether to use a any given notary. Hopefully this explanation will help us earn your trust that we are not tracking any harmful information. If you believe something about metrics is a privacy concern please let us know.
+
+
+Do all network notaries track metrics?
+
+	No. Tracking performance metrics is optional and turned off by default.
+
+
+How do I tell if a notary tracks metrics?
+
+	Visit the notary's main index page - usually the same URL your Perspectives Preferences dialog (e.g. perspectives1.networknotary.org:8080). If the notary uses metrics it will be displayed on that page. If the notary does not have an index page that means it is running an older version of the notary software and does *not* track metrics (support for metrics was added in version 3.1).
+
+
+--
+
+References
+
+[1] "Measurement", Joel on Software 2002
+http://www.joelonsoftware.com/news/20020715.html
