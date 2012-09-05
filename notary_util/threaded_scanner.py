@@ -66,6 +66,7 @@ class ScanThread(threading.Thread):
 
 	def record_failure(self, e,): 
 		stats.failures += 1
+		ndb.report_metric('ServiceScanFailure', str(e))
 		if type(e) == type(self.timeout_exc): 
 			stats.failure_timeouts += 1
 			return
@@ -164,6 +165,7 @@ all_sids = [ line.rstrip() for line in f ]
 print "Starting scan of %s service-ids at: %s" % (len(all_sids), localtime)
 print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
     (timeout_sec, rate) 
+ndb.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
 for sid in all_sids:  
 	try: 
@@ -230,4 +232,5 @@ localtime = time.asctime( time.localtime(start_time) )
 print "Ending scan at: %s" % localtime
 print "Scan of %s services took %s seconds.  %s Failures" % \
 	(stats.num_started,duration, stats.failures)
+ndb.report_metric('ServiceScanStop')
 exit(0) 

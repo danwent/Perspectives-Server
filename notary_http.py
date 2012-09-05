@@ -41,6 +41,7 @@ class NotaryHTTPServer:
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
+	PROBE_LIMIT = 10 # simultaneous scans for new services
 
 	MEMCACHE_SERVER_VAR = 'MEMCACHE_SERVERS'
 	MEMCACHE_USER_VAR = 'MEMCACHE_USERNAME'
@@ -132,7 +133,10 @@ class NotaryHTTPServer:
 		if (self.mc):
 			cached_service = self.mc.get(service)
 			if (cached_service != None):
+				self.ndb.report_metric('CacheHit', service)
 				return cached_service
+			else:
+				self.ndb.report_metric('CacheMiss', service)
 
 		return self.calculate_service_xml(service, host, port, service_type)
 
@@ -141,6 +145,7 @@ class NotaryHTTPServer:
 		Query the database and build a response containing any known keys for the given service.
 		"""
 
+		self.ndb.report_metric('GetObservationsForService', service)
 		obs = None
 		obs = self.ndb.get_observations(service)
 
@@ -159,12 +164,14 @@ class NotaryHTTPServer:
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes
-			if self.active_threads < 10: 
+			if self.active_threads < self.PROBE_LIMIT:
 				print "on demand probe for '%s'" % service
+				self.ndb.report_metric('ScanForNewService', service)
 				t = OnDemandScanThread(service, 10 , self, self.args)
 				t.start()
 			else: 
 				print "Exceeded on demand threshold, not probing '%s'" % service
+				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
 	
