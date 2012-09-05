@@ -111,6 +111,7 @@ class NotaryHTTPServer:
 				timestamps_by_key[key] = []
 				keys.append(key)
 			timestamps_by_key[key].append((start, end))
+		self.ndb.close_session()
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes
@@ -205,8 +206,9 @@ class OnDemandScanThread(threading.Thread):
 			notary_common.report_observation_with_db(db, self.sid, fp)
 		except Exception, e:
 			traceback.print_exc(file=sys.stdout)
-
-		self.server_obj.active_threads -= 1
+		finally:
+			db.close_session()
+			self.server_obj.active_threads -= 1
 
 
 

@@ -44,7 +44,8 @@ def report_observation_with_db(ndb, service, fp):
 		for k in most_recent_time_by_key:
 			if most_recent_time_by_key[k] > most_recent_time:
 				most_recent_key = k
-				most_recent_time = most_recent_time_by_key[k]  
+				most_recent_time = most_recent_time_by_key[k]
+	ndb.close_session()
 
 	if most_recent_key == fp: 
 		# this key matches the most recently seen key before this observation.

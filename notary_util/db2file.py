@@ -110,3 +110,5 @@ if (args.long):
 	print_long_output(obs)
 else:
 	print_tuples(obs)
+
+ndb.close_session()

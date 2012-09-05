@@ -69,6 +69,8 @@ else:
 	else:
 		ids = ndb.get_newest_services(int(cur_time - (3600 * 24 * args.newer)))
 
+ndb.close_session()
+
 if (ids != None):
 	for (name) in ids:
 		# print as string instead of tuple, to make it easier to use elsewhere
