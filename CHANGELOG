@@ -7,6 +7,7 @@ Format:
 
 3.1
 ---
++ Add support for memcaching of service data, to improve performance.
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
 
 3.0

@@ -42,6 +42,11 @@ class NotaryHTTPServer:
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
 
+	MEMCACHE_SERVER_VAR = 'MEMCACHE_SERVERS'
+	MEMCACHE_USER_VAR = 'MEMCACHE_USERNAME'
+	MEMCACHE_PASS_VAR = 'MEMCACHE_PASSWORD'
+	MEMCACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
+
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
 			description=self.__doc__, version=self.VERSION,
@@ -53,6 +58,11 @@ class NotaryHTTPServer:
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
+		parser.add_argument('--memcache', action='store_true', default=False,
+			help="Use memcache to cache service results, to increase performance and reduce load on the notary database.\
+				Cached info expires after " + str(self.MEMCACHE_EXPIRY / 3600) + " hours. Memcache configuration is read from the environment variables\
+				" + self.MEMCACHE_SERVER_VAR  + ", " + self.MEMCACHE_USER_VAR + ", and " + self.MEMCACHE_PASS_VAR + \
+				". Default: \'%(default)s\'")
 
 
 		args = parser.parse_args()
@@ -71,6 +81,27 @@ class NotaryHTTPServer:
 		self.web_port = self.DEFAULT_WEB_PORT
 		if(args.envport):
 			self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
+
+		self.mc = None
+		if (args.memcache):
+			try:
+				import pylibmc
+				#TODO: ALL INPUT IS EVIL
+				#regex check these variables?
+				self.mc = pylibmc.Client(
+					servers=[os.environ.get(self.MEMCACHE_SERVER_VAR)],
+					username=os.environ.get(self.MEMCACHE_USER_VAR),
+					password=os.environ.get(self.MEMCACHE_PASS_VAR),
+					binary=True
+				)
+			except ImportError:
+				print >> sys.stderr, "ERROR: Could not import pylibmc - memcache is disabled. Please install the module and try again."
+				self.mc = None
+			except AttributeError:
+				print >> sys.stderr, "ERROR: Could not connect to the memcache server '%s' as user '%s'. memcache is disabled.\
+				 Please check that the server is running, check your memcache environment variables, and try again." % (os.environ.get(self.MEMCACHE_SERVER_VAR),\
+				  os.environ.get(self.MEMCACHE_PASS_VAR))
+				self.mc = None
 
 		self.active_threads = 0 
 		self.args = args
@@ -92,15 +123,27 @@ class NotaryHTTPServer:
 			print >> i, lines
 
 	def get_xml(self, host, port, service_type):
+		"""Fetch the xml response for a given service."""
+
+		service = str(host + ":" + port + "," + service_type)
+		print "Request for '%s'" % service
+		sys.stdout.flush()
+
+		if (self.mc):
+			cached_service = self.mc.get(service)
+			if (cached_service != None):
+				return cached_service
+
+		return self.calculate_service_xml(service, host, port, service_type)
+
+	def calculate_service_xml(self, service, host, port, service_type):
 		"""
 		Query the database and build a response containing any known keys for the given service.
 		"""
 
-		service = str(host + ":" + port + "," + service_type)
-
-		print "Request for '%s'" % service
-		sys.stdout.flush()
+		obs = None
 		obs = self.ndb.get_observations(service)
+
 		timestamps_by_key = {}
 		keys = []
 		num_rows = 0
@@ -167,7 +210,12 @@ class NotaryHTTPServer:
 		packed_data = service.encode() + struct.pack("B", 0) + packed_data
 		sig = crypto.sign_content(packed_data, self.notary_priv_key)
 		top_element.setAttribute("sig",sig)
-		return top_element.toprettyxml() 
+		xml = top_element.toprettyxml()
+
+		if (self.mc != None):
+			self.mc.set(service, xml, time=self.MEMCACHE_EXPIRY)
+
+		return xml
 
 	@cherrypy.expose
 	def index(self, host=None, port=None, service_type=None):
