@@ -5,6 +5,9 @@ Format:
 + new feature
 * bug or behavior fix
 
+3.1
+---
+* Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
 
 3.0
 ---
