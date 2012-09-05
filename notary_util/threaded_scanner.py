@@ -182,7 +182,7 @@ for sid in all_sids:
 				"failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
-			print "failure details: timeouts = %s, " \
+			print "  details: timeouts = %s, " \
 				"ssl-alerts = %s, no-route = %s, " \
 				"conn-refused = %s, conn-reset = %s,"\
 				"dns = %s, other = %s" % \
