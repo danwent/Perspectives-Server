@@ -103,14 +103,15 @@ class NotaryHTTPServer:
 		obs = self.ndb.get_observations(service)
 		timestamps_by_key = {}
 		keys = []
+		num_rows = 0
 
-		num_rows = 0 
-		for (name, key, start, end) in obs:
-			num_rows += 1 
-			if key not in keys:
-				timestamps_by_key[key] = []
-				keys.append(key)
-			timestamps_by_key[key].append((start, end))
+		if (obs != None):
+			for (name, key, start, end) in obs:
+				num_rows += 1
+				if key not in keys:
+					timestamps_by_key[key] = []
+					keys.append(key)
+				timestamps_by_key[key].append((start, end))
 		self.ndb.close_session()
 
 		if num_rows == 0: 
