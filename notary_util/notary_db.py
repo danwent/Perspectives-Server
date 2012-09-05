@@ -243,11 +243,10 @@ class ndb:
 		del args['read_config_file']
 
 		# print a header to make file purpose clear
-		f = open(self.NOTARY_CONFIG_FILE, 'w')
-		print >> f, "# Network notary database configuration settings -"
-		print >> f, "# for easy sharing of db configs between tools."
-		print >> f, "# Run `python notary_http.py --help` for more info.\n"
-		f.close()
+		with open(self.NOTARY_CONFIG_FILE, 'w') as f:
+			print >> f, "# Network notary database configuration settings -"
+			print >> f, "# for easy sharing of db configs between tools."
+			print >> f, "# Run `python notary_http.py --help` for more info.\n"
 
 		config = ConfigParser.SafeConfigParser()
 		config.add_section(self.CONFIG_SECTION)

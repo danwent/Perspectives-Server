@@ -81,17 +81,15 @@ class NotaryHTTPServer:
 		STATIC_TEMPLATE = "static_template.html"
 
 		template = os.path.join(self.STATIC_DIR, STATIC_TEMPLATE)
-		f = open(template,'r')
-		lines = str(f.read())
-		f.close()
+		with open(template,'r') as t:
+			lines = str(t.read())
 
 		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
 		lines = lines.replace('<!-- ::PUBLIC_KEY:: -->', self.notary_public_key)
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
-		f = open (index, 'w')
-		print >> f, lines
-		f.close()
+		with open (index, 'w') as i:
+			print >> i, lines
 
 	def get_xml(self, host, port, service_type):
 		"""
