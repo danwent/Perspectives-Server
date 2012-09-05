@@ -8,6 +8,7 @@ Format:
 3.1
 ---
 + Add support for memcaching of service data, to improve performance.
++ Add metrics tables to allow tracking of useful performance statistics. See doc/metrics.txt for a detailed explanation.
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
 
 3.0

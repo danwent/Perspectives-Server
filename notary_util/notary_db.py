@@ -67,6 +67,31 @@ Index('ix_observations_end', Observations.end)
 Index('ix_observations_service_id_key_end', Observations.service_id, Observations.key, Observations.end)
 
 
+class EventTypes(ORMBase):
+	"""
+	Various types of events we may be interested in tracking while a notary server runs.
+	"""
+	# see the ndb class and ndb.init_event_types()
+	# for a list of possible event types
+	__tablename__ = 't_event_types'
+	event_type_id = Column(Integer, primary_key=True)
+	name = Column(String, nullable=False, unique=True)
+
+class Metrics(ORMBase):
+	"""
+	A log of interesting events that happen while a notary server runs. Mainly used for diagnostic or performance tracking.
+	"""
+	__tablename__ = 't_metrics'
+	event_id = Column(Integer, primary_key=True)
+	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'))
+	date = Column(Integer) # unix timestamp - number of seconds since the epoch.
+	comment = Column(String) # anything worth noting. do NOT track ip address or any private/personally identifiable information.
+
+# purposely don't create any indexes on metrics tables -
+# we want writing data to be as fast as possible.
+# analysis can be done later on a copy of the data so it doesn't slow down the actual notary machine.
+
+
 
 class ndb:
 	"""
@@ -102,6 +127,13 @@ class ndb:
 		os.path.join(os.path.dirname(os.path.realpath(__file__)), 'notary.db.config')
 	CONFIG_SECTION = 'NotaryDB'
 
+	EVENT_TYPE_NAMES=['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
+		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanKeyUpdated',
+		'ServiceScanPrevKeyUpdated', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
+		'EventTypeUnknown']
+	EVENT_TYPES={}
+	METRIC_PREFIX = "NOTARY_METRIC"
+
 	def __init__(self, args):
 		"""
 		Initialize a new ndb object.
@@ -129,7 +161,8 @@ class ndb:
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
 						dbtype=DEFAULT_DB_TYPE,
 						dbecho=DEFAULT_ECHO,
-						write_config_file=False, read_config_file=False):
+						write_config_file=False, read_config_file=False,
+						metricsdb=False, metricslog=False):
 		"""
 		Initialize a new ndb object.
 
@@ -165,6 +198,9 @@ class ndb:
 			self.db = create_engine(self.SUPPORTED_DBS[dbtype]['connstr'] % (dbuser, self.DB_PASSWORD, dbhost, dbname), echo=dbecho)
 			ORMBase.metadata.create_all(self.db)
 			self.Session = scoped_session(sessionmaker(bind=self.db))
+			self.__init_event_types__()
+			self.metricsdb = metricsdb
+			self.metricslog = metricslog
 
 			if (write_config_file):
 				self.write_db_config(locals())
@@ -174,6 +210,29 @@ class ndb:
 			print >> sys.stderr, errmsg
 			raise Exception(errmsg)
 
+	def __init_event_types__(self):
+		"""Create entries in the EventTypes table, if necessary, and store their IDs in the EVENT_TYPES dictionary."""
+
+		# if we're using metrics, caching these values now
+		# saves us from having to look up the ID every time we insert a metric record.
+
+		# __init__ happens in its own thread, so create and remove a local Session
+		session = self.Session()
+		for name in self.EVENT_TYPE_NAMES:
+			try:
+				evt = session.query(EventTypes).filter(EventTypes.name == name).first()
+
+				if (evt == None):
+					evt = EventTypes(name = name)
+					session.add(evt)
+					session.commit()
+
+				self.EVENT_TYPES[name] = evt.event_type_id
+
+			except Exception, e:
+				print >> sys.stderr, "Error creating Event type '%s': '%s'" % (name, e)
+				session.rollback()
+		self.Session.remove()
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
@@ -221,6 +280,13 @@ class ndb:
 			help='After successfully connecting, save all database arguments to a config file.')
 		dbgroup.add_argument('--read-config-file', '--rcf', action='store_true', default=False,
 			help='Load all database arguments from the config file. Arguments specified on the command line will override those found in the file.')
+		metricgroup = parser.add_mutually_exclusive_group()
+		metricgroup.add_argument('--metricsdb', action='store_true', default=False,
+			help="Track information about various notary events, to help diagnose performance and health, and save info in the notary database.\
+			 See docs/metrics.txt for a detailed explanation. Default: \'%(default)s\'")
+		metricgroup.add_argument('--metricslog', action='store_true', default=False,
+			help="Track information about various notary events, and print info to stdout with the prefix '" + self.METRIC_PREFIX + "'. \
+			 See docs/metrics.txt for a detailed explanation. Default: \'%(default)s\'")
 
 		return parser
 
@@ -435,3 +501,25 @@ class ndb:
 			print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
 				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
 		self.Session.remove()
+
+	def report_metric(self, event_type, comment=""):
+		"""Add a metric event to the metrics table."""
+		if (self.metricsdb or self.metricslog):
+			if (event_type not in self.EVENT_TYPES):
+				print >> sys.stderr, "Unknown event type '%s'. Please check your call to report_metric()." % event_type
+				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
+			else:
+				if (self.metricsdb):
+					# note: if we need even more speed we could try spawing this on its own thread
+					session = self.Session()
+					try:
+						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], date=int(time.time()), comment=str(comment))
+						session.add(metric)
+						session.commit()
+					except Exception, e:
+						print >> sys.stderr, "Error committing metric: '%s'" % e
+						session.rollback()
+					finally:
+						self.Session.remove()
+				elif (self.metricslog):
+					print "|%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment))
