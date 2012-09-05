@@ -51,7 +51,7 @@ class NotaryHTTPServer:
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
-		parser.add_argument('--echo-screen', action='store_true', default=False,
+		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
 
 
