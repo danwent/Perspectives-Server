@@ -32,7 +32,16 @@
 					.section.info .key {
 						background-color: #cccccc;
 						padding: 10px 10px 10px 10px;
-						width: 75ex; /* openssl wraps at 65 chars, plus our padding */}
+						width: 75ex; /* openssl wraps at 65 chars, plus our padding */
+						word-wrap: break-word;}
+
+					.section.info pre {
+						white-space: pre-wrap;       /* css-3 */
+						white-space: -moz-pre-wrap !important;  /* Mozilla, since 1999 */
+						white-space: -pre-wrap;      /* Opera 4-6 */
+						white-space: -o-pre-wrap;    /* Opera 7 */
+						word-wrap: break-word;       /* Internet Explorer 5.5+ */
+						}
 
 					.section.info img {
 						vertical-align: text-bottom;}
