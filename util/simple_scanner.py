@@ -16,8 +16,8 @@
 
 """
 Scan a list of services and print results.
-To run scans and update results in a network notary database instead,
-see threaded_scanner.py.
+To run scans and update results in a network notary database,
+see notary_util/threaded_scanner.py.
 """
 
 import os

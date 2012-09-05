@@ -16,7 +16,7 @@
 
 """
 Scan a list of services and update Observation records in the notary database.
-For running scans without connecting to the database see simple_scanner.py.
+For running scans without connecting to the database see util/simple_scanner.py.
 """
 
 import sys
