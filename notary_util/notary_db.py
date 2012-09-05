@@ -28,10 +28,9 @@ import sys
 import re
 import ConfigParser
 
-
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
-from sqlalchemy.orm import sessionmaker, relationship, backref
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
@@ -164,10 +163,8 @@ class ndb:
 
 			# set up sqlalchemy objects
 			self.db = create_engine(self.SUPPORTED_DBS[dbtype]['connstr'] % (dbuser, self.DB_PASSWORD, dbhost, dbname), echo=dbecho)
-			self.conn = self.db.connect()
 			ORMBase.metadata.create_all(self.db)
-			Session = sessionmaker(bind=self.db)
-			self.session = Session()
+			self.Session = scoped_session(sessionmaker(bind=self.db))
 
 			if (write_config_file):
 				self.write_db_config(locals())
@@ -177,6 +174,20 @@ class ndb:
 			print >> sys.stderr, errmsg
 			raise Exception(errmsg)
 
+
+	def __del__(self):
+		"""Clean up any remaining database connections."""
+
+		if ((hasattr(self, 'Session')) and (self.Session != None)):
+			try:
+				self.Session.close_all()
+				self.Session.remove()
+				del self.Session
+			except Exception, e:
+				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+
+		self.db.dispose()
+		del self.db
 
 	@classmethod
 	def get_parser(self):
@@ -333,21 +344,32 @@ class ndb:
 
 		return good_args
 
+	def close_session(self):
+		"""
+		Clean up the session after any caller is done using results.
+		Call this after any SQL method to make sure database connections are not left open.
+		"""
+		if ((hasattr(self, 'Session')) and (self.Session != None)):
+			try:
+				self.Session.remove()
+			except Exception as e:
+				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+
 
 	# actual data methods follow
 
 	def get_all_services(self):
 		"""Get all service names."""
-		return self.session.query(Services.name).all()
+		return self.Session().query(Services.name).all()
 
 	def get_newest_services(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return self.session.query(Services.name).join(Observations).\
+		return self.Session().query(Services.name).join(Observations).\
 			filter(Observations.end > end_limit)
 
 	def get_oldest_services(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return self.session.query(Services).join(Observations).filter(\
+		return self.Session().query(Services).join(Observations).filter(\
 			~Services.name.in_(\
 				self.get_newest_services(end_limit))).\
 			values(Services.name)
@@ -355,24 +377,25 @@ class ndb:
 	def insert_service(self, service_name):
 		"""Add a new Service to the database."""
 		# if this is too slow we could add bulk insertion
-		srv = self.session.query(Services).filter(Services.name == service_name).first()
+		session = self.Session()
+		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
 			srv = Services(name = service_name)
-			self.session.add(srv)
-			self.session.commit()
+			session.add(srv)
+			session.commit()
 
 		return srv
 
 	def get_all_observations(self):
 		"""Get all observations."""
-		return self.session.query(Services).join(Observations).\
+		return self.Session().query(Services).join(Observations).\
 			order_by(Services.name).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
 	def get_observations(self, service):
 		"""Get all observations for a given service."""
-		return self.session.query(Services).join(Observations).\
+		return self.Session().query(Services).join(Observations).\
 			filter(Services.name == service).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
@@ -381,12 +404,15 @@ class ndb:
 		srv = self.insert_service(service)
 
 		try:
+			session = self.Session()
 			newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
-			self.session.add(newob)
-			self.session.commit()
+			session.add(newob)
+			session.commit()
 		except IntegrityError:
 			print "Error: Observation for (%s, %s) already present. If you want to update it call that function instead. Ignoring." % (service, key)
-			self.session.rollback()
+			session.rollback()
+		finally:
+			self.Session.remove()
 
 	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
 		"""Update the end time for a given Observation."""
@@ -397,13 +423,15 @@ class ndb:
 		if (old_end_time == None):
 			old_end_time = curtime
 
-		ob = self.session.query(Observations).join(Services)\
+		session = self.Session()
+		ob = session.query(Observations).join(Services)\
 			.filter(Services.name == service)\
 			.filter(Observations.key == fp)\
 			.filter(Observations.end == old_end_time).first()
 		if (ob != None):
 			ob.end = new_end_time
-			self.session.commit()
+			session.commit()
 		else:
 			print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
 				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
+		self.Session.remove()
