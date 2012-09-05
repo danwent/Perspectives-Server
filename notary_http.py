@@ -116,8 +116,23 @@ class NotaryHTTPServer:
 		with open(template,'r') as t:
 			lines = str(t.read())
 
+		metrics_class = 'td-status-off'
+		metrics_status = 'Off'
+		metrics_text = 'This server does not track any performance-related metrics.'
+
+		if (self.ndb.metricsdb or self.ndb.metricslog):
+			metrics_class = 'td-status-on'
+			metrics_status = 'On'
+			# TODO: add link to FAQ on website once it is up.
+			metrics_text = 'This server tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
+			 This does not affect your privacy in any way.\
+			 For details see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.'
+
+
 		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
 		lines = lines.replace('<!-- ::PUBLIC_KEY:: -->', self.notary_public_key)
+		lines = lines.replace('<!-- ::OPTIONS_METRICS:: -->',
+			"<tr><td>Performance Metrics</td><td class='%s'>%s</td><td>%s</td></tr>" % (metrics_class, metrics_status, metrics_text))
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:

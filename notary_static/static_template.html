@@ -36,6 +36,27 @@
 
 					.section.info img {
 						vertical-align: text-bottom;}
+
+					.section.info table {
+						border-spacing: 5px;}
+
+					.section.info td {
+						padding: 5px 5px 5px 5px;
+						text-align: left;}
+
+					.section.info .th-title {
+						border-bottom-style: solid;
+						border-bottom-color: #333333; /* keep the same color as all text. */
+						border-bottom-width: 2px;
+						text-align: left;}
+
+					.section.info .td-status-off {
+						background-color: #cccccc; /* keep the same as the key box. TODO: use a variable. */
+						font-weight: bold; }
+
+					.section.info .td-status-on {
+						background-color: #99ccff; /* keep the same as the info section. TODO: use a variable. */
+						font-weight: bold;}
 			}
 	</style>
 </head>
@@ -51,6 +72,12 @@
 			<div class='key'>
 				<p><pre><!-- ::PUBLIC_KEY:: --></pre></p>
 			</div>
+			<p>
+				<table>
+					<th class='th-title'>Server Details</th><th colspan="2"></th>
+					<!-- ::OPTIONS_METRICS:: -->
+				</table>
+			</p>
 		</div>
 	  </div>
 	</div>
