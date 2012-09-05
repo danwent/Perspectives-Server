@@ -278,7 +278,7 @@ class ndb:
 			items = config.items(self.CONFIG_SECTION)
 			return items
 		except ConfigParser.NoSectionError:
-			print >> stderr, "Could not read config file. Please write one with --write-config-file before reading"
+			print >> sys.stderr, "Could not read config file. Please write one with --write-config-file before reading"
 			return ()
 
 	def set_config_args(self):
@@ -409,7 +409,7 @@ class ndb:
 			session.add(newob)
 			session.commit()
 		except IntegrityError:
-			print "Error: Observation for (%s, %s) already present. If you want to update it call that function instead. Ignoring." % (service, key)
+			print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. If you want to update it call that function instead. Ignoring." % (service, key)
 			session.rollback()
 		finally:
 			self.Session.remove()
