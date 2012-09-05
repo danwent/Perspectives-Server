@@ -84,7 +84,7 @@ class ScanThread(threading.Thread):
 			stats.failure_dns += 1
 		else: 	
 			stats.failure_other += 1 
-			print "Unknown error scanning '%s'" % self.sid 
+			print "Unknown error scanning '%s'\n" % self.sid
 			traceback.print_exc(file=sys.stdout)
 
 	def run(self): 
@@ -167,7 +167,8 @@ print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
 
 for sid in all_sids:  
 	try: 
-		# ignore non SSL services	
+		# ignore non SSL services
+		# TODO: use a regex instead
 		if sid.split(",")[1] == notary_common.SSL_TYPE:
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
@@ -206,6 +207,8 @@ for sid in all_sids:
 					 (sid,duration) 
 			sys.stdout.flush()
 
+	except IndexError:
+		print >> sys.stderr, "Service '%s' has no index [1] after splitting on ','.\n" % (sid)
 	except KeyboardInterrupt: 
 		exit(1)	
 
