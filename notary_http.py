@@ -24,7 +24,8 @@ import os
 
 import cherrypy
 
-from util import keygen, crypto
+from util import crypto
+from util.keymanager import keymanager
 from notary_util.notary_db import ndb
 from notary_util import notary_common
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
@@ -49,7 +50,7 @@ class NotaryHTTPServer:
 	MEMCACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
 
 	def __init__(self):
-		parser = argparse.ArgumentParser(parents=[ndb.get_parser(), keygen.get_parser()],
+		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
 			description=self.__doc__, version=self.VERSION,
 			epilog="If the database schema or public/private keypair do not exist they will be automatically created on launch.")
 		portgroup = parser.add_mutually_exclusive_group()
@@ -71,11 +72,13 @@ class NotaryHTTPServer:
 		# pass ndb the args so it can use any relevant ones from its own parser
 		self.ndb = ndb(args)
 
-
-		(pub_name, priv_name) = keygen.generate_keypair(args.private_key)
-		self.notary_priv_key= open(priv_name,'r').read()
-		self.notary_public_key = open(pub_name,'r').read()
-		print "Using public key " + pub_name + " \n" + self.notary_public_key
+		# same for keymanager
+		km = keymanager(args)
+		(self.notary_public_key, self.notary_priv_key) = km.get_keys()
+		if (self.notary_public_key == None or self.notary_priv_key == None):
+			print >> sys.stderr, "Could not get public and private keys."
+			exit(1)
+		print "Using public key\n" + self.notary_public_key
 
 		self.create_static_index()
 
