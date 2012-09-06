@@ -11,6 +11,8 @@ Format:
 + Add metrics tables to allow tracking of useful performance statistics. See doc/metrics.txt for a detailed explanation.
 + Display whether a notary tracks performance metrics on the static index page
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
++ Allow notary public/private keys to be read from environment variables.
+	Could be a security trade-off, but makes it easier to run notaries on some distributed systems.
 
 
 3.0

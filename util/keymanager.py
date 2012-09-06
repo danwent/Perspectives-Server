@@ -28,6 +28,9 @@ import crypto
 class keymanager:
 	"""Read, set, create, and export public and private server keys."""
 
+	ENV_PUB_KEY_NAME='NOTARY_PUBLIC_KEY'
+	ENV_PRIV_KEY_NAME='NOTARY_PRIVATE_KEY'
+
 	def __init__(self, args):
 		"""
 		Initialize a new keymanager.
@@ -92,6 +95,10 @@ class keymanager:
 			keygroup.add_argument('--private-key', '-k', default=keygen.DEFAULT_PRIV_NAME, metavar='PRIVATE_KEY_FILE',
 				help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
 
+		keygroup.add_argument('--envkeys', action='store_true', default=False,
+			help="Read public and private keys from the environment variables '" +
+				self.ENV_PUB_KEY_NAME + "' and '" + self.ENV_PRIV_KEY_NAME + "' rather than from files." +
+				" Default: \'%(default)s\'.")
 		return parser
 
 
@@ -100,8 +107,10 @@ class keymanager:
 		Read and return a public/private key pair, creating them if necessary.
 		If valid keys cannot be created or read, return (None, None).
 		"""
-
-		(pub_key, priv_key) = self.get_file_keys(self.private_key)
+		if (self.envkeys):
+			(pub_key, priv_key) = self.get_env_keys()
+		else:
+			(pub_key, priv_key) = self.get_file_keys(self.private_key)
 
 		if (pub_key == None or priv_key == None):
 			return (None, None)
@@ -121,6 +130,32 @@ class keymanager:
 			return (None, None)
 
 
+	def get_env_keys(self):
+		"""Read public and private keys from environment variables."""
+
+		if ((self.ENV_PUB_KEY_NAME not in os.environ) or \
+			(self.ENV_PRIV_KEY_NAME not in os.environ) or \
+			(os.environ[self.ENV_PUB_KEY_NAME] == None) or \
+			(os.environ[self.ENV_PRIV_KEY_NAME] == None)):
+
+			return (None, None)
+
+		valid_pub_key = crypto.valid_pub_key
+		valid_priv_key = crypto.valid_priv_key
+
+		pub_key = None
+		key_try = str(os.environ[self.ENV_PUB_KEY_NAME])
+		match = valid_pub_key.match(key_try)
+		if (match != None):
+			pub_key = "%s\n%s\n%s" % (match.group(1), self.wrap_key(match.group(2)), match.group(3))
+
+		priv_key = None
+		key_try = str(os.environ[self.ENV_PRIV_KEY_NAME])
+		match = valid_priv_key.match(key_try)
+		if (match != None):
+			priv_key = "%s\n%s\n%s" % (match.group(1), self.wrap_key(match.group(2)), match.group(3))
+
+		return (pub_key, priv_key)
 	def get_file_keys(self, private_key):
 		"""Read public and private keys from files on disk."""
 		(pub_file, priv_file) = self.get_keynames(private_key)
@@ -152,6 +187,14 @@ class keymanager:
 			real_pub_name = keypat.match(private_key_name).group(1) + ".pub"
 
 		return (real_pub_name, real_priv_name)
+
+	def wrap_key(self, key, width = 65):
+		"""Wrap text at 'width' lines so it prints nicely."""
+		key = key.strip()
+		if (len(key) < width):
+			return key
+		else:
+			return key[:(width-1)] + '\n' + self.wrap_key(key[(width-1):])
 
 
 if __name__ == "__main__":
