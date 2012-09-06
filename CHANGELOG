@@ -9,10 +9,13 @@ Format:
 ---
 + Add support for memcaching of service data, to improve performance.
 + Add metrics tables to allow tracking of useful performance statistics. See doc/metrics.txt for a detailed explanation.
++ Display whether a notary tracks performance metrics on the static index page
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
+
 
 3.0
 ---
+Requires python 2.7.
 + Separate the database interface from the notary code.
     This lets us change the type of database much more easily,
     and gives us a central way to organize other modules that communicate with the database.
