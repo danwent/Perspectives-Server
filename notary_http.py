@@ -52,7 +52,7 @@ class NotaryHTTPServer:
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
 			description=self.__doc__, version=self.VERSION,
-			epilog="If the database schema or public/private keypair do not exist they will be automatically created on launch.")
+			epilog="If the database schema does not exist it will be automatically created on launch.")
 		portgroup = parser.add_mutually_exclusive_group()
 		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT,
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")

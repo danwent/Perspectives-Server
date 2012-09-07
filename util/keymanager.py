@@ -84,7 +84,8 @@ class keymanager:
 			# is the expected behaviour
 			keygroup = parser.add_mutually_exclusive_group()
 			keygroup.add_argument('private_key', nargs='?', default=keygen.DEFAULT_PRIV_NAME,
-				help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+				help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.\
+				If the public/private keypair do not exist they will be automatically created.")
 
 		else:
 			# don't specify description or epilogue,
@@ -94,7 +95,8 @@ class keymanager:
 			# when imported from another module it makes more sense to use an optional argument.
 			keygroup = parser.add_mutually_exclusive_group()
 			keygroup.add_argument('--private-key', '-k', default=keygen.DEFAULT_PRIV_NAME, metavar='PRIVATE_KEY_FILE',
-				help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.")
+				help="File to use as the private key. '.priv' will be appended if necessary. Default: \'%(default)s\'.\
+				If the public/private keypair do not exist they will be automatically created.")
 
 		keygroup.add_argument('--envkeys', action='store_true', default=False,
 			help="Read public and private keys from the environment variables '" +
