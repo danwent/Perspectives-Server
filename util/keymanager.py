@@ -42,16 +42,17 @@ class keymanager:
 		self.__actual_init__(**keymanager.filter_args(vars(args)))
 
 
+
 	# note: keep these arg names the same as the argparser args - see filter_args()
-	def __actual_init__(self, private_key=None, envkeys=None):
+	def __actual_init__(self, private_key=None, envkeys=None, export_heroku_keys=None):
 		"""
 		Initialize a new keymanager.
 
 		The actual initialization work is done here.
 		"""
-
 		self.envkeys = envkeys
 		self.private_key = private_key
+		self.export_heroku_keys = export_heroku_keys
 		return
 
 
@@ -99,6 +100,11 @@ class keymanager:
 			help="Read public and private keys from the environment variables '" +
 				self.ENV_PUB_KEY_NAME + "' and '" + self.ENV_PRIV_KEY_NAME + "' rather than from files." +
 				" Default: \'%(default)s\'.")
+		keygroup.add_argument('--export-heroku-keys', '--export-heroku', '--heroku',
+			nargs='?', default=None, const='', metavar='app-name',
+			help="Export the keys as heroku 'config vars' for the specified app (or the current app if none is specified).\
+			For notaries hosted on heroku.com.")
+
 		return parser
 
 
@@ -125,6 +131,8 @@ class keymanager:
 			valid_keys = False
 
 		if (valid_keys):
+			if (self.export_heroku_keys != None):
+				self.set_heroku_keys(pub_key, priv_key)
 			return (pub_key, priv_key)
 		else:
 			return (None, None)
@@ -156,6 +164,7 @@ class keymanager:
 			priv_key = "%s\n%s\n%s" % (match.group(1), self.wrap_key(match.group(2)), match.group(3))
 
 		return (pub_key, priv_key)
+
 	def get_file_keys(self, private_key):
 		"""Read public and private keys from files on disk."""
 		(pub_file, priv_file) = self.get_keynames(private_key)
@@ -187,6 +196,37 @@ class keymanager:
 			real_pub_name = keypat.match(private_key_name).group(1) + ".pub"
 
 		return (real_pub_name, real_priv_name)
+
+	def set_heroku_keys(self, pub_key, priv_key):
+		"""
+		Export keys as heroku config vars.
+		This way the user doesn't have to awkwardly copy/paste things manually.
+		"""
+
+		# remove newlines so keys are exported properly
+		pub_key = pub_key.replace('\n', '')
+		priv_key = priv_key.replace('\n', '')
+
+		app_name = ''
+		if (self.export_heroku_keys != ''):
+			# then the user specified an app name.
+
+			# remove invalid characters from the app name.
+			# note: heroku's app names match the policy on valid domain names
+			# https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_host_names
+			# i.e.: heroku app names must start with a letter
+			# and can only contain lowercase letters, numbers, and dashes.
+			app_name = self.export_heroku_keys
+			app_name = "--app " + re.sub("[^a-z0-9\-]",'', app_name)
+
+		# wrap key values in "" in case we have an = sign in our key.
+		# quotes will not be present in the exported config var.
+		export = "heroku config:set %s=\"%s\" %s=\"%s\" %s" % \
+			(self.ENV_PUB_KEY_NAME, pub_key, self.ENV_PRIV_KEY_NAME, priv_key, app_name)
+		ret = os.system(export)
+		if (ret != 0):
+			print >> sys.stderr, "Error: setting heroku config vars\n"
+
 
 	def wrap_key(self, key, width = 65):
 		"""Wrap text at 'width' lines so it prints nicely."""
