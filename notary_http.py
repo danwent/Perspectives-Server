@@ -293,7 +293,7 @@ notary = NotaryHTTPServer()
 
 # PATCH: cherrypy has problems binding to the port on hosted server spaces
 # https://bitbucket.org/cherrypy/cherrypy/issue/1100/cherrypy-322-gives-engine-error-when
-# use this workaround until 1100 is available for release and we can upgrade
+# TODO use this workaround until 1100 is available for release and we can upgrade
 from cherrypy.process import servers
 def fake_wait_for_occupied_port(host, port): return
 servers.wait_for_occupied_port = fake_wait_for_occupied_port
