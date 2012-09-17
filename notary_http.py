@@ -62,6 +62,8 @@ class NotaryHTTPServer:
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
 			help="Use memcache to cache observation data, to increase performance and reduce load on the notary database.\
 				Cached info expires after " + str(self.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
+		cachegroup.add_argument('--memcachier', action='store_true', default=False,
+			help="Use memcachier to cache observation data. " + cache.Memcachier.get_help())
 
 		args = parser.parse_args()
 
@@ -85,6 +87,8 @@ class NotaryHTTPServer:
 		self.cache = None
 		if (args.memcache):
 			self.cache = cache.Memcache()
+		elif (args.memcachier):
+			self.cache = cache.Memcachier()
 
 		self.active_threads = 0 
 		self.args = args

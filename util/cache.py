@@ -127,3 +127,37 @@ class Memcache(CacheBase):
 		else:
 			print >> sys.stderr, "Cache does not exist! Create it first"
 
+
+class Memcachier(Memcache):
+	"""
+	Cache data using memcachier (www.memcachier.com).
+	"""
+
+	# Memcachier is actually 'protocol-compliant' with memcached -
+	# it has exactly the same interface except for the env vars
+
+	CACHE_SERVER_VAR = 'MEMCACHIER_SERVERS'
+	CACHE_USER_VAR = 'MEMCACHIER_USERNAME'
+	CACHE_PASS_VAR = 'MEMCACHIER_PASSWORD'
+
+	@classmethod
+	def get_help(self):
+		"""Tell the user how they can use this type of cache."""
+		return super(Memcachier, self).get_help()
+
+	def __init__(self):
+		"""Connect to the memcachier server(s)."""
+		return super(Memcachier, self).__init__()
+
+	def __del__(self):
+		"""Clean up resources"""
+		return super(Memcachier, self).__del__()
+
+	def get(self, key):
+		"""Retrieve the value for a given key, or None if no key exists."""
+		return super(Memcachier, self).get(key)
+
+	def set(self, key, data, expiry):
+		"""Save the value to a given key name."""
+		return super(Memcachier, self).set(key, data, expiry)
+
