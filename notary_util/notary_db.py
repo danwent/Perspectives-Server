@@ -342,10 +342,10 @@ class ndb:
 		dbgroup.add_argument('--read-config-file', '--rcf', action='store_true', default=False,
 			help='Load all database arguments from the config file. Arguments specified on the command line will override those found in the file.')
 		metricgroup = parser.add_mutually_exclusive_group()
-		metricgroup.add_argument('--metricsdb', action='store_true', default=False,
+		metricgroup.add_argument('--metricsdb', '--dbmetrics', action='store_true', default=False,
 			help="Track information about various notary events, to help diagnose performance and health, and save info in the notary database.\
 			 See docs/metrics.txt for a detailed explanation. Default: \'%(default)s\'")
-		metricgroup.add_argument('--metricslog', action='store_true', default=False,
+		metricgroup.add_argument('--metricslog', '--logmetrics', action='store_true', default=False,
 			help="Track information about various notary events, and print info to stdout with the prefix '" + self.METRIC_PREFIX + "'. \
 			 See docs/metrics.txt for a detailed explanation. Default: \'%(default)s\'")
 
