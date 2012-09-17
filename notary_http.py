@@ -24,7 +24,7 @@ import os
 
 import cherrypy
 
-from util import crypto
+from util import crypto, cache
 from util.keymanager import keymanager
 from notary_util.notary_db import ndb
 from notary_util import notary_common
@@ -44,10 +44,7 @@ class NotaryHTTPServer:
 	STATIC_INDEX = "index.html"
 	PROBE_LIMIT = 10 # simultaneous scans for new services
 
-	MEMCACHE_SERVER_VAR = 'MEMCACHE_SERVERS'
-	MEMCACHE_USER_VAR = 'MEMCACHE_USERNAME'
-	MEMCACHE_PASS_VAR = 'MEMCACHE_PASSWORD'
-	MEMCACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
+	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
@@ -60,12 +57,11 @@ class NotaryHTTPServer:
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
-		parser.add_argument('--memcache', action='store_true', default=False,
-			help="Use memcache to cache service results, to increase performance and reduce load on the notary database.\
-				Cached info expires after " + str(self.MEMCACHE_EXPIRY / 3600) + " hours. Memcache configuration is read from the environment variables\
-				" + self.MEMCACHE_SERVER_VAR  + ", " + self.MEMCACHE_USER_VAR + ", and " + self.MEMCACHE_PASS_VAR + \
-				". Default: \'%(default)s\'")
 
+		cachegroup = parser.add_mutually_exclusive_group()
+		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
+			help="Use memcache to cache observation data, to increase performance and reduce load on the notary database.\
+				Cached info expires after " + str(self.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
 
 		args = parser.parse_args()
 
@@ -86,26 +82,9 @@ class NotaryHTTPServer:
 		if(args.envport):
 			self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
 
-		self.mc = None
+		self.cache = None
 		if (args.memcache):
-			try:
-				import pylibmc
-				#TODO: ALL INPUT IS EVIL
-				#regex check these variables?
-				self.mc = pylibmc.Client(
-					servers=[os.environ.get(self.MEMCACHE_SERVER_VAR)],
-					username=os.environ.get(self.MEMCACHE_USER_VAR),
-					password=os.environ.get(self.MEMCACHE_PASS_VAR),
-					binary=True
-				)
-			except ImportError:
-				print >> sys.stderr, "ERROR: Could not import pylibmc - memcache is disabled. Please install the module and try again."
-				self.mc = None
-			except AttributeError:
-				print >> sys.stderr, "ERROR: Could not connect to the memcache server '%s' as user '%s'. memcache is disabled.\
-				 Please check that the server is running, check your memcache environment variables, and try again." % (os.environ.get(self.MEMCACHE_SERVER_VAR),\
-				  os.environ.get(self.MEMCACHE_PASS_VAR))
-				self.mc = None
+			self.cache = cache.Memcache()
 
 		self.active_threads = 0 
 		self.args = args
@@ -148,13 +127,16 @@ class NotaryHTTPServer:
 		print "Request for '%s'" % service
 		sys.stdout.flush()
 
-		if (self.mc):
-			cached_service = self.mc.get(service)
-			if (cached_service != None):
-				self.ndb.report_metric('CacheHit', service)
-				return cached_service
-			else:
-				self.ndb.report_metric('CacheMiss', service)
+		if (self.cache):
+			try:
+				cached_service = self.cache.get(service)
+				if (cached_service != None):
+					self.ndb.report_metric('CacheHit', service)
+					return cached_service
+				else:
+					self.ndb.report_metric('CacheMiss', service)
+			except Exception, e:
+				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
 		return self.calculate_service_xml(service, host, port, service_type)
 
@@ -237,8 +219,8 @@ class NotaryHTTPServer:
 		top_element.setAttribute("sig",sig)
 		xml = top_element.toprettyxml()
 
-		if (self.mc != None):
-			self.mc.set(service, xml, time=self.MEMCACHE_EXPIRY)
+		if (self.cache != None):
+			self.cache.set(service, xml, expiry=self.CACHE_EXPIRY)
 
 		return xml
 
