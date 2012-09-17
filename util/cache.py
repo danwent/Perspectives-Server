@@ -161,3 +161,52 @@ class Memcachier(Memcache):
 		"""Save the value to a given key name."""
 		return super(Memcachier, self).set(key, data, expiry)
 
+
+class Redis(CacheBase):
+	"""
+	Cache data using redis.
+	"""
+
+	# the redis-py module nicely handles thread-safety for us,
+	# so we don't have to do anything :)
+	# https://github.com/andymccurdy/redis-py#thread-safety
+
+	REDIS_URL = 'REDISTOGO_URL'
+
+	@classmethod
+	def get_help(self):
+		"""Tell the user how they can use this type of cache."""
+		return "Redis configuration is read from the environment variable '%s'." % (self.REDIS_URL)
+
+	def __init__(self):
+		"""Connect to the redis server(s)."""
+		self.redis = None
+		try:
+			import redis
+			#TODO: ALL INPUT IS EVIL
+			#regex check these variables
+			redis_url = os.getenv(self.REDIS_URL, 'redis://localhost')
+			self.redis = redis.from_url(redis_url)
+		except ImportError:
+			print >> sys.stderr, "ERROR: Could not import module 'redis' - redis caching is disabled. Please install the module and try again."
+			self.redis = None
+		except Exception, e:
+			# unfortunately, the redis library doesn't give us any details if the connection didn't work.
+			print >> sys.stderr, "ERROR starting redis: '%s'. Is your redis URL '%s' correct? Redis caching is disabled." % (e, self.REDIS_URL)
+			self.redis = None
+
+	def get(self, key):
+		"""Retrieve the value for a given key, or None if no key exists."""
+		if (self.redis != None):
+			return self.redis.get(key)
+		else:
+			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
+			return None
+
+	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
+		"""Save the value to a given key name."""
+		if (self.redis != None):
+			self.redis.set(key, data)
+			self.redis.expire(key, expiry)
+		else:
+			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
