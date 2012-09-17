@@ -130,7 +130,7 @@ class ndb:
 	EVENT_TYPE_NAMES=['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
 		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanKeyUpdated',
 		'ServiceScanPrevKeyUpdated', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
-		'EventTypeUnknown']
+		'OnDemandServiceScanFailure', 'EventTypeUnknown']
 	EVENT_TYPES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
 

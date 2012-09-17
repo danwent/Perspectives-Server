@@ -260,19 +260,20 @@ class OnDemandScanThread(threading.Thread):
 		self.server_obj.active_threads += 1
 
 	def run(self): 
+
+		# create a new db instance, since we're on a new thread
+		# pass through any args we have so we'll connect to the same database in the same way
+		db = ndb(self.args)
+
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
-
-			# create a new db instance, since we're on a new thread
-			# pass through any args we have so we'll connect to the same database in the same way
-			db = ndb(self.args)
-
 			notary_common.report_observation_with_db(db, self.sid, fp)
 		except Exception, e:
+			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
 		finally:
-			db.close_session()
 			self.server_obj.active_threads -= 1
+			db.close_session()
 
 
 
