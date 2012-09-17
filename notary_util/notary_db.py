@@ -307,6 +307,8 @@ class ndb:
 		Can be used by calling modules that need to connect to a notary database to build their own parser on top.
 		"""
 
+		# IMPORTANT: For every switch here, add a named argument by the same name to __actual_init__.
+		# See filter_args()for details.
 		# Several other modules use us to connect to notary databases.
 		# We let them access and extend our arg parser so we can keep the code in one place.
 		# Note: do not use 'None' as a default for aguments: it interferes with set_config_args().
@@ -579,7 +581,7 @@ class ndb:
 						session.add(metric)
 						session.commit()
 					except Exception, e:
-						print >> sys.stderr, "Error committing metric: '%s'" % e
+						print >> sys.stderr, "Error committing metric: '%s'\n" % e
 						session.rollback()
 					finally:
 						self.Session.remove()
