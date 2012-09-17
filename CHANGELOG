@@ -8,7 +8,7 @@ Format:
 
 3.1
 ---
-+ Add support for memcaching of service data, to improve performance.
++ Add support for caching of service data with memcached, memcachier, or redis, to reduce database load.
 + Add metrics tables to allow tracking of useful performance statistics. See doc/metrics.txt for a detailed explanation.
 + Display whether a notary tracks performance metrics on the static index page
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
