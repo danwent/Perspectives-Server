@@ -118,6 +118,7 @@ class ndb:
 								'connstr': 'postgresql://%s:%s@%s/%s'}
 					}
 	DEFAULT_DB_TYPE = 'sqlite'
+	DB_URL_FIELD = 'DATABASE_URL'
 	DB_PASSWORD_FIELD = 'NOTARY_DB_PASSWORD'
 	DEFAULT_ECHO = 0
 
@@ -156,7 +157,8 @@ class ndb:
 
 	# note: keep these arg names the same as the argparser args - see filter_args()
 	# we supply default values so everything can be passed as a named argument.
-	def __actual_init__(self, dbname=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultdbname'],
+	def __actual_init__(self, dburl=False,
+						dbname=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultdbname'],
 						dbuser=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultusername'],
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
 						dbtype=DEFAULT_DB_TYPE,
@@ -170,7 +172,13 @@ class ndb:
 		of the extra steps we take inside __init__.
 		"""
 
-		if (dbtype in self.SUPPORTED_DBS):
+		connstr = ''
+
+		# TODO: ALL INPUT IS EVIL
+		# regex check these variables
+		if (dburl):
+			connstr = os.environ[self.DB_URL_FIELD]
+		elif (dbtype in self.SUPPORTED_DBS):
 
 			self.DB_PASSWORD = ''
 
@@ -191,24 +199,27 @@ class ndb:
 					# let the caller decide and handle it.
 					pass
 
-			if (dbecho):
-				dbecho = True
-
-			# set up sqlalchemy objects
-			self.db = create_engine(self.SUPPORTED_DBS[dbtype]['connstr'] % (dbuser, self.DB_PASSWORD, dbhost, dbname), echo=dbecho)
-			ORMBase.metadata.create_all(self.db)
-			self.Session = scoped_session(sessionmaker(bind=self.db))
-			self.__init_event_types__()
-			self.metricsdb = metricsdb
-			self.metricslog = metricslog
-
-			if (write_config_file):
-				self.write_db_config(locals())
+			connstr = self.SUPPORTED_DBS[dbtype]['connstr'] % (dbuser, self.DB_PASSWORD, dbhost, dbname)
 
 		else:
 			errmsg = "'%s' is not a supported database type" % dbtype
 			print >> sys.stderr, errmsg
 			raise Exception(errmsg)
+
+		if (dbecho):
+			dbecho = True
+
+		# set up sqlalchemy objects
+		self.db = create_engine(connstr, echo=dbecho)
+		ORMBase.metadata.create_all(self.db)
+		self.Session = scoped_session(sessionmaker(bind=self.db))
+		self.__init_event_types__()
+		self.metricsdb = metricsdb
+		self.metricslog = metricslog
+
+		if (write_config_file):
+			self.write_db_config(locals())
+
 
 	def __init_event_types__(self):
 		"""Create entries in the EventTypes table, if necessary, and store their IDs in the EVENT_TYPES dictionary."""
@@ -261,6 +272,15 @@ class ndb:
 
 		parser = argparse.ArgumentParser(add_help=False) #don't specify description or epilogue so the module that includes us can write their own.
 		dbgroup = parser.add_argument_group('optional database arguments')
+
+		# dburl: unfortunately argparse doesn't make it easy to make one switch mutually exclusive from multiple other switches,
+		# so we'll just document the behavior and enforce it in code.
+
+		# if desired we could allow an optional parameter to pass in the name of the env var.
+		# if so we should check it for valid characters; probably [A-Z_]
+		dbgroup.add_argument('--dburl', action='store_true', default=False,
+			help="Read database connection info from the environment variable '" + self.DB_URL_FIELD + "'.\
+				If present this switch will override all other database connection switches. Default: \'%(default)s\'")
 		dbgroup.add_argument('--dbtype', '--db-type', '-t', default=self.DEFAULT_DB_TYPE,
 			choices=self.SUPPORTED_DBS.keys(),
 			help='Type of database to use. Must be one of {' + ", ".join(self.SUPPORTED_DBS.keys()) + '}. Default: \'%(default)s\'')
