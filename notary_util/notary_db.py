@@ -21,11 +21,12 @@ This allows us to drop in any database without changing code,
 and keeps things modular for easier refactoring.
 """
 
-import time
 import argparse
 import os
-import sys
+import platform
 import re
+import sys
+import time
 import ConfigParser
 
 from sqlalchemy.ext.declarative import declarative_base
@@ -84,12 +85,21 @@ class Metrics(ORMBase):
 	__tablename__ = 't_metrics'
 	event_id = Column(Integer, primary_key=True)
 	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'))
+	machine_id = Column(Integer, ForeignKey('t_machines.machine_id'))
 	date = Column(Integer) # unix timestamp - number of seconds since the epoch.
 	comment = Column(String) # anything worth noting. do NOT track ip address or any private/personally identifiable information.
 
 # purposely don't create any indexes on metrics tables -
 # we want writing data to be as fast as possible.
 # analysis can be done later on a copy of the data so it doesn't slow down the actual notary machine.
+
+class Machines(ORMBase):
+	"""
+	Computers that run notary software.
+	"""
+	__tablename__ = 't_machines'
+	machine_id = Column(Integer, primary_key=True)
+	name = Column(String)
 
 
 
@@ -133,6 +143,7 @@ class ndb:
 		'ServiceScanPrevKeyUpdated', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
 		'OnDemandServiceScanFailure', 'EventTypeUnknown']
 	EVENT_TYPES={}
+	MACHINES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
 
 	def __init__(self, args):
@@ -217,6 +228,9 @@ class ndb:
 		self.metricsdb = metricsdb
 		self.metricslog = metricslog
 
+		# cache the machine name for logging metrics
+		self.__init_machine_names__()
+
 		if (write_config_file):
 			self.write_db_config(locals())
 
@@ -243,6 +257,33 @@ class ndb:
 			except Exception, e:
 				print >> sys.stderr, "Error creating Event type '%s': '%s'" % (name, e)
 				session.rollback()
+		self.Session.remove()
+
+	def __init_machine_names__(self):
+		"""Create entries in the Machines table, if necessary, and store their IDs in the MACHINES dictionary."""
+
+		machine_name = platform.node()
+		self.machine_name = machine_name
+
+		# if we're using metrics, caching these values now
+		# saves us from having to look up the ID every time we insert a metric record.
+
+		# __init__ happens in its own thread, so create and remove a local Session
+		session = self.Session()
+		try:
+			machine = session.query(Machines).filter(Machines.name == machine_name).first()
+
+			if (machine == None):
+				machine = Machines(name = machine_name)
+				session.add(machine)
+				session.commit()
+
+			self.MACHINES[machine_name] = machine.machine_id
+
+		except Exception, e:
+			print >> sys.stderr, "Error creating Machine name '%s': '%s'" % (machine_name, e)
+			session.rollback()
+
 		self.Session.remove()
 
 	def __del__(self):
@@ -533,7 +574,8 @@ class ndb:
 					# note: if we need even more speed we could try spawing this on its own thread
 					session = self.Session()
 					try:
-						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], date=int(time.time()), comment=str(comment))
+						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], machine_id=self.MACHINES[self.machine_name],\
+							date=int(time.time()), comment=str(comment))
 						session.add(metric)
 						session.commit()
 					except Exception, e:
@@ -542,4 +584,4 @@ class ndb:
 					finally:
 						self.Session.remove()
 				elif (self.metricslog):
-					print "|%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment))
+					print "|%s|%s|%s|%s|%s" % (self.METRIC_PREFIX, self.machine_name, event_type, int(time.time()), str(comment))
