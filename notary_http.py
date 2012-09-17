@@ -132,8 +132,6 @@ class NotaryHTTPServer:
 		"""Fetch the xml response for a given service."""
 
 		service = str(host + ":" + port + "," + service_type)
-		print "Request for '%s'" % service
-		sys.stdout.flush()
 
 		if (self.cache):
 			try:
@@ -173,12 +171,10 @@ class NotaryHTTPServer:
 		if num_rows == 0: 
 			# rate-limit on-demand probes
 			if self.active_threads < self.PROBE_LIMIT:
-				print "on demand probe for '%s'" % service
 				self.ndb.report_metric('ScanForNewService', service)
 				t = OnDemandScanThread(service, 10 , self, self.args)
 				t.start()
 			else: 
-				print "Exceeded on demand threshold, not probing '%s'" % service
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404)
