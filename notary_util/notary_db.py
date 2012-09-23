@@ -32,7 +32,7 @@ import ConfigParser
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -306,9 +306,14 @@ class ndb:
 
 				self.EVENT_TYPES[name] = evt.event_type_id
 
-			except Exception, e:
-				print >> sys.stderr, "Error creating Event type '%s': '%s'" % (name, e)
+			except ProgrammingError as e:
+				print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
 				session.rollback()
+				if (self.metricsdb):
+					self.metricsdb = False
+					print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
+					break
+
 		self.Session.remove()
 
 	def __init_machine_names__(self):
@@ -332,9 +337,12 @@ class ndb:
 
 			self.MACHINES[machine_name] = machine.machine_id
 
-		except Exception, e:
+		except ProgrammingError as e:
 			print >> sys.stderr, "Error creating Machine name '%s': '%s'" % (machine_name, e)
 			session.rollback()
+			if (self.metricsdb):
+				self.metricsdb = False
+				print >> sys.stderr, "Cannot log performance metrics without event types - metrics will be disabled."
 
 		self.Session.remove()
 
@@ -346,7 +354,7 @@ class ndb:
 				self.Session.close_all()
 				self.Session.remove()
 				del self.Session
-			except Exception, e:
+			except Exception as e:
 				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
 
 		self.db.dispose()
@@ -563,8 +571,14 @@ class ndb:
 
 		if (srv == None):
 			srv = Services(name = service_name)
-			session.add(srv)
-			session.commit()
+			try:
+				session.add(srv)
+				session.commit()
+			except ProgrammingError as e:
+				print >> sys.stderr, "Error committing service '%s': '%s'" % (service_name, e)
+				session.rollback()
+				self.Session.remove()
+				srv = None
 
 		return srv
 
@@ -583,17 +597,21 @@ class ndb:
 	def insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
 		srv = self.insert_service(service)
-
-		try:
-			session = self.Session()
-			newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
-			session.add(newob)
-			session.commit()
-		except IntegrityError:
-			print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. If you want to update it call that function instead. Ignoring." % (service, key)
-			session.rollback()
-		finally:
-			self.Session.remove()
+		if (srv != None):
+			try:
+				session = self.Session()
+				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
+				session.add(newob)
+				session.commit()
+			except IntegrityError:
+				print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. " +\
+					"If you want to update it call that function instead. Ignoring." % (service, key)
+				session.rollback()
+			except ProgrammingError as e:
+				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
+				session.rollback()
+			finally:
+				self.Session.remove()
 
 	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
 		"""Update the end time for a given Observation."""
@@ -639,7 +657,8 @@ class ndb:
 								date=int(time.time()), comment=str(comment))
 							session.add(metric)
 							session.commit()
-						except Exception as e:
+						except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
+							# ResourceClosedError can happen when the database is under heavy load
 							print >> sys.stderr, "Error committing metric: '%s'" % e
 							print >> sys.stderr, "Was trying to log the following metric:"
 							self.__print_metric__(event_type, comment)
