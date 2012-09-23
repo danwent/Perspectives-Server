@@ -152,7 +152,7 @@ class NotaryHTTPServer:
 			return self.calculate_service_xml(service, host, port, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
-			raise cherrypy.HTTPError(503)
+			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
 	def calculate_service_xml(self, service, host, port, service_type):
 		"""
@@ -185,7 +185,7 @@ class NotaryHTTPServer:
 			else: 
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
-			raise cherrypy.HTTPError(404)
+			raise cherrypy.HTTPError(404) # 404 Not Found
 	
 		dom_impl = getDOMImplementation() 
 		new_doc = dom_impl.createDocument(None, "notary_reply", None) 
@@ -244,10 +244,10 @@ class NotaryHTTPServer:
 			path = os.path.join(cherrypy.request.app.config['/']['tools.staticfile.root'], self.STATIC_INDEX)
 			return cherrypy.lib.static.serve_file(path)
 		elif (host == None or port == None or service_type == None):
-			raise cherrypy.HTTPError(400)
+			raise cherrypy.HTTPError(400) # 400 Bad Request
 
 		if (service_type not in notary_common.SERVICE_TYPES):
-			raise cherrypy.HTTPError(404)
+			raise cherrypy.HTTPError(404) # 404 Not Found
 			
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
 		return self.get_xml(host, port, service_type)
