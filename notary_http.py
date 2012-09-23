@@ -72,7 +72,7 @@ class NotaryHTTPServer:
 		# pass ndb the args so it can use any relevant ones from its own parser
 		try:
 			self.ndb = ndb(args)
-		except Exception, e:
+		except Exception as e:
 			self.ndb = None
 			print >> sys.stderr, "Database error: '%s'" % (str(e))
 
@@ -145,7 +145,7 @@ class NotaryHTTPServer:
 					return cached_service
 				else:
 					self.ndb.report_metric('CacheMiss', service)
-			except Exception, e:
+			except Exception as e:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
 		if (self.ndb and (self.ndb.Session != None)):
@@ -269,7 +269,7 @@ class OnDemandScanThread(threading.Thread):
 		# pass through any args we have so we'll connect to the same database in the same way
 		try:
 			db = ndb(self.args)
-		except Exception, e:
+		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Did not run on-demand scan." % (str(e))
 			self.server_obj.active_threads -= 1
 			return
@@ -277,7 +277,7 @@ class OnDemandScanThread(threading.Thread):
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
 			notary_common.report_observation_with_db(db, self.sid, fp)
-		except Exception, e:
+		except Exception as e:
 			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
 		finally:
