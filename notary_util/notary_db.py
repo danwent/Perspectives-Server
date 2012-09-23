@@ -222,7 +222,20 @@ class ndb:
 
 		# set up sqlalchemy objects
 		self.db = create_engine(connstr, echo=dbecho)
-		ORMBase.metadata.create_all(self.db)
+
+		# in most cases we expect callers to handle any exceptions that get thrown here.
+		# we still want to make sure the error is logged, however.
+		# for now we only check that (self.Session != None) in a few places that may be called accidentally,
+		# since callers really shouldn't be calling methods if the database couldn't connect.
+		# we could add more checks if that's warranted.
+		self.Session = None
+		try:
+			ORMBase.metadata.create_all(self.db)
+		except Exception as e:
+			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
+			self.Session = None
+			raise e
+
 		self.Session = scoped_session(sessionmaker(bind=self.db))
 		self.__init_event_types__()
 		self.metricsdb = metricsdb
@@ -566,24 +579,38 @@ class ndb:
 		self.Session.remove()
 
 	def report_metric(self, event_type, comment=""):
-		"""Add a metric event to the metrics table."""
+		"""Record a metric event in the database or the log."""
 		if (self.metricsdb or self.metricslog):
 			if (event_type not in self.EVENT_TYPES):
 				print >> sys.stderr, "Unknown event type '%s'. Please check your call to report_metric()." % event_type
 				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
 			else:
 				if (self.metricsdb):
-					# note: if we need even more speed we could try spawing this on its own thread
-					session = self.Session()
-					try:
-						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], machine_id=self.MACHINES[self.machine_name],\
-							date=int(time.time()), comment=str(comment))
-						session.add(metric)
-						session.commit()
-					except Exception, e:
-						print >> sys.stderr, "Error committing metric: '%s'\n" % e
-						session.rollback()
-					finally:
-						self.Session.remove()
-				elif (self.metricslog):
-					print "|%s|%s|%s|%s|%s" % (self.METRIC_PREFIX, self.machine_name, event_type, int(time.time()), str(comment))
+					if (self.Session != None):
+						# note: if we need even more speed we could try spawning this on its own thread
+
+						# wrap metric write attempts in a try/catch block so errors don't bring down the server
+						# even if its getting hammered with requests
+						session = self.Session()
+						try:
+							metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], machine_id=self.MACHINES[self.machine_name],\
+								date=int(time.time()), comment=str(comment))
+							session.add(metric)
+							session.commit()
+						except Exception as e:
+							print >> sys.stderr, "Error committing metric: '%s'" % e
+							print >> sys.stderr, "Was trying to log the following metric:"
+							self.__print_metric__(event_type, comment)
+							session.rollback()
+						finally:
+							self.Session.remove()
+					else:
+						print >> sys.stderr, "There is no database session to connect with! Please check your logs for a database connection error."
+						print >> sys.stderr, "Was trying to log the following metric:"
+						self.__print_metric__(event_type, comment)
+				else:
+					self.__print_metric__(event_type, comment)
+
+	def __print_metric__(self, event_type, comment):
+		"""Print metric to stdout. External callers should use report_metric() instead."""
+		print "%s|%s|%s|%s|%s" % (self.METRIC_PREFIX, self.machine_name, event_type, int(time.time()), str(comment))

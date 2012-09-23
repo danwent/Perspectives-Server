@@ -13,6 +13,11 @@ Format:
 + Display whether a notary tracks performance metrics on the static index page
 + Add --dburl switch so db connection info can be easily passed all at once
 * Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
++ Attempt to fail gracefully in the face of catastrophic database errors
+	- Attempt to fall back to the cache if we can't get data from the database
+	(e.g. if there are too many connections or something went terribly wrong)
+	- Fall back to printing and then ignoring metrics if they can't be written to the database
+	- Serve a HTTP 503 code if we can't get data, rather than crashing
 + Allow notary public/private keys to be read from environment variables.
 	Could be a security trade-off, but makes it easier to run notaries on some distributed systems.
 + Allow notary public/private keys to be exported as heroku config vars.

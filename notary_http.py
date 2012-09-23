@@ -70,7 +70,11 @@ class NotaryHTTPServer:
 		args = parser.parse_args()
 
 		# pass ndb the args so it can use any relevant ones from its own parser
-		self.ndb = ndb(args)
+		try:
+			self.ndb = ndb(args)
+		except Exception, e:
+			self.ndb = None
+			print >> sys.stderr, "Database error: '%s'" % (str(e))
 
 		# same for keymanager
 		km = keymanager(args)
@@ -110,7 +114,7 @@ class NotaryHTTPServer:
 		metrics_status = 'Off'
 		metrics_text = 'This server does not track any performance-related metrics.'
 
-		if (self.ndb.metricsdb or self.ndb.metricslog):
+		if ((self.ndb) and (self.ndb.metricsdb or self.ndb.metricslog)):
 			metrics_class = 'td-status-on'
 			metrics_status = 'On'
 			# TODO: add link to FAQ on website once it is up.
@@ -144,7 +148,11 @@ class NotaryHTTPServer:
 			except Exception, e:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
-		return self.calculate_service_xml(service, host, port, service_type)
+		if (self.ndb and (self.ndb.Session != None)):
+			return self.calculate_service_xml(service, host, port, service_type)
+		else:
+			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
+			raise cherrypy.HTTPError(503)
 
 	def calculate_service_xml(self, service, host, port, service_type):
 		"""
@@ -259,7 +267,12 @@ class OnDemandScanThread(threading.Thread):
 
 		# create a new db instance, since we're on a new thread
 		# pass through any args we have so we'll connect to the same database in the same way
-		db = ndb(self.args)
+		try:
+			db = ndb(self.args)
+		except Exception, e:
+			print >> sys.stderr, "Database error: '%s'. Did not run on-demand scan." % (str(e))
+			self.server_obj.active_threads -= 1
+			return
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
