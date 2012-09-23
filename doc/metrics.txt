@@ -121,7 +121,11 @@ Why track metrics in such a specific way? Why not just look at the server logs?
 
 What about performance? Won't tracking metrics slow down the server?
 
-	Based on our tests: with caching turned off tracking metrics roughly halves performance when writing to the database. With caching turned on there is very little noticible difference in performance. If you are not caching data you may not want to track performance metrics on production systems.
+	Metrics are rate-limited so that a large number of requests doesn't slow down the web server. The default setting is to write at most one metric per second. Based on our tests, there is often little noticible performance difference when metrics are turned on because any calls that would slow down the server are discarded.
+
+	Our recommendation is to test your notary under expected conditions and see if tracking metrics works for you. You can adjust the rate limiting as needed.
+
+	If we need more robust reporting where metric events cannot be discarded we could refactor the way metrics are gathered.
 
 
 Will using a notary that tracks metrics affect my privacy?
