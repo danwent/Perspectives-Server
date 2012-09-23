@@ -102,6 +102,45 @@ class Machines(ORMBase):
 	name = Column(String)
 
 
+def ratelimited(max_per_second=1):
+	"""
+	Decorate a function, only allowing it to be called every so often.
+	"""
+	# we could make this available to other modules if it would be useful.
+
+	min_interval = 1.0 / float(max_per_second)
+	warn_every = 10 # seconds
+
+	def decorate(func):
+		last_called = [0.0]
+		last_warned = [0.0]
+		num_skips = [0]
+
+		def rate_limited_function(*args,**kargs):
+			curtime = time.clock()
+			elapsed = curtime - last_called[0]
+			left_to_wait = min_interval - elapsed
+
+			if left_to_wait <= 0:
+				# return the actual function so it can be called
+				ret = func(*args, **kargs)
+				last_called[0] = curtime
+
+				# we want to note in the logs that some calls were skipped,
+				# while not printing the log too often -
+				# that would slow down the system and defeat the purpose of rate limiting.
+				if ((curtime - last_warned[0] >= warn_every) and (num_skips[0] > 0)):
+					print >> sys.stderr, "WARNING: Skipped %s calls to '%s()' in %s seconds." % (num_skips[0], func.__name__, warn_every)
+					last_warned[0] = curtime
+					num_skips[0] = 0
+			else:
+				# ignore the function call and continue
+				ret = lambda: True
+				num_skips[0] += 1
+			return ret
+		return rate_limited_function
+	return decorate
+
 
 class ndb:
 	"""
@@ -578,6 +617,9 @@ class ndb:
 				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
 		self.Session.remove()
 
+	# rate limit metrics so spamming queries doesn't take down the system.
+	# TODO: we could group metrics up to report in one big transaction, or use a background worker
+	@ratelimited(1)
 	def report_metric(self, event_type, comment=""):
 		"""Record a metric event in the database or the log."""
 		if (self.metricsdb or self.metricslog):
