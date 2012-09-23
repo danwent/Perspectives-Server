@@ -223,6 +223,12 @@ class ndb:
 		"""
 
 		connstr = ''
+		self.Session = None
+		self.metricsdb = metricsdb
+		self.metricslog = metricslog
+
+		if (dbecho):
+			dbecho = True
 
 		# TODO: ALL INPUT IS EVIL
 		# regex check these variables
@@ -256,9 +262,6 @@ class ndb:
 			print >> sys.stderr, errmsg
 			raise Exception(errmsg)
 
-		if (dbecho):
-			dbecho = True
-
 		# set up sqlalchemy objects
 		self.db = create_engine(connstr, echo=dbecho)
 
@@ -267,7 +270,6 @@ class ndb:
 		# for now we only check that (self.Session != None) in a few places that may be called accidentally,
 		# since callers really shouldn't be calling methods if the database couldn't connect.
 		# we could add more checks if that's warranted.
-		self.Session = None
 		try:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
@@ -276,11 +278,9 @@ class ndb:
 			raise e
 
 		self.Session = scoped_session(sessionmaker(bind=self.db))
-		self.__init_event_types__()
-		self.metricsdb = metricsdb
-		self.metricslog = metricslog
 
-		# cache the machine name for logging metrics
+		# cache data used when logging metrics
+		self.__init_event_types__()
 		self.__init_machine_names__()
 
 		if (write_config_file):
