@@ -27,6 +27,18 @@ While Running:
 	- If enabled, are they properly printed to the log?
 
 
+Database Connections:
+---------------------
+How to count connections for various database types:
+
+	postgres:
+		select numbackends from pg_stat_database WHERE datname = 'dbname'
+
+
+- When retrieving observations for a known service, are the database connections properly closed afterward?
+	- When scanning for a new service?
+
+
 Failing Gracefully:
 -------------------
 - If the server can't connect to the database, does it still log an error and attempt to serve data from the cache?
@@ -38,4 +50,3 @@ Failing Gracefully:
 	- For Machines, and Event Types (on startup) does it log an error, disable database metrics, and continue?
 	- For Metrics does it ignore the metric, log an error, and continue?
 - Are metrics throttled back if the server receives many requests in a short period of time? (e.g. 200 requests per second)
-
