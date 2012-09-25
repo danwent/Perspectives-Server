@@ -161,20 +161,27 @@ class NotaryHTTPServer:
 
 		self.ndb.report_metric('GetObservationsForService', service)
 		obs = None
-		obs = self.ndb.get_observations(service)
-
 		timestamps_by_key = {}
 		keys = []
 		num_rows = 0
 
-		if (obs != None):
-			for (name, key, start, end) in obs:
-				num_rows += 1
-				if key not in keys:
-					timestamps_by_key[key] = []
-					keys.append(key)
-				timestamps_by_key[key].append((start, end))
-		self.ndb.close_session()
+		try:
+			# TODO: can we grab this all in one query instead of looping?
+			obs = self.ndb.get_observations(service)
+			if (obs != None):
+				for (name, key, start, end) in obs:
+					num_rows += 1
+					if key not in keys:
+						timestamps_by_key[key] = []
+						keys.append(key)
+					timestamps_by_key[key].append((start, end))
+		except Exception as e:
+			# error already logged inside get_observations.
+			# we can also see InterfaceError or AttributeError when looping through observation records
+			# if the database is under heavy load.
+			raise cherrypy.HTTPError(503) # 503 Service Unavailable
+		finally:
+			self.ndb.close_session()
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes

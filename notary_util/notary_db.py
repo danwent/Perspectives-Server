@@ -590,9 +590,16 @@ class ndb:
 
 	def get_observations(self, service):
 		"""Get all observations for a given service."""
-		return self.Session().query(Services).join(Observations).\
-			filter(Services.name == service).\
-			values(Services.name, Observations.key, Observations.start, Observations.end)
+		try:
+			return self.Session().query(Services).join(Observations).\
+				filter(Services.name == service).\
+				values(Services.name, Observations.key, Observations.start, Observations.end)
+		except Exception as e:
+			print >> sys.stderr, "Error getting observations: '%s'" % (e)
+			self.close_session()
+			# re-raise the error so the caller definitely knows something bad happened,
+			# as opposed to there being no observation records
+			raise e
 
 	def insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
