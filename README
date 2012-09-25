@@ -82,6 +82,11 @@ with '--write-config-file' and then running utils with:
 
 % python notary_util/list_services.py --read-config-file | python notary_util/threaded_scanner.py --read-config-file
 
+Or, if your database info is stored as an environment variable you can use
+
+% python notary_util/list_services.py --dburl | python notary_util/threaded_scanner.py --dburl
+
+
 
 Scanning can take a long time, depending on the size of your database and the rate you
 specify to threaded_scanner.py .
@@ -104,8 +109,8 @@ requery to get the results. The Perspectives Firefox client will requery appropr
 
 Unlike the original C implementation of the notary server, this implementation performs
 signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
-cost of making requests heavy-weight and subject to DoS.  We could implement a caching scheme
-for the signatures if it proves valuable.  
+cost of making requests heavy-weight and subject to DoS. You can use caching on production servers
+to reduce the load on the database.
 
 The only service-type that is currently fully supported is SSL (service-type 2).  There is 
 still code for SSH (service-type 1) but since we no longer maintain any notary clients of
