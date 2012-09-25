@@ -20,5 +20,22 @@ While Running:
 	- Including multiple keys for a given service?
 - If the visitor simply goes to the index do they get the HTML explanation page?
 	- Are the public key and version number displayed?
+	- Is the metric on/off status displayed on the page?
 - If the service_type is unknown do they get a 404 error?
 - Does the favicon work?
+- If enabled, are metrics properly logged to the database for each type of event?
+	- If enabled, are they properly printed to the log?
+
+
+Failing Gracefully:
+-------------------
+- If the server can't connect to the database, does it still log an error and attempt to serve data from the cache?
+	- Does the static index page still get created?
+- If both the cache and database are unavailable will the server log errors, serve an HTTP 503 code, and keep running?
+- Does the database fail gracefully if it does not have permission to create tables?
+- Does the database fail gracefully if it does not have INSERT permission in the database? :
+	- For Observations and Services, does it log an error and attempt to continue (instead of crashing)?
+	- For Machines, and Event Types (on startup) does it log an error, disable database metrics, and continue?
+	- For Metrics does it ignore the metric, log an error, and continue?
+- Are metrics throttled back if the server receives many requests in a short period of time? (e.g. 200 requests per second)
+
