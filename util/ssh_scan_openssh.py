@@ -14,18 +14,22 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+An SSH scanner that uses ssh-keyscan.
+"""
 
 from subprocess import *
 import re
 import sys
 import tempfile
 import os
-import notary_common 
+import argparse
+import traceback
 
-# note: timeout is ignored for now
 
-def attempt_observation_for_service(service_id, timeout):  
-	dns_and_port = service_id.split(",")[0]
+def attempt_observation_for_service(service, timeout):
+	# note: timeout is ignored for now
+	dns_and_port = service.split(",")[0]
 	dns_name, port = dns_and_port.split(":")
 	
 	fname = tempfile.mktemp()
@@ -39,14 +43,14 @@ def attempt_observation_for_service(service_id, timeout):
 	for key_type in ("rsa","dsa","rsa1"):
 		fd = open(fname,'w')
 		p1 = Popen(["ssh-keyscan", "-t", key_type, "-p", port, dns_name ],
-			stdin=file("/dev/null", "r"), stdout=fd, stderr=None)
+			stdin=file(os.devnull, "r"), stdout=fd, stderr=None)
 		p1.wait()
 		if p1.returncode != 0:
 			print >> sys.stderr, "ERROR: error fetching ssh '%s' key for %s" % (key_type,dns_and_port)
 			continue
 
 		p2 = Popen(["ssh-keygen","-l","-f", fname],
-			stdin=file("/dev/null", "r"), stdout=PIPE, stderr=None)
+			stdin=file(os.devnull, "r"), stdout=PIPE, stderr=None)
 		output = p2.communicate()[0].strip()
 		p2.wait()
 
@@ -62,27 +66,24 @@ def attempt_observation_for_service(service_id, timeout):
 		
 		return fp 
 
-	os.remove(fname)
+	try:
+		os.remove(fname)
+	except WindowsError:
+		pass
 	raise Exception("all key types failed") 
 
 if __name__ == "__main__":
 
+	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument('service',
+			help="A service name of the form 'host:port' - e.g. remoteserver.com:22.")
 
-	if len(sys.argv) != 3 and len(sys.argv) != 2:
-		print >> sys.stderr, "ERROR: usage: <service-id> [notary-db-file>]"
-		exit(1)
+	args = parser.parse_args()
+	service = args.service
 
-	service_id = sys.argv[1]
 	try: 
-		fp = attempt_observation_for_service(service_id, 10) 
-	
-		if len(sys.argv) == 3: 
-			notary_common.report_observation(sys.argv[2], service_id, fp) 
-		else: 
-			print "INFO: no database specified, not saving observation"
-
-		print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)
+		fp = attempt_observation_for_service(service, 10)
+		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
 	except:
-		print "Error scanning for %s" % service_id 
+		print "Error scanning for %s" % service
 		traceback.print_exc(file=sys.stdout)
-		

@@ -1,0 +1,63 @@
+High-level changes to Perspectives server / Network Notary code
+
+
+Format:
++ new feature
+* bug or behavior fix
+
+
+3.1
+---
++ Add support for caching of service data with memcached, memcachier, or redis, to reduce database load.
++ Add metrics tables to allow tracking of useful performance statistics. See doc/metrics.txt for a detailed explanation.
++ Display whether a notary tracks performance metrics on the static index page
++ Add --dburl switch so db connection info can be easily passed all at once
+* Fix bug where the notary server would use too many database connections (it now properly closes sessions and connections).
++ Attempt to fail gracefully in the face of catastrophic database errors
+	- Attempt to fall back to the cache if we can't get data from the database
+	(e.g. if there are too many connections or something went terribly wrong)
+	- Fall back to printing and then ignoring metrics if they can't be written to the database
+	- Serve a HTTP 503 code if we can't get data, rather than crashing
++ Allow notary public/private keys to be read from environment variables.
+	Could be a security trade-off, but makes it easier to run notaries on some distributed systems.
++ Allow notary public/private keys to be exported as heroku config vars.
+	Other systems could be supported as needed.
+
+
+3.0
+---
+Requires python 2.7.
++ Separate the database interface from the notary code.
+    This lets us change the type of database much more easily,
+    and gives us a central way to organize other modules that communicate with the database.
++ Use SQLAlchemy as a database ORM, to make database abstraction and maintenance even easier (and cleaner).
++ Refactor database tables to be 3rd Normal Form.
+* Explicitly add a Primary Key of (service_id, key) for Observations.
+	This was semi-implied before, as keys could not be null, and it doesn't make sense to have a null service_id.
+	SQLAlchemy requires tables to have a Primary Key anyway.
+* Fix bug when reporting observations that would attempt to update the previous key's end time when there was no previous key.
+	(this was harmless, but saves us running an extra query that returns no results)
++ Clearly separate utility scripts and modules that do *not* rely on the notary database (in 'utils/') from those that do (in 'notary_utils/').
++ Separate client modules into client/
+* Refactor standalone modules so they can be run by themselves or when imported by another module.
+    Database functionality was removed from modules in util/ so they comply with the "Do One Thing Well" philosophy.
++ Implement clean argument parsing for all modules using argparse.
++ Add documentation and docstrings to many things that needed it
++ Explain the tasks a network notary server performs in the README
++ Add default arguments and actions wherever possible, to make it easier to set up and run a network notary server without having to read (or understand ;) anything.
++ Add --write-config-file and --read-config-file switches so all modules that connect to the database can share settings more easily.
++ Add a static index page to explain what a 'network notary' server is to visitors.
++ Add AUTHORS and CHANGELOG files
+
+
+2.0
+---
+Implementation in python.
+Requires python 2.5.
++ Calculate signatures for each service inside the webserver as needed. This makes scanning lighter weight, at the cost of making requests heavy-weight and subject to DoS.
+
+
+1.0
+---
+Original implementation in C.
+Signatures for each service's data are calculated by a separate tool outside of the webserver each time the data changes.

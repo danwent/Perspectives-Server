@@ -1,89 +1,125 @@
- ==== INFO ====
+==== INFO ====
 
 This is a simple python-only implementation of a Perspectives network notary server. 
 
-Contact: perspectives-project@cs.cmu.edu  
-Website: http://www.cs.cmu.edu/~perspectives 
+Website: 		http://perspectives-project.org
+Mailing List: 	perspectives-dev@googlegroups.com
+				https://groups.google.com/group/perspectives-dev
 Primary Author: Dan Wendlandt (danwent@gmail.com) 
 
- ==== PREREQUISITES ====
+==== PREREQUISITES ====
 
-The implementation relies on python >= 2.5 and the following third-party python libraries:
-* sqlite3
-* M2Crypto
-* cherrypy3 
+* openssl, to generate public/private RSA keys
+* python 2.7 or later
+* python libraries:
+	* M2Crypto
+	* cherrypy3
+	* sqlalchemy
+	* a python driver for your type of database
+	(e.g. sqlite3 for sqlite, psycopg2 for postgresql, etc.)
+
 
 On debian you can install these using: 
 
 apt-get install python-sqlite python-m2crypto python-cherrypy3
 
- ===== SETUP ====
+==== SETUP ====
 
-First, create a database: 
+Creating a server is as easy as using:
 
-% python utilities/create_tables.py notary.sqlite
+% python notary_http.py
 
-Then create the notary server key pair (private key is needed by the server, and 
-the public key should be used by the notary client): 
+The server will create a new public/private key pair and a new database, if necessary, with the default options.
 
-% bash utilities/create_key_pair.sh notary.priv notary.pub
+Run the server with '-h' or '--help' to see a list of options. For example you can specify a different type of database with '--dbtype postgresql'.
+
  
- ===== RUNNING ====
+==== RUNNING ====
 
-Run the webserver in its own window (or in the background): 
+Once your server is running, try asking it about a service:
 
-% python notary_http.py notary.sqlite notary.priv 
+% python client/simple_client.py github.com:443,2
 
-To run a scan:  
+You can also fetch results with a webbrowser, though you may need to 'view source'
+to see the XML:
 
-% python ssl_scan_sock.py www.google.com:443,2 notary.sqlite
+  http://localhost:8080/?host=github.com&port=443&service_type=2
 
-To test, run a query for a service-id you have scanned:
 
-% python utilities/simple_client.py www.google.com:443,2 localhost 8080 notary.pub
+The first time you query for a particular service, it's normal to get a 404 error
+(see the Technical Details section below for an explanation).
+Just wait a few seconds and try again.
 
-You could also fetch the results with a webbrowser, though you will need to 'view source'
-to see the XML:  http://localhost:8080/?host=www.google.com&port=443&service_type=2
-(Note the first time you query for a particular service, it's normal to get a 404 error,
-see Notes section following for an explanation.)
+After waiting a few seconds, test that the service has been added to the database:
 
-Commonly, you do not run scans explicitly using these tools, but rather set a cron job to 
-periodically run a scan of all service-ids in the database, then pass this list 
-to threaded_scanner.py: 
+% python notary_util/list_services.py
 
-% python utilities/list_service_ids.py notary.sqlite all | python threaded_scanner.py notary.sqlite - 10 10
 
-Running a scan can take a long time, depending on the size of your database and the rate you
-specify to threaded_scanner.py .  
+==== DETAILS ====
+
+A network notary server does three things:
+
+1. Stores a history of services and keys it has seen (kept in the database)
+2. Sends key information for a particular service to any client that requests it (usually done via the Perspectives Firefox extension)
+3. Routinely scans the services it knows about, to keep its information up to date (usually a scheduled job that runs threaded_scanner.py)
+
+
+Installing this software and launching the server will take care of tasks 1 and 2.
+The scheduled task (whether done via crontab or some other method) is important
+as it covers step 3, allowing the server to generate a history of keys for each service over time.
+
+
+==== SCHEDULED SCANS ====
+
+Usually you do not run scans manually but rather set a scheduled task to
+periodically scan all services in the database, using something like:
+
+% python notary_util/list_services.py | python notary_util/threaded_scanner.py
+
+If you are using a more complex database setup and don't want to type out the
+arguments every time, you can share the database config by launching the server
+with '--write-config-file' and then running utils with:
+
+% python notary_util/list_services.py --read-config-file | python notary_util/threaded_scanner.py --read-config-file
+
+Or, if your database info is stored as an environment variable you can use
+
+% python notary_util/list_services.py --dburl | python notary_util/threaded_scanner.py --dburl
+
+
+
+Scanning can take a long time, depending on the size of your database and the rate you
+specify to threaded_scanner.py .
 
 Here is an example crontab file to run scans twice a day (1 am and 1 pm) on all services in the database
 that have been seen in the past 5 days, with a rate of 20 simultaneous probes and a timeout of 20 seconds
-per probe.  It also contains an entry to restart the server if the machine reboots: 
+per probe.  It also contains an entry to restart the server if the machine reboots:
 
-0 1,13 * * * cd /root/Perspectives-Server && python utilities/list_service_ids.py notary.sqlite all | python threaded_scanner.py notary.sqlite - 10 10
+0 1,13 * * * cd /root/Perspectives-Server && python notary_utils/list_services.py | python notary_utils/threaded_scanner.py
 
-@reboot cd /root/Perspectives-Server && python notary_http.py notary.sqlite notary.priv
+@reboot cd /root/Perspectives-Server && python notary_http.py
 
- ==== Notes ====
 
-The server implements "on-demand probing", so if you query for a service-id that is not
-in the database, the notary will automatically kick-off a probe for that service.  The 
-notary will respond with an HTTP 404, and the client should requery to get the results.
-The Perspectives Firefox client will requery appropriately.  
+==== TECHNICAL DETAILS ====
+
+The server implements "on-demand probing", so if you query for a service that is not
+in the database the notary will automatically kick-off a probe for that service.
+The notary will respond to the requestor with an HTTP 404, and the client should
+requery to get the results. The Perspectives Firefox client will requery appropriately.
 
 Unlike the original C implementation of the notary server, this implementation performs
 signatures in the webserver portion of the code.  This makes scanning lighter weight, at the 
-cost of making reuests heavy-weight and subject to DoS.  We could implement a caching scheme
-for the signatures if it proves valuable.  
+cost of making requests heavy-weight and subject to DoS. You can use caching on production servers
+to reduce the load on the database.
 
 The only service-type that is currently fully supported is SSL (service-type 2).  There is 
 still code for SSH (service-type 1) but since we no longer maintain any notary clients of
 this type, we do not regularly test it.  Currently, the threaded_scanner.py will only scan
-for SSL services, though work to have it scan for SSH services is pretty minor.  
+for SSL services, though work to have it scan for SSH services is pretty minor.
 
-This code still needs some clean-up and less hard-coded configuration, but its good enough 
-for use.  Please visit the github page to submit changes and suggest improvments: 
+
+==== CONTRIBUTING ====
+
+Please visit the github page to submit changes and suggest improvements:
 
 https://github.com/danwent/Perspectives-Server
-
-

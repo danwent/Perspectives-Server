@@ -14,6 +14,11 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+A lightweight SSL scanner that does not invoke openssl at all.
+Instead it executes the initial steps of the SSL handshake directly
+using a TCP socket and parses the data itself.
+"""
 
 import socket
 import struct 
@@ -23,14 +28,10 @@ import hashlib
 import traceback 
 import sys
 import errno 
-import notary_common
+import argparse
 
-# This is a lightweight version of SSL scanning that does not invoke openssl
-# at all.  Instead, it executes the initial steps of the SSL handshake directly
-# using a TCP socket and parses the data itself
 
 USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
-
 SLEEP_LEN_SEC = 0.2
 
 class SSLScanTimeoutException(Exception): 
@@ -115,7 +116,7 @@ def get_all_handshake_protocols(rec_data):
 		rec_data = rec_data[4 + l:]
 	return protos 
 
-# rfc 2246 says the server cert if the first one
+# rfc 2246 says the server cert is the first one
 # in the chain, so ignore everything else 
 def get_server_cert_from_protocol(proto_data): 
 	proto_data = proto_data[3:] # get rid of 3-bytes describing length of all certs
@@ -130,9 +131,9 @@ def get_server_cert_from_protocol(proto_data):
 		fp += binascii.b2a_hex(digest_raw[i]) + ":"
 	return fp[:-1] 
 
-def attempt_observation_for_service(service_id, timeout_sec): 
+def attempt_observation_for_service(service, timeout_sec):
 
-		dns, port = service_id.split(",")[0].split(":")
+		dns, port = service.split(",")[0].split(":")
 		# if we want to try SNI, do such a scan but if that
 		# scan fails with an SSL alert, retry with a non SNI request
 		if USE_SNI and dns[-1:].isalpha(): 
@@ -217,25 +218,20 @@ def get_sni_client_hello(hostname):
 	rec_len = proto_len + 4
 	return "160301" + get_twobyte_hexstr(rec_len) + "01" + get_threebyte_hexstr(proto_len) + the_rest 
 
+
 if __name__ == "__main__":
 
+	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument('service',
+			help="A service name of the form 'host:port' - e.g. github.com:443.")
 
-	if len(sys.argv) != 3 and len(sys.argv) != 2:
-		print >> sys.stderr, "ERROR: usage: <service-id> [notary-db-file>]"
-		exit(1)
-
-	service_id = sys.argv[1]
+	args = parser.parse_args()
+	service = args.service
 	try:
  
-		fp = attempt_observation_for_service(service_id, 10) 
-	
-		if len(sys.argv) == 3: 
-			notary_common.report_observation(sys.argv[2], service_id, fp) 
-		else: 
-			print "INFO: no database specified, not saving observation"
-
-		print "Successful scan complete: '%s' has key '%s' " % (service_id,fp)
+		fp = attempt_observation_for_service(service, 10)
+		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
 	except:
-		print "Error scanning for %s" % service_id 
+		print "Error scanning for %s" % service
 		traceback.print_exc(file=sys.stdout)
 		

@@ -1,0 +1,94 @@
+<html>
+<head>
+		<title>Perspectives Network Notary Server</title>
+		<style type='text/css'>
+			body {
+				background-color: white;
+				color: #333333;
+				padding: 20px;
+				margin: 0;
+				line-height: 20px;
+				font-size: 14px;
+				font-family: Arial, sans-serif;
+			}
+
+			.section.info {
+				color: #222222; }
+
+				.section.info h1 {
+					font-size: 22px;
+					background-color: #99ccff;
+					padding: 10px 10px 10px 10px;
+					margin: 0;
+					overflow: hidden; }
+
+					.section.info .box {
+						border: 4px solid #99ccff;
+						padding: 20px 20px 20px 20px; }
+
+						.section.info .box a {
+							color: #6666cc; }
+
+					.section.info .key {
+						background-color: #cccccc;
+						padding: 10px 10px 10px 10px;
+						width: 75ex; /* openssl wraps at 65 chars, plus our padding */
+						word-wrap: break-word;}
+
+					.section.info pre {
+						white-space: pre-wrap;       /* css-3 */
+						white-space: -moz-pre-wrap !important;  /* Mozilla, since 1999 */
+						white-space: -pre-wrap;      /* Opera 4-6 */
+						white-space: -o-pre-wrap;    /* Opera 7 */
+						word-wrap: break-word;       /* Internet Explorer 5.5+ */
+						}
+
+					.section.info img {
+						vertical-align: text-bottom;}
+
+					.section.info table {
+						border-spacing: 5px;}
+
+					.section.info td {
+						padding: 5px 5px 5px 5px;
+						text-align: left;}
+
+					.section.info .th-title {
+						border-bottom-style: solid;
+						border-bottom-color: #333333; /* keep the same color as all text. */
+						border-bottom-width: 2px;
+						text-align: left;}
+
+					.section.info .td-status-off {
+						background-color: #cccccc; /* keep the same as the key box. TODO: use a variable. */
+						font-weight: bold; }
+
+					.section.info .td-status-on {
+						background-color: #99ccff; /* keep the same as the info section. TODO: use a variable. */
+						font-weight: bold;}
+			}
+	</style>
+</head>
+
+<body>
+	<div class='container'>
+	  <div class='section info'>
+		<h1><IMG SRC="img/perspectives-logo.png" TITLE="Perspectives" width="32" heigh="32" />&nbsp;Perspectives Network Notary Server <!-- ::VERSION:: --></h1>
+		<div class='box'>
+			<p>This is a Perspectives 'network notary' server. It collects and shares information on SSL certificates from around the internet.</p>
+			<p>For more information see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.</p>
+			<p>You can add this server to your Perspectives client with the following public key:</p>
+			<div class='key'>
+				<p><pre><!-- ::PUBLIC_KEY:: --></pre></p>
+			</div>
+			<p>
+				<table>
+					<th class='th-title'>Server Details</th><th colspan="2"></th>
+					<!-- ::OPTIONS_METRICS:: -->
+				</table>
+			</p>
+		</div>
+	  </div>
+	</div>
+</body>
+</html>

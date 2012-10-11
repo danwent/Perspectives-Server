@@ -14,23 +14,37 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Scan a list of services and update Observation records in the notary database.
+For running scans without connecting to the database see util/simple_scanner.py.
+"""
+
 import sys
 import time 
-import socket
-import struct
-import sys
-import notary_common 
 import traceback 
 import threading
-import sqlite3
+import argparse
 import errno
-from ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
+
+import notary_common
+from notary_db import ndb
+
+# TODO: HACK
+# add ..\util to the import path so we can import ssl_scan_sock
+import os
+sys.path.insert(0,
+	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
+
+
+DEFAULT_SCANS = 10
+DEFAULT_WAIT = 20
+DEFAULT_INFILE = "-"
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
 # those that fail or hang after making some progress, as they could indicate
 # logic bugs
-
 
 class ScanThread(threading.Thread): 
 
@@ -52,6 +66,7 @@ class ScanThread(threading.Thread):
 
 	def record_failure(self, e,): 
 		stats.failures += 1
+		ndb.report_metric('ServiceScanFailure', str(e))
 		if type(e) == type(self.timeout_exc): 
 			stats.failure_timeouts += 1
 			return
@@ -70,7 +85,7 @@ class ScanThread(threading.Thread):
 			stats.failure_dns += 1
 		else: 	
 			stats.failure_other += 1 
-			print "Unknown error scanning '%s'" % self.sid 
+			print "Unknown error scanning '%s'\n" % self.sid
 			traceback.print_exc(file=sys.stdout)
 
 	def run(self): 
@@ -108,12 +123,9 @@ def record_observations_in_db(res_list):
 	if len(res_list) == 0: 
 		return
 	try: 
-		conn = sqlite3.connect(notary_db)
 		for r in res_list: 
-			notary_common.report_observation_with_conn( \
-						conn, r[0], r[1]) 
-		conn.commit()
-		conn.close() 
+			notary_common.report_observation_with_db( \
+						ndb, r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
 		print "DB Error: Failed to write res_list of length %s" % \
@@ -121,35 +133,45 @@ def record_observations_in_db(res_list):
 		traceback.print_exc(file=sys.stdout)
 
 
-if len(sys.argv) != 5: 
-  print >> sys.stderr, "ERROR: usage: <notary-db> <service_id_file> <scans-per-sec> <timeout sec> " 
-  sys.exit(1)
 
-notary_db=sys.argv[1]
-if sys.argv[2] == "-": 
-	f = sys.stdin
-else: 
-	f = open(sys.argv[2])
+parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
+description=__doc__)
+
+parser.add_argument('service_id_file', type=argparse.FileType('r'), nargs='?', default=DEFAULT_INFILE,
+			help="File that contains a list of service names - one per line. Will read from stdin by default.")
+parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAULT_SCANS, const=DEFAULT_SCANS, type=int,
+			help="How many scans to run per second. Default: %(default)s.")
+parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
+			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+
+args = parser.parse_args()
+
+# pass ndb the args so it can use any relevant ones from its own parser
+ndb = ndb(args)
 
 res_list = [] 
 stats = GlobalStats()
-rate = int(sys.argv[3])
-timeout_sec = int(sys.argv[4]) 
+rate = args.scans
+timeout_sec = args.timeout
+f = args.service_id_file
 start_time = time.time()
 localtime = time.asctime( time.localtime(start_time) )
 
-# read all sids to start, otherwise sqlite locks up 
-# if you start scanning before list_services_ids.py is not done
+# read all service names to start;
+# otherwise the database can lock up
+# if we're accepting data piped from another process
 all_sids = [ line.rstrip() for line in f ]
 
 print "Starting scan of %s service-ids at: %s" % (len(all_sids), localtime)
 print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
     (timeout_sec, rate) 
+ndb.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
 for sid in all_sids:  
 	try: 
-		# ignore non SSL services	
-		if sid.split(",")[1] == "2": 
+		# ignore non SSL services
+		# TODO: use a regex instead
+		if sid.split(",")[1] == notary_common.SSL_TYPE:
 			stats.num_started += 1
 			t = ScanThread(sid,stats,timeout_sec)
 			t.start()
@@ -163,7 +185,7 @@ for sid in all_sids:
 				"failures.  %s Active threads" % \
 				(so_far, stats.num_completed, 
 					stats.failures, stats.active_threads)
-			print "failure details: timeouts = %s, " \
+			print "  details: timeouts = %s, " \
 				"ssl-alerts = %s, no-route = %s, " \
 				"conn-refused = %s, conn-reset = %s,"\
 				"dns = %s, other = %s" % \
@@ -187,6 +209,8 @@ for sid in all_sids:
 					 (sid,duration) 
 			sys.stdout.flush()
 
+	except IndexError:
+		print >> sys.stderr, "Service '%s' has no index [1] after splitting on ','.\n" % (sid)
 	except KeyboardInterrupt: 
 		exit(1)	
 
@@ -201,11 +225,12 @@ while stats.active_threads > 0:
 # record any observations made since we finished the
 # main for-loop			
 record_observations_in_db(res_list) 
+ndb.close_session()
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
 print "Ending scan at: %s" % localtime
 print "Scan of %s services took %s seconds.  %s Failures" % \
 	(stats.num_started,duration, stats.failures)
+ndb.report_metric('ServiceScanStop')
 exit(0) 
-
