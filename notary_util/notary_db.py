@@ -611,8 +611,8 @@ class ndb:
 				session.add(newob)
 				session.commit()
 			except IntegrityError:
-				print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. " +\
-					"If you want to update it call that function instead. Ignoring." % (service, key)
+				print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. \
+					If you want to update it call that function instead. Ignoring." % (service, key)
 				session.rollback()
 			except ProgrammingError as e:
 				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
