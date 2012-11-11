@@ -18,7 +18,7 @@ Arguments
 	- If neither is specifed do we use the default port?
 	- If webport is specefied but is not an integer, does argparse reject it?
 	- If webport is specified and is an integer, and no envport is given, do we use the webport?
-	- If envport is specified but no environment variable by that name exists, do we log a warning and fall back to the default?
+	- If envport is specified but no environment variable by that name exists, do we throw a ValueError?
 	- If envport is specified and the env var exists but is not an integer, do we throw a ValueError?
 	- If envport is specified and the env var exists and is a valid integer, do we use it?
 	- If both are specified, does argparse reject that usage?

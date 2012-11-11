@@ -91,8 +91,8 @@ class NotaryHTTPServer:
 			if (self.ENV_PORT_KEY_NAME in os.environ):
 				self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
 			else:
-				print >> sys.stderr, "ERROR: envport option specified but no '%s' variable exists. Falling back to port %s." % \
-					(self.ENV_PORT_KEY_NAME, self.web_port)
+				raise ValueError("--envport option specified but no '%s' variable exists." % \
+					(self.ENV_PORT_KEY_NAME))
 		elif (args.webport):
 			self.web_port = args.webport
 
