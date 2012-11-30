@@ -51,7 +51,7 @@ class NotaryHTTPServer:
 			description=self.__doc__, version=self.VERSION,
 			epilog="If the database schema does not exist it will be automatically created on launch.")
 		portgroup = parser.add_mutually_exclusive_group()
-		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT,
+		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT, type=int,
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
@@ -87,8 +87,14 @@ class NotaryHTTPServer:
 		self.create_static_index()
 
 		self.web_port = self.DEFAULT_WEB_PORT
-		if(args.envport):
-			self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
+		if (args.envport):
+			if (self.ENV_PORT_KEY_NAME in os.environ):
+				self.web_port = int(os.environ[self.ENV_PORT_KEY_NAME])
+			else:
+				raise ValueError("--envport option specified but no '%s' variable exists." % \
+					(self.ENV_PORT_KEY_NAME))
+		elif (args.webport):
+			self.web_port = args.webport
 
 		self.cache = None
 		if (args.memcache):
