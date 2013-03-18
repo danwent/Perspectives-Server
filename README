@@ -118,6 +118,11 @@ this type, we do not regularly test it.  Currently, the threaded_scanner.py will
 for SSL services, though work to have it scan for SSH services is pretty minor.
 
 
+==== MORE INFO ====
+
+See doc/advanced_notary_configuration.txt for tips on improving notary performance.
+
+
 ==== CONTRIBUTING ====
 
 Please visit the github page to submit changes and suggest improvements:
