@@ -31,6 +31,7 @@ Make sure you have enough memory to use the cache you request!
 import heapq
 import itertools
 import sys
+import threading
 import time
 
 # Note: the maximum cache size applies only to stored data;
@@ -150,15 +151,16 @@ def __free_memory(mem_needed):
 	"""Remove entries from the heap and cache until we have enough free memory."""
 	global current_mem
 
-	while heap and (current_mem + mem_needed > MAX_CACHE_SIZE):
-		key = heap.pop()
-		if key in cache:
-			# naive implementation - we don't worry about discarding a non-expired item
-			# before all expired items are gone.
-			# we just want to clear *some* memory for the new item as fast as possible.
-			# if this really hurts performance we could refactor.
-			__delete_key(key)
-		else:
+	with mem_lock:
+		while heap and (current_mem + mem_needed > MAX_CACHE_SIZE):
+			key = heap.pop()
+			if key in cache:
+				# naive implementation - we don't worry about discarding a non-expired item
+				# before all expired items are gone.
+				# we just want to clear *some* memory for the new item as fast as possible.
+				# if this really hurts performance we could refactor.
+				__delete_key(key)
+			else:
 				raise KeyError("The heap key '%s' does not exist in the cache and cannot be removed." % (key))
 
 
@@ -166,40 +168,56 @@ def __delete_key(key):
 	"""Remove this entry from the cache."""
 	global current_mem
 
-	current_mem -= cache[key].memory_used
-	del cache[key]
+	with mem_lock:
+		current_mem -= cache[key].memory_used
+		del cache[key]
 
 
 def set_cache_size(size):
 	"""Set the maximum amount of RAM to use, in bytes."""
 	size = int(size)
 	if size > 0:
-		global MAX_CACHE_SIZE
-		MAX_CACHE_SIZE = size
+		with mem_lock:
+			global MAX_CACHE_SIZE
+			MAX_CACHE_SIZE = size
 
 
 def set(key, data, expiry):
 	"""Save the value to a given key."""
-	global current_mem	
 
-	entry = CacheEntry(key, data, expiry)
+	with set_lock:
+		if key in set_threads:
+			# some other thread is already updating the value for this key.
+			# don't compete or waste time calculating a possibly duplicate value
+			return
+		else:
+			set_threads[key] = True
 
-	if (entry.memory_used > MAX_CACHE_SIZE):
-		print >> sys.stderr, "ERROR: cannot store data for '%s' - it's larger than the max cache size (%s bytes)\n" \
-			% (key, MAX_CACHE_SIZE)
-		return
+	try:
+		entry = CacheEntry(key, data, expiry)
 
-	# add/replace the entry in the hash;
-	# this tracks whether we have the key at all.
-	if entry.key in cache:
-		current_mem -= cache[key].memory_used # subtract the memory we gain back
+		if (entry.memory_used > MAX_CACHE_SIZE):
+			print >> sys.stderr, "ERROR: cannot store data for '%s' - it's larger than the max cache size (%s bytes)\n" \
+				% (key, MAX_CACHE_SIZE)
+			return
 
-	if (current_mem + entry.memory_used > MAX_CACHE_SIZE):
-		__free_memory(entry.memory_used)
+		with mem_lock:
+			global current_mem
 
-	heap.push(entry)
-	cache[key] = entry
-	current_mem += entry.memory_used
+			# add/replace the entry in the hash;
+			# this tracks whether we have the key at all.
+			if entry.key in cache:
+				current_mem -= cache[key].memory_used # subtract the memory we gain back
+
+			if (current_mem + entry.memory_used > MAX_CACHE_SIZE):
+				__free_memory(entry.memory_used)
+
+			heap.push(entry)
+			cache[key] = entry
+			current_mem += entry.memory_used
+
+	finally:
+		del set_threads[key]
 
 
 def get(key):
@@ -226,3 +244,11 @@ heap = Heap()
 
 current_mem = 0 # bytes
 
+
+# we don't care if we get a slightly out of date value when retrieving,
+# but prevent multiple set() calls from writing data for the same key at the same time.
+set_threads = {}
+set_lock = threading.Lock()
+
+# prevent multiple threads from altering memory counts at the same time
+mem_lock = threading.RLock()
