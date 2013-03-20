@@ -37,7 +37,7 @@ import time
 # Note: the maximum cache size applies only to stored data;
 # the internal structures used to for implementation will cause pycache
 # to use slightly more memory.
-MAX_CACHE_SIZE = 50 * 1024 * 1024 # bytes
+DEFAULT_CACHE_SIZE = 50 * 1024 * 1024 # bytes
 
 
 class CacheEntry(object):
@@ -150,9 +150,10 @@ class Heap(object):
 def __free_memory(mem_needed):
 	"""Remove entries from the heap and cache until we have enough free memory."""
 	global current_mem
+	global max_mem
 
 	with mem_lock:
-		while heap and (current_mem + mem_needed > MAX_CACHE_SIZE):
+		while heap and (current_mem + mem_needed > max_mem):
 			key = heap.pop()
 			if key in cache:
 				# naive implementation - we don't worry about discarding a non-expired item
@@ -178,12 +179,14 @@ def set_cache_size(size):
 	size = int(size)
 	if size > 0:
 		with mem_lock:
-			global MAX_CACHE_SIZE
-			MAX_CACHE_SIZE = size
+			global max_mem
+			max_mem = size
 
 
 def set(key, data, expiry):
 	"""Save the value to a given key."""
+	global current_mem
+	global max_mem
 
 	with set_lock:
 		if key in set_threads:
@@ -196,20 +199,19 @@ def set(key, data, expiry):
 	try:
 		entry = CacheEntry(key, data, expiry)
 
-		if (entry.memory_used > MAX_CACHE_SIZE):
+		if (entry.memory_used > max_mem):
 			print >> sys.stderr, "ERROR: cannot store data for '%s' - it's larger than the max cache size (%s bytes)\n" \
-				% (key, MAX_CACHE_SIZE)
+				% (key, max_mem)
 			return
 
 		with mem_lock:
-			global current_mem
 
 			# add/replace the entry in the hash;
 			# this tracks whether we have the key at all.
 			if entry.key in cache:
 				current_mem -= cache[key].memory_used # subtract the memory we gain back
 
-			if (current_mem + entry.memory_used > MAX_CACHE_SIZE):
+			if (current_mem + entry.memory_used > max_mem):
 				__free_memory(entry.memory_used)
 
 			heap.push(entry)
@@ -243,6 +245,7 @@ cache = {}
 heap = Heap()
 
 current_mem = 0 # bytes
+max_mem = DEFAULT_CACHE_SIZE
 
 
 # we don't care if we get a slightly out of date value when retrieving,
