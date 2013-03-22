@@ -102,12 +102,10 @@ class Memcache(CacheBase):
 			print >> sys.stderr, "ERROR: Could not connect to memcache server: '%s'. memcache is disabled." % (str(e))
 			self.pool = None
 
-
 	def __del__(self):
 		"""Clean up resources"""
 		if (self.pool != None):
 			self.pool.relinquish()
-
 
 	def get(self, key):
 		"""Retrieve the value for a given key, or None if no key exists."""
@@ -117,7 +115,6 @@ class Memcache(CacheBase):
 		else:
 			print >> sys.stderr, "Cache does not exist! Create it first"
 			return None
-
 
 	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
 		"""Save the value to a given key name."""
@@ -210,3 +207,86 @@ class Redis(CacheBase):
 			self.redis.expire(key, expiry)
 		else:
 			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
+
+
+class Pycache(CacheBase):
+	"""
+	Cache data using RAM.
+	"""
+
+	CACHE_SIZE = "50" # megabytes
+
+	@classmethod
+	def get_help(cls):
+		"""Tell the user how they can use this type of cache."""
+		# TODO: quantify how many observation records this can store
+		return "Size can be specified in Megabytes (M/MB) or Gigabytes (G/GB). \
+			Megabytes is assumed if no unit is given. \
+			Default size: " + cls.CACHE_SIZE + "MB."
+
+	@classmethod
+	def get_metavar(cls):
+		"""
+		Return the string that should be used for argparse's metavariable
+		(i.e. the string that explains how to specify a cache size on the command line)
+		"""
+		return "CACHE_SIZE_INTEGER[M|MB|G|GB]"
+
+	def __init__(self, cache_size=CACHE_SIZE):
+		"""Create a cache using RAM."""
+		self.cache = None
+
+		import re
+
+		# let the user specify sizes with the characters 'MB' or 'GB'
+		if (re.search("[^0-9MGBmgb]+", cache_size) != None):
+			raise ValueError("Invalid Pycache cache size '%s': use '%s'." %
+				(str(cache_size), self.get_metavar()))
+
+		if (re.search("[Mm]", cache_size) and re.search("[Gg]", cache_size)):
+			raise ValueError("Invalid Pycache cache size '%s': " % (str(cache_size)) +
+				"specify only one of MB and GB.")
+
+		multiplier = 1024 * 1024 # convert to bytes
+
+		if (re.search("[Gg]", cache_size)):
+			multiplier *= 1024
+
+		# remove non-numeric characters
+		cache_size = cache_size.translate(None, 'MGBmgb')
+		cache_size = int(cache_size)
+
+		if (cache_size < 1):
+			raise ValueError("Invalid Pycache cache size '%s': " % (str(cache_size)) +
+				"cache must be at least 1MB.")
+
+		cache_size *= multiplier
+
+		try:
+			from util import pycache
+			self.cache = pycache
+			pycache.set_cache_size(cache_size)
+		except ImportError, e:
+			print >> sys.stderr, "ERROR: Could not import module 'pycache': '%s'." % (e)
+			self.cache = None
+		except Exception, e:
+			print >> sys.stderr, "ERROR creating cache in memory: '%s'." % (e)
+			self.cache = None
+
+	def get(self, key):
+		"""Retrieve the value for a given key, or None if no key exists."""
+		if (self.cache != None):
+			return self.cache.get(key)
+		else:
+			print >> sys.stderr, "pycache get() error: cache does not exist! create it before retrieving values."
+			return None
+
+	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
+		"""Save the value to a given key name."""
+		if (self.cache != None):
+			try:
+				self.cache.set(key, data, expiry)
+			except Exception, e:
+				print >> sys.stderr, "pycache set() error: '%s'." % (e)
+		else:
+			print >> sys.stderr, "pycache set() error: cache does not exist! create it before setting values."

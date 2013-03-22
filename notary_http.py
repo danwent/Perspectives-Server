@@ -37,7 +37,7 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "3.1"
+	VERSION = "pre3.2a"
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
@@ -66,6 +66,10 @@ class NotaryHTTPServer:
 			help="Use memcachier to cache observation data. " + cache.Memcachier.get_help())
 		cachegroup.add_argument('--redis', action='store_true', default=False,
 			help="Use redis to cache observation data. " + cache.Redis.get_help())
+		cachegroup.add_argument('--pycache', default=False, const=cache.Pycache.CACHE_SIZE,
+			nargs='?', metavar=cache.Pycache.get_metavar(),
+			help="Use RAM to cache observation data on the local machine only.\
+			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
 
 		args = parser.parse_args()
 
@@ -103,6 +107,8 @@ class NotaryHTTPServer:
 			self.cache = cache.Memcachier()
 		elif (args.redis):
 			self.cache = cache.Redis()
+		elif (args.pycache):
+			self.cache = cache.Pycache(args.pycache)
 
 		self.active_threads = 0 
 		self.args = args

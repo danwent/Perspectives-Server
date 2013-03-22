@@ -62,3 +62,32 @@ Failing Gracefully:
 	- For Machines, and Event Types (on startup) does it log an error, disable database metrics, and continue?
 	- For Metrics does it ignore the metric, log an error, and continue?
 - Are metrics throttled back if the server receives many requests in a short period of time? (e.g. 200 requests per second)
+
+
+In-memory caching with pycache:
+-------------------------------
+- If the cache is below the memory limit, are new keys continually added upon request?
+- If adding a new key would use too much memory, does the cache remove an entry and then store the key?
+	- Is the least recently used entry removed?
+	- If removing one entry doesn't clear enough RAM, does the cache remove multiple entries until it has enough space?
+	- Do both the hash and the heap size go down?
+- If a requested object is bigger than total RAM allowed, do we log a warning and not store it?
+- When an existing entry is retrieved from the cache is it's 'last viewed' time updated?
+
+expiry:
+- Are expired entries removed during get() calls and None returned instead?
+- Are expired entries cleaned up as they are encountered when clearing new memory?
+- Are negative expiry times rejected and cache entries not created?
+
+pycache threads:
+- Do we only create a single cache and return the proper results regardless of how many threads the server uses?
+- If multiple threads attempt to set a value for the same key is only one of them allowed to set and the rest return immediately?
+- If multiple threads attempt to set a value for *different* keys, are they all allowed to do so?
+- Is only one thread at a time allowed to adjust the current memory usage?
+
+pycache arguments:
+- Are characters other than 0-9MGB rejected, throwing an error?
+- Does it stop you from specifyng MB *and* GB?
+- Is it case insensitive?
+- Does the cache have to be at least 1MB?
+
