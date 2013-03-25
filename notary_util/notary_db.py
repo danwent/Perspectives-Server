@@ -193,21 +193,21 @@ class ndb:
 		"""
 
 		# sanity/safety check:
-		# filter the args and send only those that are relevant to __actual_init__.
+		# filter the args and send only those that are relevant to __actual_init().
 		# this makes it simple for callers that extend our argparser to use us
 		# (i.e. by just calling 'ndb = ndb(args)')
 		# but ensures we pass only the correct parameters,
 		# so there are no errors.
-		good_args = ndb.filter_args(vars(args))
+		good_args = ndb.__filter_args(vars(args))
 
 		if (good_args['read_config_file']):
-			good_args = self.set_config_args()
+			good_args = self._set_config_args()
 
-		self.__actual_init__(**good_args)
+		self.__actual_init(**good_args)
 
-	# note: keep these arg names the same as the argparser args - see filter_args()
+	# note: keep these arg names the same as the argparser args - see __filter_args()
 	# we supply default values so everything can be passed as a named argument.
-	def __actual_init__(self, dburl=False,
+	def __actual_init(self, dburl=False,
 						dbname=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultdbname'],
 						dbuser=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultusername'],
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
@@ -280,14 +280,14 @@ class ndb:
 		self.Session = scoped_session(sessionmaker(bind=self.db))
 
 		# cache data used when logging metrics
-		self.__init_event_types__()
-		self.__init_machine_names__()
+		self.__init_event_types()
+		self.__init_machine_names()
 
 		if (write_config_file):
-			self.write_db_config(locals())
+			self._write_db_config(locals())
 
 
-	def __init_event_types__(self):
+	def __init_event_types(self):
 		"""Create entries in the EventTypes table, if necessary, and store their IDs in the EVENT_TYPES dictionary."""
 
 		# if we're using metrics, caching these values now
@@ -316,7 +316,7 @@ class ndb:
 
 		self.Session.remove()
 
-	def __init_machine_names__(self):
+	def __init_machine_names(self):
 		"""Create entries in the Machines table, if necessary, and store their IDs in the MACHINES dictionary."""
 
 		machine_name = platform.node()
@@ -367,11 +367,11 @@ class ndb:
 		Can be used by calling modules that need to connect to a notary database to build their own parser on top.
 		"""
 
-		# IMPORTANT: For every switch here, add a named argument by the same name to __actual_init__.
-		# See filter_args()for details.
+		# IMPORTANT: For every switch here, add a named argument by the same name to __actual_init().
+		# See __filter_args()for details.
 		# Several other modules use us to connect to notary databases.
 		# We let them access and extend our arg parser so we can keep the code in one place.
-		# Note: do not use 'None' as a default for aguments: it interferes with set_config_args().
+		# Note: do not use 'None' as a default for aguments: it interferes with _set_config_args().
 
 		parser = argparse.ArgumentParser(add_help=False) #don't specify description or epilogue so the module that includes us can write their own.
 		dbgroup = parser.add_argument_group('optional database arguments')
@@ -414,7 +414,7 @@ class ndb:
 		return parser
 
 	@classmethod
-	def filter_args(self, argsdict):
+	def __filter_args(self, argsdict):
 		"""
 		Filter a dictionary of arguments and return only ones that are applicable to ndb.
 
@@ -425,7 +425,7 @@ class ndb:
 		Thus we use this function internally to filter incoming args
 		and make sure that only the parameters applicable to ndb are used.
 		"""
-		valid_args = ndb.__actual_init__.func_code.co_varnames[:ndb.__actual_init__.func_code.co_argcount]
+		valid_args = ndb.__actual_init.func_code.co_varnames[:ndb.__actual_init.func_code.co_argcount]
 		d = dict((key, val) for key, val in argsdict.iteritems() if key in valid_args)
 
 		if 'self' in d:
@@ -433,10 +433,10 @@ class ndb:
 
 		return d
 
-	def write_db_config(self, args):
+	def _write_db_config(self, args):
 		"""Write all ndb args to the config file."""
 
-		good_args = ndb.filter_args(args)
+		good_args = ndb.__filter_args(args)
 
 		# don't store keys related to config actions
 		del good_args['write_config_file']
@@ -458,7 +458,7 @@ class ndb:
 
 		print "Notary database config saved in %s." % self.NOTARY_CONFIG_FILE
 
-	def read_db_config(self):
+	def _read_db_config(self):
 		"""Read ndb args from the config file and return as a list."""
 
 		config = ConfigParser.SafeConfigParser()
@@ -470,11 +470,11 @@ class ndb:
 			print >> sys.stderr, "Could not read config file. Please write one with --write-config-file before reading"
 			return ()
 
-	def set_config_args(self):
+	def _set_config_args(self):
 		"""Sanitize and set up ndb arguments read from a config file."""
 
 		print "Reading config data from %s." % self.NOTARY_CONFIG_FILE
-		temp_args = self.read_db_config()
+		temp_args = self._read_db_config()
 		good_args = {}
 
 
@@ -668,17 +668,17 @@ class ndb:
 							# ResourceClosedError can happen when the database is under heavy load
 							print >> sys.stderr, "Error committing metric: '%s'" % e
 							print >> sys.stderr, "Was trying to log the following metric:"
-							self.__print_metric__(event_type, comment)
+							self.__print_metric(event_type, comment)
 							session.rollback()
 						finally:
 							self.Session.remove()
 					else:
 						print >> sys.stderr, "There is no database session to connect with! Please check your logs for a database connection error."
 						print >> sys.stderr, "Was trying to log the following metric:"
-						self.__print_metric__(event_type, comment)
+						self.__print_metric(event_type, comment)
 				else:
-					self.__print_metric__(event_type, comment)
+					self.__print_metric(event_type, comment)
 
-	def __print_metric__(self, event_type, comment):
+	def __print_metric(self, event_type, comment):
 		"""Print metric to stdout. External callers should use report_metric() instead."""
 		print "%s|%s|%s|%s|%s" % (self.METRIC_PREFIX, self.machine_name, event_type, int(time.time()), str(comment))
