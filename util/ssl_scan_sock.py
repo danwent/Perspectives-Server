@@ -20,15 +20,15 @@ Instead it executes the initial steps of the SSL handshake directly
 using a TCP socket and parses the data itself.
 """
 
-import socket
-import struct 
-import time
-import binascii
-import hashlib 
-import traceback 
-import sys
-import errno 
 import argparse
+import binascii
+import errno
+import hashlib
+import socket
+import struct
+import sys
+import time
+import traceback
 
 
 USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
