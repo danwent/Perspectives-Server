@@ -57,6 +57,9 @@ class NotaryHTTPServer:
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
+		parser.add_argument('--sni', action='store_true', default=False,
+			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			 Default: \'%(default)s\'")
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
@@ -107,6 +110,7 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
+		self.use_sni = args.sni
 		self.active_threads = 0 
 		self.create_static_index()
 		self.args = args
@@ -136,18 +140,33 @@ class NotaryHTTPServer:
 			lines = str(t.read())
 
 		options = ""
-		metrics_text = 'This server does not track any performance-related metrics.'
 
 
+		# performance metrics
 		metrics_name = "Performance Metrics"
+		metrics_text = 'This notary does not track any performance-related metrics.'
+
 		if ((self.ndb) and (self.ndb.metricsdb or self.ndb.metricslog)):
 			# TODO: add link to FAQ on website once it is up.
-			metrics_text = 'This server tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
+			metrics_text = 'This notary tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
 			 This does not affect your privacy in any way.\
 			 For details see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.'
 			options += self._create_status_row(metrics_name, True, metrics_text)
 		else:
 			options += self._create_status_row(metrics_name, False, metrics_text)
+
+		# SNI scanning
+		# Note: this assumes that if you set --sni for server on-demand scans that it is *also*
+		# set for routine scanning. We do not currently verify that though -
+		# it's up to the server owner to maintain.
+		sni_name = 'Server Name Indication'
+		sni_text = "This notary does not use Server Name Indication when scanning websites."
+
+		if (self.use_sni):
+			sni_text = 'This notary uses <a href="https://en.wikipedia.org/wiki/Server_Name_Indication">Server Name Indication</a> when scanning websites.'
+			options += self._create_status_row(sni_name, True, sni_text)
+		else:
+			options += self._create_status_row(sni_name, False, sni_text)
 
 
 		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
@@ -213,7 +232,7 @@ class NotaryHTTPServer:
 			# rate-limit on-demand probes
 			if self.active_threads < self.PROBE_LIMIT:
 				self.ndb.report_metric('ScanForNewService', service)
-				t = OnDemandScanThread(service, 10 , self, self.args)
+				t = OnDemandScanThread(service, 10 , self.use_sni, self, self.args)
 				t.start()
 			else: 
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
@@ -295,10 +314,11 @@ class NotaryHTTPServer:
 
 class OnDemandScanThread(threading.Thread): 
 
-	def __init__(self, sid,timeout_sec,server_obj, args):
+	def __init__(self, sid, timeout_sec, use_sni, server_obj, args):
 		self.sid = sid
-		self.server_obj = server_obj
 		self.timeout_sec = timeout_sec
+		self.use_sni = use_sni
+		self.server_obj = server_obj
 		self.args = args
 		threading.Thread.__init__(self)
 		self.server_obj.active_threads += 1
@@ -315,7 +335,7 @@ class OnDemandScanThread(threading.Thread):
 			return
 
 		try:
-			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
 			notary_common.report_observation_with_db(db, self.sid, fp)
 		except Exception as e:
 			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
