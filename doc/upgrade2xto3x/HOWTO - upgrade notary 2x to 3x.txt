@@ -1,0 +1,66 @@
+So you're upgrading to Perspectives Server version 3! Congratulations :) Here's how.
+
+
+0. Install Prerequisites:
+
+	a) Upgrade to python 2.7.
+
+	http://www.python.org/getit/
+
+	This is required for the 'argparse' module.
+
+
+	b) Install sqlalchemy
+
+	See http://docs.sqlalchemy.org/ru/latest/intro.html#installation-guide
+
+	Depending on your system, you may be able to use something like
+
+	>pip install SQLAlchemy
+
+	sqlalchemy is used to talk to the database so we don't have hardcoded SQL strings.
+
+
+1. Back up your database:
+
+>cp notary.slqite notary.sqlite.backup2x
+
+You can also use the db2file command from the next step.
+
+
+2. Export your data using the special db2file_2to3.py module.
+
+This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
+
+>python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
+
+
+3. Rename your database
+
+You can also specify a different database name when importing your data - perspectives will create the database and schema if they don't exist.
+
+>mv notary.sqlite notary_2x.sqlite
+
+
+4. Import your data
+
+>python notary_util\file2db.py upgraded_data.txt
+
+
+5. Check your settings
+
+Many of the hardcoded settings from 2.0 have been converted to command-line arguments. Many of the required arguments have been given defaults. You can use the '-h' or '--help' switches to see the usage for each module - check how your old notary settings compare against the new settings and adjust anything you want to keep.
+
+One of the biggest improvements with the 3.x notary is data caching. You may want to consider setting up a dedicated caching server or at least using the --pycache argument.
+
+
+6. Run your server!
+
+The command is now much shorter:
+
+>python notary_http.py
+
+
+7. You're done!
+
+Congratulations, and enjoy the new features :)
