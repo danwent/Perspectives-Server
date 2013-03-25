@@ -6,6 +6,15 @@ Format:
 * bug or behavior fix
 
 
+3.2
+---
++ Add support for caching data with local system memory only (--pycache).
+	This makes it easy to cache data and improve notary performance even if you are unable to use a dedicated caching server.
++ Add default URL parameters so 'service_type' and 'port' are not required.
+* Convert hardcoded SNI setting to command-line argument, so it's easier to toggle (Thanks Carl A.!)
++ Add documentation and script for upgrading from notary version 2.x to version 3.x.
+
+
 3.1
 ---
 + Add support for caching of service data with memcached, memcachier, or redis, to reduce database load.
@@ -22,6 +31,7 @@ Format:
 	Could be a security trade-off, but makes it easier to run notaries on some distributed systems.
 + Allow notary public/private keys to be exported as heroku config vars.
 	Other systems could be supported as needed.
+* Fix bug: actually use the webport argument (thanks mwgamera!)
 
 
 3.0
