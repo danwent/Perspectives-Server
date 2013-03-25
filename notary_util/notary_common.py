@@ -24,6 +24,8 @@ SSH_TYPE = "1"
 SSL_TYPE = "2"
 SERVICE_TYPES = {SSH_TYPE: "ssh",
 				 SSL_TYPE: "ssl"}
+PORTS = {SSH_TYPE: 22,
+		SSL_TYPE: 443}
 
 
 def report_observation_with_db(ndb, service, fp):
