@@ -113,6 +113,19 @@ class NotaryHTTPServer:
 
 		print "Using public key\n" + self.notary_public_key
 
+	def _create_status_row(self, name, enabled, description):
+		"""Generate the HTML to display one particular server option."""
+
+		css_class = 'td-status-off'
+		status_text = 'Off'
+
+		if (enabled):
+			css_class = 'td-status-on'
+			status_text = 'On'
+
+		return "<tr><td>{0}</td><td class='{1}'>{2}</td><td>{3}</td></tr>\n".format(\
+			name, css_class, status_text, description)
+
 	def create_static_index(self):
 		"""Create a static index page."""
 		# right now this is VERY simple - copy the template file and insert some variables.
@@ -122,23 +135,24 @@ class NotaryHTTPServer:
 		with open(template,'r') as t:
 			lines = str(t.read())
 
-		metrics_class = 'td-status-off'
-		metrics_status = 'Off'
+		options = ""
 		metrics_text = 'This server does not track any performance-related metrics.'
 
+
+		metrics_name = "Performance Metrics"
 		if ((self.ndb) and (self.ndb.metricsdb or self.ndb.metricslog)):
-			metrics_class = 'td-status-on'
-			metrics_status = 'On'
 			# TODO: add link to FAQ on website once it is up.
 			metrics_text = 'This server tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
 			 This does not affect your privacy in any way.\
 			 For details see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.'
+			options += self._create_status_row(metrics_name, True, metrics_text)
+		else:
+			options += self._create_status_row(metrics_name, False, metrics_text)
 
 
 		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
 		lines = lines.replace('<!-- ::PUBLIC_KEY:: -->', self.notary_public_key)
-		lines = lines.replace('<!-- ::OPTIONS_METRICS:: -->',
-			"<tr><td>Performance Metrics</td><td class='%s'>%s</td><td>%s</td></tr>" % (metrics_class, metrics_status, metrics_text))
+		lines = lines.replace('<!-- ::OPTIONS:: -->', options)
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:
