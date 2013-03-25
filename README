@@ -43,7 +43,7 @@ Once your server is running, try asking it about a service:
 You can also fetch results with a webbrowser, though you may need to 'view source'
 to see the XML:
 
-  http://localhost:8080/?host=github.com&port=443&service_type=2
+  http://localhost:8080/?host=github.com
 
 
 The first time you query for a particular service, it's normal to get a 404 error
