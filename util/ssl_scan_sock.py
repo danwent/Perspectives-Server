@@ -31,7 +31,6 @@ import time
 import traceback
 
 
-USE_SNI = False # Use server name indication: See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt
 SLEEP_LEN_SEC = 0.2
 
 class SSLScanTimeoutException(Exception): 
@@ -130,19 +129,6 @@ def _get_server_cert_from_protocol(proto_data):
 	for i in range(len(digest_raw)):
 		fp += binascii.b2a_hex(digest_raw[i]) + ":"
 	return fp[:-1] 
-
-def attempt_observation_for_service(service, timeout_sec):
-
-		dns, port = service.split(",")[0].split(":")
-		# if we want to try SNI, do such a scan but if that
-		# scan fails with an SSL alert, retry with a non SNI request
-		if USE_SNI and dns[-1:].isalpha(): 
-			try: 
-				return run_scan(dns,port,timeout_sec,True)
-			except SSLAlertException: 
-				pass
-
-		return run_scan(dns,port,timeout_sec,False) 
 		
 def _run_scan(dns, port, timeout_sec, sni_query):
 	try: 	
@@ -218,18 +204,36 @@ def _get_sni_client_hello(hostname):
 	rec_len = proto_len + 4
 	return "160301" + _get_twobyte_hexstr(rec_len) + "01" + _get_threebyte_hexstr(proto_len) + the_rest
 
+def attempt_observation_for_service(service, timeout_sec, use_sni=False):
+
+		dns, port = service.split(",")[0].split(":")
+		# if we want to try SNI, do such a scan but if that
+		# scan fails with an SSL alert, retry with a non SNI request
+		if use_sni:
+			if dns[-1:].isalpha():
+				try:
+					return _run_scan(dns,port,timeout_sec,True)
+				except SSLAlertException:
+					pass
+			else:
+				raise ValueError("Service must be of the form 'host:port'")
+
+		return _run_scan(dns,port,timeout_sec,False)
 
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument('service',
-			help="A service name of the form 'host:port' - e.g. github.com:443.")
+			help="a service name of the form 'host:port' - e.g. github.com:443.")
+	parser.add_argument('--sni', action='store_true', default=False,
+			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			 Default: \'%(default)s\'")
 
 	args = parser.parse_args()
 	service = args.service
 	try:
  
-		fp = attempt_observation_for_service(service, 10)
+		fp = attempt_observation_for_service(service, 10, args.sni)
 		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
 	except:
 		print >> sys.stderr, "Error scanning for %s" % (service)
