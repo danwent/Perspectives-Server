@@ -262,7 +262,14 @@ class NotaryHTTPServer:
 			# serve a static explanation page
 			path = os.path.join(cherrypy.request.app.config['/']['tools.staticfile.root'], self.STATIC_INDEX)
 			return cherrypy.lib.static.serve_file(path)
-		elif (host == None or port == None or service_type == None):
+
+		if (service_type == None):
+			service_type = notary_common.SSL_TYPE
+
+		if (port == None and (service_type in notary_common.PORTS)):
+			port = str(notary_common.PORTS[service_type])
+
+		if (host == None or port == None or service_type == None):
 			raise cherrypy.HTTPError(400) # 400 Bad Request
 
 		if (service_type not in notary_common.SERVICE_TYPES):
