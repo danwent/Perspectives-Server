@@ -232,6 +232,6 @@ if __name__ == "__main__":
 		fp = attempt_observation_for_service(service, 10)
 		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
 	except:
-		print "Error scanning for %s" % service
-		traceback.print_exc(file=sys.stdout)
+		print >> sys.stderr, "Error scanning for %s" % (service)
+		traceback.print_exc(file=sys.stderr)
 		
