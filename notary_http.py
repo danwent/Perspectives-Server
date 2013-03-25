@@ -86,9 +86,6 @@ class NotaryHTTPServer:
 		if (self.notary_public_key == None or self.notary_priv_key == None):
 			print >> sys.stderr, "Could not get public and private keys."
 			exit(1)
-		print "Using public key\n" + self.notary_public_key
-
-		self.create_static_index()
 
 		self.web_port = self.DEFAULT_WEB_PORT
 		if (args.envport):
@@ -111,7 +108,10 @@ class NotaryHTTPServer:
 			self.cache = cache.Pycache(args.pycache)
 
 		self.active_threads = 0 
+		self.create_static_index()
 		self.args = args
+
+		print "Using public key\n" + self.notary_public_key
 
 	def create_static_index(self):
 		"""Create a static index page."""
