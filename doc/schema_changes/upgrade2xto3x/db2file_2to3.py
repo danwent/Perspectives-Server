@@ -141,8 +141,11 @@ def print_tuples(obs):
 	for (service, key, start, end) in obs:
 		output.append("(%s, %s, %s, %s)" % (service, key, start, end))
 
-	output = '\n'.join(output)
-	print >> output_file, output
+	#output = '\n'.join(output)
+	for line in output:
+		print >> output_file, line, '\n'
+
+
 
 
 
