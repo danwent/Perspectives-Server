@@ -1,0 +1,46 @@
+In Perspectives server version 3.1 a table and column were added to track the machine name as part of metrics data. This was used to troubleshoot a potential issue running notaries on environments that use multiple machines (such as distributed cloud platforms). The issue was determined to not be a problem and the table and column were removed in version 3.2.
+
+You only need follow these steps in the unlikely event that you are upgrading a notary from version 3.1 to 3.2. If you are upgrading a 2.x notary to version 3.2 or later (or running any notary version 3.2 or later) these steps are not needed.
+
+
+
+---
+
+How to upgrade the database:
+
+
+1. Stop your notary
+
+2. Update/sinc the code
+
+>git pull
+
+3. Run this SQL on the database
+
+
+	Most databases, including postgresql:
+
+		ALTER TABLE t_metrics DROP COLUMN machine_id;
+		DROP TABLE t_machines;
+
+	sqlite:
+	(sqlite does not allow you to drop columns from a table)
+
+		ALTER TABLE t_metrics RENAME TO t_metrics_old;
+
+		CREATE TABLE t_metrics (
+				event_id INTEGER NOT NULL,
+				event_type_id INTEGER,
+				date INTEGER,
+				comment VARCHAR,
+				PRIMARY KEY (event_id),
+				FOREIGN KEY(event_type_id) REFERENCES t_event_types (event_type_id)
+		);
+
+		INSERT INTO t_metrics SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
+
+		DROP TABLE t_metrics_old;
+		DROP TABLE t_machines;
+
+
+4. Restart your notary with the new code
