@@ -47,7 +47,7 @@ def import_records(infile):
 
 	# tuples will be formatted like this:
 	# (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
-	valid_tuple = re.compile("^\(([\w:,.]+), *([0-9a-fA-F:]+), *(\d)+, *(\d+)\)$")
+	valid_tuple = re.compile("^ *\(([\w:,.]+), *([0-9a-fA-F:]+), *(\d+), *(\d+)\) *$")
 
 	for line in lines:
 
