@@ -373,10 +373,6 @@ if (notary.args.echo_screen):
 	cherrypy.config.update({
 			 'log.error_file' : None,
 			 'log.screen' : True } )
-else:
-	cherrypy.config.update({
-			 'log.error_file' : 'error.log',
-			 'log.screen' : False } )
 
 static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
 notary_config = { '/': {'tools.staticfile.root' : static_root,
