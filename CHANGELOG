@@ -14,6 +14,7 @@ Format:
 * Convert hardcoded SNI setting to command-line argument, so it's easier to toggle (Thanks Carl A.!)
 * Turn off logging of request headers during errors and exceptions; we do not want to record any private or sensitive client information.
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
+* Add --verbose switch to scanner to generate less log data.
 
 
 3.1

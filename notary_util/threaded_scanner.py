@@ -143,6 +143,8 @@ parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAU
 			help="How many scans to run per second. Default: %(default)s.")
 parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
 			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+parser.add_argument('--verbose', '-v', default=False, action='store_true',
+			help="Verbose mode. Print more info about each scan.")
 
 args = parser.parse_args()
 
@@ -181,33 +183,35 @@ for sid in all_sids:
 			record_observations_in_db(res_list) 
 			res_list = [] 
 			so_far = int(time.time() - start_time)
-			print "%s seconds passed.  %s complete, %s " \
-				"failures.  %s Active threads" % \
-				(so_far, stats.num_completed, 
-					stats.failures, stats.active_threads)
-			print "  details: timeouts = %s, " \
-				"ssl-alerts = %s, no-route = %s, " \
-				"conn-refused = %s, conn-reset = %s,"\
-				"dns = %s, other = %s" % \
-				(stats.failure_timeouts,
-				stats.failure_ssl_alert,
-				stats.failure_no_route,
-				stats.failure_conn_refused,
-				stats.failure_conn_reset,
-				stats.failure_dns, 
-				stats.failure_other)
-			sys.stdout.flush()
+			if (args.verbose):
+				print "%s seconds passed.  %s complete, %s " \
+					"failures.  %s Active threads" % \
+					(so_far, stats.num_completed,
+						stats.failures, stats.active_threads)
+				print "  details: timeouts = %s, " \
+					"ssl-alerts = %s, no-route = %s, " \
+					"conn-refused = %s, conn-reset = %s,"\
+					"dns = %s, other = %s" % \
+					(stats.failure_timeouts,
+					stats.failure_ssl_alert,
+					stats.failure_no_route,
+					stats.failure_conn_refused,
+					stats.failure_conn_reset,
+					stats.failure_dns,
+					stats.failure_other)
+				sys.stdout.flush()
 
 		if stats.num_started  % 1000 == 0: 
-			print "long running threads" 
-			cur_time = time.time() 
-			for sid in stats.threads.keys(): 
-				spawn_time = stats.threads.get(sid,cur_time)
-				duration = cur_time - spawn_time
-				if duration > 20: 
-					print "'%s' has been running for %s" %\
-					 (sid,duration) 
-			sys.stdout.flush()
+			if (args.verbose):
+				print "long running threads"
+				cur_time = time.time()
+				for sid in stats.threads.keys():
+					spawn_time = stats.threads.get(sid,cur_time)
+					duration = cur_time - spawn_time
+					if duration > 20:
+						print "'%s' has been running for %s" %\
+						 (sid,duration)
+				sys.stdout.flush()
 
 	except IndexError:
 		print >> sys.stderr, "Service '%s' has no index [1] after splitting on ','.\n" % (sid)
