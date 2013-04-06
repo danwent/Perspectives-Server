@@ -361,7 +361,11 @@ servers.wait_for_occupied_port = fake_wait_for_occupied_port
 cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
 			 'request.show_tracebacks' : False,  
-			 'log.access_file' : None,  # default for production 
+			 # IMPORTANT PRIVACY SETTINGS!
+			 # we do *not* want to record any information about clients
+			 'log.access_file' : None,
+			 'server.log_request_headers': False,
+			 # end of privacy settings
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
 

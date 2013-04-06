@@ -12,6 +12,7 @@ Format:
 	This makes it easy to cache data and improve notary performance even if you are unable to use a dedicated caching server.
 + Add default URL parameters so 'service_type' and 'port' are not required.
 * Convert hardcoded SNI setting to command-line argument, so it's easier to toggle (Thanks Carl A.!)
+* Turn off logging of request headers during errors and exceptions; we do not want to record any private or sensitive client information.
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
 
 
