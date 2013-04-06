@@ -172,10 +172,16 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 		return fp 
 
 	# make sure we always close the socket, but still propogate the exception
-	except Exception, e: 
+	except socket.gaierror, e:
+		print >> sys.stderr, "socket.gaierror: Name or service '%s' is not known." % (dns)
 		try: 
 			sock.close()
 		except: 
+			pass
+	except Exception, e:
+		try:
+			sock.close()
+		except:
 			pass
 		raise e
 
