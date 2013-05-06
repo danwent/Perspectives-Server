@@ -48,12 +48,13 @@ DEFAULT_INFILE = "-"
 
 class ScanThread(threading.Thread): 
 
-	def __init__(self, sid, global_stats,timeout_sec): 
+	def __init__(self, sid, global_stats,timeout_sec, sni):
 		self.sid = sid
 		self.global_stats = global_stats
 		self.global_stats.active_threads += 1
 		threading.Thread.__init__(self)
 		self.timeout_sec = timeout_sec
+		self.sni = sni
 		self.global_stats.threads[sid] = time.time() 
 		self.timeout_exc = SSLScanTimeoutException() 
 		self.alert_exc = SSLAlertException("foo")
@@ -90,7 +91,7 @@ class ScanThread(threading.Thread):
 
 	def run(self): 
 		try: 
-			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			res_list.append((self.sid,fp))
 		except Exception, e:
 			self.record_failure(e) 
@@ -143,6 +144,9 @@ parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAU
 			help="How many scans to run per second. Default: %(default)s.")
 parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
 			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+parser.add_argument('--sni', action='store_true', default=False,
+			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			Default: \'%(default)s\'")
 parser.add_argument('--verbose', '-v', default=False, action='store_true',
 			help="Verbose mode. Print more info about each scan.")
 
@@ -175,7 +179,7 @@ for sid in all_sids:
 		# TODO: use a regex instead
 		if sid.split(",")[1] == notary_common.SSL_TYPE:
 			stats.num_started += 1
-			t = ScanThread(sid,stats,timeout_sec)
+			t = ScanThread(sid,stats,timeout_sec,args.sni)
 			t.start()
  
 		if (stats.num_started % rate) == 0: 
