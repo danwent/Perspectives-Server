@@ -222,7 +222,10 @@ class ndb:
 		# TODO: ALL INPUT IS EVIL
 		# regex check these variables
 		if (dburl):
-			connstr = os.environ[self.DB_URL_FIELD]
+			try:
+				connstr = os.environ[self.DB_URL_FIELD]
+			except KeyError:
+				raise KeyError("There is no environment variable named '%s'" % (self.DB_URL_FIELD))
 		elif (dbtype in self.SUPPORTED_DBS):
 
 			self.DB_PASSWORD = ''
