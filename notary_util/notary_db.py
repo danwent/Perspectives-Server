@@ -315,8 +315,9 @@ class ndb:
 			except Exception as e:
 				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
 
-		self.db.dispose()
-		del self.db
+		if (hasattr(self, 'db')):
+			self.db.dispose()
+			del self.db
 
 	@classmethod
 	def get_parser(self):
