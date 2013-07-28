@@ -509,6 +509,10 @@ class ndb:
 
 	# actual data methods follow
 
+	def count_services(self):
+		"""Return a count of the service records."""
+		return self.Session().query(Services.service_id).count()
+
 	def get_all_services(self):
 		"""Get all service names."""
 		return self.Session().query(Services.name).all()
