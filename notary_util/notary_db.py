@@ -32,6 +32,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
+from sqlalchemy.sql import select
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -531,7 +532,6 @@ class ndb:
 
 	def insert_service(self, service_name):
 		"""Add a new Service to the database."""
-		# if this is too slow we could add bulk insertion
 		session = self.Session()
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
@@ -547,6 +547,46 @@ class ndb:
 				srv = None
 
 		return srv
+
+	def insert_bulk_services(self, services):
+		"""
+		Add multiple Services to the database at once.
+		This is much faster than adding them one record at a time.
+
+		'services': a list of service names.
+		"""
+		if len(services) < 1:
+			print >> sys.stderr, "Could not add services - no services in list."
+			return
+
+		try:
+			conn = self.db.connect()
+
+			# select duplicates that already exist in the database
+			dupes = conn.execute(select([Services.name], Services.name.in_(services))).fetchall()
+
+			# convert dupes to dictionary so we can easily test against them
+			dupes_dict = dict((dup[0], True) for dup in dupes)
+
+			# remove any entries that already exist in the database
+			# so that inserting bulk records doesn't throw an IntegrityError.
+			# At the same time, modify entries to be dictionaries
+			# with the correct key/value mapping to be used in a bulk insert.
+			# doing this at the same time saves us from looping through the list twice.
+			services = [{'name': service_name} for service_name in services
+				if service_name not in dupes_dict]
+
+			# any services left in the list will be new entries
+			if (len(services)) > 0:
+				conn.execute(Services.__table__.insert(), services)
+
+		except IntegrityError as e:
+			print >> sys.stderr, "Error adding bulk services: '{0}'".format(e)
+
+		finally:
+			conn.close()
+
+		return
 
 	def get_all_observations(self):
 		"""Get all observations."""
