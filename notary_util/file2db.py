@@ -20,10 +20,14 @@ Can be used to seed a notary database from another notary's list of services.
 
 File is expected to be a list of tuples, one per line.
 Tuples look like:
-  (servicename:port,servicetype, rsakey, starttime, endtime)
+  (servicename:port, servicetype, rsakey, starttime, endtime)
 
 e.g.
   (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
+
+If you have a large number of records to insert (i.e. millions)
+you may want to run this *without* echoing database statements,
+both to improve speed and to avoid memory issues.
 """
 
 import sys
@@ -38,16 +42,22 @@ DEFAULT_INFILE = "-"
 
 def import_records(infile):
 	"""Read a file of tuples and extract service and observation data."""
+
+	print "Reading records from '{0}'.".format(infile.name)
+
 	lines = infile.readlines()
 	infile.close()
 
-	service_names = {}
+	services = {}
 	observations = []
 	num_lines = 0
+	num_invalid_lines = 0
 
 	# tuples will be formatted like this:
 	# (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
-	valid_tuple = re.compile("^ *\(([\w:,.]+), *([0-9a-fA-F:]+), *(\d+), *(\d+)\) *$")
+	#TODO: get correct regex for URLs
+	valid_tuple = re.compile("^ *\(([\w\-:,.]+), *([0-9a-fA-F:]+), *(\d+), *(\d+)\) *$")
+
 
 	for line in lines:
 
@@ -60,22 +70,30 @@ def import_records(infile):
 			start = int(match.group(3))
 			end = int(match.group(4))
 
-			if (service not in service_names):
-				service_names[service] = True
-
+			services[service] = True
 			observations.append((service, key, start, end))
 
+		# ignore comments and blank lines
+		elif ((not line.startswith('#')) and (line not in ['\n', '\r\n'])):
+			# TODO: could print to file
+			#print >> sys.stderr, "Invalid tuple '{0}'".format(line.strip())
+			num_invalid_lines +=1
+
 		num_lines += 1
-		if (num_lines) % 1000 == 0:
-			print "Finished %s lines..." % num_lines
+		if (num_lines) % 100000 == 0:
+			print "Finished reading {0} lines...".format(num_lines)
 
-	print "Found %s services. Adding to database." % (len(service_names))
-
-	for name in service_names.keys():
-		ndb.insert_service(name)
+	service_count = len(services)
+	if (service_count > 0):
+		print "Found {0} services. Adding to database.".format(service_count)
+		ndb.insert_bulk_services(services.keys())
+	else:
+		print "No services found."
+	print "Found {0} invalid lines.".format(num_invalid_lines)
 
 	if not args.services_only:
 		print "Found %s observations. Adding to database." % len(observations)
+		#TODO: need to get the service_ids after services are inserted
 		for (service, key, start, end) in observations:
 			ndb.insert_observation(service, key, start, end)
 
