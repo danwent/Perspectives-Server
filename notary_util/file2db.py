@@ -50,6 +50,8 @@ def import_records(infile):
 
 	services = {}
 	observations = []
+	invalid_lines = []
+	invalid_file = "invalid_lines.txt"
 	num_lines = 0
 	num_invalid_lines = 0
 
@@ -58,6 +60,9 @@ def import_records(infile):
 	#TODO: get correct regex for URLs
 	valid_tuple = re.compile("^ *\(([\w\-:,.]+), *([0-9a-fA-F:]+), *(\d+), *(\d+)\) *$")
 
+	# some lines may contain service-only tuples, like
+	# (domain.com:443,2, None, None, None)
+	site_tuple = re.compile("^ *\(([\w\-:,.]+), *\w+, *\w+, *\w+\) *$")
 
 	for line in lines:
 
@@ -73,15 +78,23 @@ def import_records(infile):
 			services[service] = True
 			observations.append((service, key, start, end))
 
+		elif (site_tuple.match(line)):
+			service = str(site_tuple.match(line).group(1))
+			services[service] = True
+
 		# ignore comments and blank lines
 		elif ((not line.startswith('#')) and (line not in ['\n', '\r\n'])):
-			# TODO: could print to file
-			#print >> sys.stderr, "Invalid tuple '{0}'".format(line.strip())
-			num_invalid_lines +=1
+			invalid_lines.append(line)
 
 		num_lines += 1
 		if (num_lines) % 100000 == 0:
 			print "Finished reading {0} lines...".format(num_lines)
+
+	print "Found {0} invalid lines. Exporting to {1}.".format(
+		len(invalid_lines), invalid_file)
+	with open(invalid_file,'w') as outfile:
+		for line in invalid_lines:
+			print >> outfile, line
 
 	service_count = len(services)
 	if (service_count > 0):
@@ -89,7 +102,6 @@ def import_records(infile):
 		ndb.insert_bulk_services(services.keys())
 	else:
 		print "No services found."
-	print "Found {0} invalid lines.".format(num_invalid_lines)
 
 	if not args.services_only:
 		print "Found %s observations. Adding to database." % len(observations)
