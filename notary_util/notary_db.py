@@ -55,10 +55,11 @@ class Observations(ORMBase):
 	The time ranges observed for each key used by a service.
 	"""
 	__tablename__ = 't_observations'
-	service_id = Column(Integer, ForeignKey('t_services.service_id'), primary_key=True)
-	key = Column(String, primary_key=True)			#certificate key supplied by a service - e.g. aa:bb:cc:dd:00
-	start = Column(Integer) 						#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
-	end = Column(Integer)							#another unix timestamp.  The most recent time we saw a key for a given service.
+	observation_id = Column(Integer, primary_key=True)
+	service_id = Column(Integer, ForeignKey('t_services.service_id'))
+	key = Column(String)	#md5 certificate key supplied by a service - e.g. aa:bb:cc:dd:00
+	start = Column(Integer)	#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
+	end = Column(Integer)	#another unix timestamp.  The most recent time we saw a key for a given service.
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
 
@@ -616,15 +617,12 @@ class ndb:
 				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
 				session.add(newob)
 				session.commit()
-			except IntegrityError:
-				print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. \
-					If you want to update it call that function instead. Ignoring." % (service, key)
-				session.rollback()
-			except ProgrammingError as e:
+			except (ProgrammingError, IntegrityError) as e:
 				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
 				session.rollback()
 			finally:
 				self.Session.remove()
+		# else error already logged by previous function
 
 	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
 		"""Update the end time for a given Observation."""
