@@ -21,46 +21,88 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	sqlalchemy is used to talk to the database so we don't have hardcoded SQL strings.
 
 
-1. Back up your database:
+1. Back up your database (just in case):
 
 >cp notary.slqite notary.sqlite.backup2x
 
 You can also use the db2file command from the next step.
 
 
-2. Export your data using the special db2file_2to3.py module.
-
-This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
-
->python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
+2. Upgrade your database schema
 
 
-3. Rename your database
-
-You can also specify a different database name when importing your data - perspectives will create the database and schema if they don't exist.
-
->mv notary.sqlite notary_2x.sqlite
-
-
-4. Import your data
-
->python notary_util\file2db.py upgraded_data.txt
+	=======
+	Option a: upgrade the database in-place.
+	This is the recommended option. It will usually be faster.
+	This may be the only option if your database has a large number of records (e.g. 3 million observations)
 
 
-5. Check your settings
+	2a.i) open once with python to create the schema
+
+	2a.ii)
+
+		INSERT INTO t_services (name)
+		SELECT DISTINCT service_id FROM observations
+
+	2a.iii)
+
+		DELETE FROM observations WHERE key IS NULL AND start IS NULL AND end IS NULL
+
+	2a.iv)
+
+		UPDATE observations
+		SET service_id = (SELECT t_services.service_id
+							FROM t_services
+							WHERE t_services.name = observations.service_id )
+
+	2a.v)
+
+		INSERT INTO t_observations (service_id, key, start, end)
+			SELECT service_id, key, start, end FROM observations
+
+
+	2a.vi)
+
+		DROP TABLE observations
+
+
+	=======
+	Option b: export and re-import your data.
+	This option is useful if you prefer not to work with SQL.
+
+	2b.i) Export your data using the special db2file_2to3.py module.
+
+		This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
+
+		>python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
+
+	2b.ii) Rename your database.
+
+		>mv notary.sqlite notary_2x.sqlite
+
+		You can also specify a different database name when importing your data - perspectives will create the database and schema if they don't exist.
+
+	2b.iii) Import your data
+
+		>python notary_util\file2db.py upgraded_data.txt
+
+
+
+
+3. Check your settings
 
 Many of the hardcoded settings from 2.0 have been converted to command-line arguments. Many of the required arguments have been given defaults. You can use the '-h' or '--help' switches to see the usage for each module - check how your old notary settings compare against the new settings and adjust anything you want to keep.
 
 One of the biggest improvements with the 3.x notary is data caching. You may want to consider setting up a dedicated caching server or at least using the --pycache argument.
 
 
-6. Run your server!
+4. Run your server!
 
 The command is now much shorter:
 
 >python notary_http.py
 
 
-7. You're done!
+5. You're done!
 
 Congratulations, and enjoy the new features :)
