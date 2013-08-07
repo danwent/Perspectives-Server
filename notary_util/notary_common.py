@@ -49,7 +49,7 @@ def report_observation_with_db(ndb, service, fp):
 				most_recent_time = most_recent_time_by_key[k]
 	ndb.close_session()
 
-	if most_recent_key == fp: 
+	if most_recent_key == fp: # "fingerprint"
 		# this key matches the most recently seen key before this observation.
 		# just update the observation 'end' time.
 		ndb.update_observation_end_time(service, fp, most_recent_time, cur_time)
@@ -58,10 +58,6 @@ def report_observation_with_db(ndb, service, fp):
 		# the key has changed or no observations exist yet for this service.
 		# add a new entry for this key with start and end set to the current time
 		ndb.insert_observation(service, fp, cur_time, cur_time)
-		if most_recent_key != None:
-			# if there was a previous key, set its 'end' timespan value to be
-			# the current time minus one second (ending just before the new key)
-			ndb.update_observation_end_time(service, most_recent_key, most_recent_time, cur_time -1)
-			ndb.report_metric('ServiceScanPrevKeyUpdated', service)
+		# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
 
 
