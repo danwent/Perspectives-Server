@@ -362,7 +362,7 @@ class ndb:
 			# use default 0 but const 1 so we get the expected behaviour if the argument is passed with no parameter.
 			default=self.DEFAULT_ECHO, const=1,
 			metavar='0/1', type=int,
-			help='Echo all SQL statements and other database messages to stdout. If passed with no value echo defaults to true.')
+			help='Echo all SQL statements and other database messages to stdout. Not recommended for production use as this generates a lot of log data. If passed with no value echo defaults to true.')
 		dbgroup.add_argument('--write-config-file', '--wcf', action='store_true', default=False,
 			help='After successfully connecting, save all database arguments to a config file.')
 		dbgroup.add_argument('--read-config-file', '--rcf', action='store_true', default=False,
