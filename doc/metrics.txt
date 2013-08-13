@@ -83,12 +83,7 @@ To give us a high-level overview, enabling notary metrics tracks the following s
 	This helps us answer question c. We note the total number of services that will be scanned.
 
 
-5. The results of scanning a service (ServiceScanKeyUpdated, ServiceScanPrevKeyUpdated)
-
-	To make sure scans are working.
-
-
-6. Failures from scanning services (ServiceScanFailure, OnDemandServiceScanFailure).
+5. Failures from scanning services (ServiceScanFailure, OnDemandServiceScanFailure).
 
 	For question d. We note the error type, message, and info.
 

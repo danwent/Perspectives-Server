@@ -170,8 +170,7 @@ class ndb:
 	CONFIG_SECTION = 'NotaryDB'
 
 	EVENT_TYPE_NAMES=['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
-		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanKeyUpdated',
-		'ServiceScanPrevKeyUpdated', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
+		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
 		'OnDemandServiceScanFailure', 'EventTypeUnknown']
 	EVENT_TYPES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
