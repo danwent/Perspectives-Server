@@ -37,9 +37,11 @@ You can also use the db2file command from the next step.
 	This may be the only option if your database has a large number of records (e.g. 3 million observations)
 
 
-	2a.i) open once with python to create the schema
+	2a.i) Open your database once with the updated python script to create the new schema
 
-	2a.ii)
+		> python notary_http.py
+
+	2a.ii) Migrate your data from the old schema to the new one:
 
 		INSERT INTO t_services (name)
 		SELECT DISTINCT service_id FROM observations
@@ -61,7 +63,7 @@ You can also use the db2file command from the next step.
 			SELECT service_id, key, start, end FROM observations
 
 
-	2a.vi)
+	2a.vi) Clean up the old schema:
 
 		DROP TABLE observations
 
