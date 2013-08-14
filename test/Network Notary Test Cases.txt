@@ -51,6 +51,13 @@ How to count connections for various database types:
 	- When scanning for a new service?
 
 
+Database Transactions:
+----------------------
+- Does the database throw an error if we try to insert an observation with a start time < 0?
+- Does the database throw an error if we try to insert an observation with an end time < 0?
+- Does the database throw an error if we try to insert an observation with an end time < the start time?
+
+
 Failing Gracefully:
 -------------------
 - If the server can't connect to the database, does it still log an error and attempt to serve data from the cache?

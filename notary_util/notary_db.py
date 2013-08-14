@@ -32,6 +32,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
+from sqlalchemy.schema import CheckConstraint, UniqueConstraint
 from sqlalchemy.sql import select
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
@@ -60,6 +61,14 @@ class Observations(ORMBase):
 	key = Column(String)	#md5 certificate key supplied by a service - e.g. aa:bb:cc:dd:00
 	start = Column(Integer)	#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
 	end = Column(Integer)	#another unix timestamp.  The most recent time we saw a key for a given service.
+
+	__table_args__ = (
+		UniqueConstraint('service_id', 'key', 'start'),
+		UniqueConstraint('service_id', 'key', 'end'),
+		CheckConstraint('start >= 0'),
+		CheckConstraint('end >= 0'),
+		CheckConstraint('start <= end'),
+		)
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
 
