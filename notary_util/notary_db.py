@@ -307,7 +307,7 @@ class ndb:
 		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
 			self.Session = None
-			raise e
+			raise
 
 		self.Session = scoped_session(sessionmaker(bind=self.db))
 
@@ -649,7 +649,7 @@ class ndb:
 			self.close_session()
 			# re-raise the error so the caller definitely knows something bad happened,
 			# as opposed to there being no observation records
-			raise e
+			raise
 
 	def insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
