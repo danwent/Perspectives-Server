@@ -56,6 +56,7 @@ Database Transactions:
 - Does the database throw an error if we try to insert an observation with a start time < 0?
 - Does the database throw an error if we try to insert an observation with an end time < 0?
 - Does the database throw an error if we try to insert an observation with an end time < the start time?
+	- Does the code check for these conditions as well, in case they cannot be enforced by the database?
 
 
 Failing Gracefully:

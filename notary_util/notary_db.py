@@ -30,7 +30,7 @@ import ConfigParser
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, validates
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy.schema import CheckConstraint, UniqueConstraint
 from sqlalchemy.sql import select
@@ -71,6 +71,36 @@ class Observations(ORMBase):
 		)
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
+
+	# add validation for individual fields, in case the database itself cannot.
+	@validates('start')
+	def validates_start(self, key, start):
+		"""Validate the 'start' field when creating a new Observation."""
+		if (start < 0):
+			raise ValueError('Observation start time cannot be < 0 (attempted to use {0})'.format(start))
+		return start
+
+	@validates('end')
+	def validates_end(self, key, end):
+		"""Validate the 'end' field when creating a new Observation."""
+		if (end < 0):
+			raise ValueError('Observation end time cannot be < 0 (attempted to use {0})'.format(end))
+		return end
+
+	def validate(self):
+		"""
+		Check whether an Observation is a valid record that can be inserted in the database,
+		and raise an exception if it is not.
+		Keeping the code inside one function makes it easy to call from any insert or update methods.
+
+		This function contains logic that cannot be run inside sqlalchemy @validates functions -
+		either because it operates on multiple fields and requires the object to be completely instantiated,
+		or for some other reason.
+		"""
+		if (self.end < self.start):
+			raise ValueError('Observation end time must be >= start time (attempted to use start {0} and end {1})'.format(
+				self.start, self.end))
+
 
 # create indexes to speed up queries
 Index('ix_services_name', Services.name)
@@ -623,9 +653,10 @@ class ndb:
 			try:
 				session = self.Session()
 				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
+				newob.validate()
 				session.add(newob)
 				session.commit()
-			except (ProgrammingError, IntegrityError) as e:
+			except (ProgrammingError, IntegrityError, ValueError) as e:
 				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
 				session.rollback()
 			finally:
@@ -641,18 +672,26 @@ class ndb:
 		if (old_end_time == None):
 			old_end_time = curtime
 
-		session = self.Session()
-		ob = session.query(Observations).join(Services)\
-			.filter(Services.name == service)\
-			.filter(Observations.key == fp)\
-			.filter(Observations.end == old_end_time).first()
-		if (ob != None):
-			ob.end = new_end_time
-			session.commit()
-		else:
-			print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
-				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
-		self.Session.remove()
+		try:
+			session = self.Session()
+			ob = session.query(Observations).join(Services)\
+				.filter(Services.name == service)\
+				.filter(Observations.key == fp)\
+				.filter(Observations.end == old_end_time).first()
+			if (ob != None):
+				if (new_end_time <= ob.end):
+					raise ValueError('New end time must be > current end time. (attempted to use new end time {0})'.format(
+						new_end_time))
+				ob.validate()
+				ob.end = new_end_time
+				session.commit()
+			else:
+				print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
+					but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
+		except (ValueError) as e:
+			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
+		finally:
+			self.Session.remove()
 
 	# rate limit metrics so spamming queries doesn't take down the system.
 	# TODO: we could group metrics up to report in one big transaction, or use a background worker
