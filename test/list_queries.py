@@ -129,6 +129,9 @@ class NotarySQLEnumeration(unittest.TestCase):
 	def test_count_services(self):
 		self.ndb.count_services()
 
+	def test_count_observations(self):
+		self.ndb.count_observations()
+
 	def test_get_all_observations(self):
 		self.ndb.get_all_observations()
 
