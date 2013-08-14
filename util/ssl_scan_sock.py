@@ -51,7 +51,7 @@ def _read_data(s,data_len, timeout_sec):
 				break
 		except socket.error, e:
 			if not _is_nonblocking_exception(e):
-				raise e 
+				raise
 		if time.time() - start_time > timeout_sec: 
 			raise SSLScanTimeoutException("timeout in _read_data")
 		time.sleep(SLEEP_LEN_SEC)
@@ -69,7 +69,7 @@ def _send_data(s, data, timeout_sec):
 					raise SSLScanTimeoutException("timeout in _send_data")
 				time.sleep(SLEEP_LEN_SEC)
 			else: 
-				raise e
+				raise
 
 def _is_nonblocking_exception(e):
 	try: 
@@ -93,7 +93,7 @@ def _do_connect(s, host, port, timeout_sec):
 					raise SSLScanTimeoutException("timeout in _do_connect")
 				time.sleep(SLEEP_LEN_SEC) 
 			else: 
-				raise e
+				raise
 
 def _read_record(sock,timeout_sec):
 	rec_start = _read_data(sock,5,timeout_sec)
@@ -183,7 +183,7 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 			sock.close()
 		except:
 			pass
-		raise e
+		raise
 
 def _get_standard_client_hello():
 	return "8077010301004e0000002000003900003800003500001600001300000a0700c000003300003200002f0300800000050000040100800000150000120000090600400000140000110000080000060400800000030200800000ff9c82ce1e4bc89df2c726b7cebe211ef80a611945d140834eede5674b597be487" 
