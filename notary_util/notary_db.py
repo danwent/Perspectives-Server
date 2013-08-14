@@ -627,6 +627,11 @@ class ndb:
 
 		return
 
+	#######
+	def count_observations(self):
+		"""Return a count of the observation records."""
+		return self.Session().query(Observations.observation_id).count()
+
 	def get_all_observations(self):
 		"""Get all observations."""
 		return self.Session().query(Services).join(Observations).\
