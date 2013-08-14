@@ -212,19 +212,23 @@ def _get_sni_client_hello(hostname):
 
 def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 
+	try:
 		dns, port = service.split(",")[0].split(":")
-		# if we want to try SNI, do such a scan but if that
-		# scan fails with an SSL alert, retry with a non SNI request
-		if use_sni:
-			if dns[-1:].isalpha():
-				try:
-					return _run_scan(dns,port,timeout_sec,True)
-				except SSLAlertException:
-					pass
-			else:
-				raise ValueError("Service must be of the form 'host:port'")
+	except (ValueError):
+		raise ValueError("Service must be of the form 'host:port'")
 
-		return _run_scan(dns,port,timeout_sec,False)
+	# if we want to try SNI, do such a scan but if that
+	# scan fails with an SSL alert, retry with a non SNI request
+	if use_sni:
+		if dns[-1:].isalpha():
+			try:
+				return _run_scan(dns,port,timeout_sec,True)
+			except SSLAlertException:
+				pass
+		else:
+			raise ValueError("Service must be of the form 'host:port'")
+
+	return _run_scan(dns,port,timeout_sec,False)
 
 if __name__ == "__main__":
 
