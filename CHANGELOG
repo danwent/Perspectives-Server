@@ -16,6 +16,8 @@ Format:
 * Fix bug with incorrect Primary Key on Observations.
 	It's perfectly reasonable that we might see the same certificate used on the same site in non-contiguous blocks of time. Allow such changes to be stored in the database. (this has only been a bug since v3.0)
 * Fix bug: do not update previous key's observation end time when adding a new key.
+* Remove ServiceScanKeyUpdated metric types (they're not needed)
++ Add data validation to database and code for Observation records
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
 * Add --verbose switch to scanner to generate less log data.
 
