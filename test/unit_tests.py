@@ -21,6 +21,7 @@ Feel free to add tests!
 You may see error messages printed to stderr, but that should be evidence of code properly handling errors.
 """
 
+import argparse
 import logging
 import unittest
 
@@ -229,8 +230,11 @@ class NotaryDBTestCases(unittest.TestCase):
 		count_srv_after = self.ndb.count_services()
 		self.assertTrue(count_srv_before == (count_srv_after - len(services)))
 
-# TODO: add argparse for -h explanation
+parser = argparse.ArgumentParser(description=__doc__)
+
 if __name__ == '__main__':
+
+	args = parser.parse_args()
 
 	if (os.path.exists(NotaryDBTestCases.TEST_DATABASE) and (os.path.isfile(NotaryDBTestCases.TEST_DATABASE))):
 			try:
