@@ -231,8 +231,7 @@ while stats.active_threads > 0:
 
 # record any observations made since we finished the
 # main for-loop			
-record_observations_in_db(res_list) 
-ndb.close_session()
+record_observations_in_db(res_list)
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
