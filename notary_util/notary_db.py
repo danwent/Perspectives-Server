@@ -613,8 +613,8 @@ class ndb:
 			try:
 				session.add(srv)
 				session.commit()
-			except ProgrammingError as e:
-				print >> sys.stderr, "Error committing service '%s': '%s'" % (service_name, e)
+			except (ProgrammingError, IntegrityError) as e:
+				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
 				session.rollback()
 				self.close_session()
 				srv = None
