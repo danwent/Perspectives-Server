@@ -19,6 +19,9 @@ Format:
 * Remove ServiceScanKeyUpdated metric types (they're not needed)
 + Add data validation to database and code for Observation records
 + Track the number of open database connections so we can see if we're leaking any
+* Stop generating Traceback for socket exceptions; simply log the error and continue.
+	This *significantly* improves speed and response times for scans that didn't work
+	(and we're not losing any information).
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
 * Add --verbose switch to scanner to generate less log data.
 
