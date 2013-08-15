@@ -50,7 +50,7 @@ class Services(ORMBase):
 	Service names take the form 'host:port,servicetype' - e.g. github.com:443,2
 	"""
 	__tablename__ = 't_services'
-	service_id = Column(Integer, primary_key=True)
+	service_id = Column(Integer, nullable=False, primary_key=True)
 	name = Column(String, nullable=False, unique=True)
 
 class Observations(ORMBase):
@@ -58,11 +58,11 @@ class Observations(ORMBase):
 	The time ranges observed for each key used by a service.
 	"""
 	__tablename__ = 't_observations'
-	observation_id = Column(Integer, primary_key=True)
-	service_id = Column(Integer, ForeignKey('t_services.service_id'))
-	key = Column(String)	#md5 certificate key supplied by a service - e.g. aa:bb:cc:dd:00
-	start = Column(Integer)	#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
-	end = Column(Integer)	#another unix timestamp.  The most recent time we saw a key for a given service.
+	observation_id = Column(Integer, nullable=False, primary_key=True)
+	service_id = Column(Integer, ForeignKey('t_services.service_id'), nullable=False)
+	key = Column(String, nullable=False)	#md5 certificate key supplied by a service - e.g. aa:bb:cc:dd:00
+	start = Column(Integer, nullable=False)	#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
+	end = Column(Integer, nullable=False)	#another unix timestamp.  The most recent time we saw a key for a given service.
 
 	__table_args__ = (
 		UniqueConstraint('service_id', 'key', 'start'),
@@ -117,7 +117,7 @@ class EventTypes(ORMBase):
 	# see the ndb class and ndb.init_event_types()
 	# for a list of possible event types
 	__tablename__ = 't_event_types'
-	event_type_id = Column(Integer, primary_key=True)
+	event_type_id = Column(Integer, nullable=False, primary_key=True)
 	name = Column(String, nullable=False, unique=True)
 
 class Metrics(ORMBase):
@@ -125,9 +125,9 @@ class Metrics(ORMBase):
 	A log of interesting events that happen while a notary server runs. Mainly used for diagnostic or performance tracking.
 	"""
 	__tablename__ = 't_metrics'
-	event_id = Column(Integer, primary_key=True)
-	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'))
-	date = Column(Integer) # unix timestamp - number of seconds since the epoch.
+	event_id = Column(Integer, nullable=False, primary_key=True)
+	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'), nullable=False)
+	date = Column(Integer, nullable=False) # unix timestamp - number of seconds since the epoch.
 	comment = Column(String) # anything worth noting. do NOT track ip address or any private/personally identifiable information.
 
 # purposely don't create any indexes on metrics tables -
