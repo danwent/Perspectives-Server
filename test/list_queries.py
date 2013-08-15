@@ -109,6 +109,9 @@ class NotarySQLEnumeration(unittest.TestCase):
 	def test_get_oldest_services(self):
 		self.ndb.get_oldest_services(0)
 
+	def test_report_metric(self):
+		self.ndb.report_metric('CacheHit')
+
 	def test_insert_service(self):
 		self.ndb.insert_service('insert_service_test:443,2')
 
@@ -128,6 +131,9 @@ class NotarySQLEnumeration(unittest.TestCase):
 		self.ndb.insert_service(srv)
 		self.ndb.insert_observation(srv, key, end_time - 1, end_time)
 		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
+
+	def test_report_observation(self):
+		self.ndb.report_observation('report_observation_test:443,2', 'aa:bb')
 
 	# less important SQL - used less often or in the background
 	def test_count_services(self):
