@@ -127,7 +127,7 @@ class NotarySQLEnumeration(unittest.TestCase):
 
 		self.ndb.insert_service(srv)
 		self.ndb.insert_observation(srv, key, end_time - 1, end_time)
-		self.ndb.update_observation_end_time(srv, key, end_time, end_time + 1)
+		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
 
 	# less important SQL - used less often or in the background
 	def test_count_services(self):

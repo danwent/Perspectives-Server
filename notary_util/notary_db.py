@@ -705,8 +705,11 @@ class ndb:
 				self.close_session()
 		# else error already logged by previous function
 
-	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
-		"""Update the end time for a given Observation."""
+	def _update_observation_end_time(self, service, fp, old_end_time, new_end_time):
+		"""
+		Update the end time for a given Observation.
+		External callers shouldn't use this - call report_observation() instead.
+		"""
 		curtime = int(time.time())
 
 		if (new_end_time == None):
@@ -760,7 +763,7 @@ class ndb:
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.
 			# just update the observation 'end' time.
-			self.update_observation_end_time(service, fp, most_recent_time, cur_time)
+			self._update_observation_end_time(service, fp, most_recent_time, cur_time)
 		else:
 			# the key has changed or no observations exist yet for this service.
 			# add a new entry for this key with start and end set to the current time

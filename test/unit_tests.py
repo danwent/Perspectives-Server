@@ -180,10 +180,10 @@ class NotaryDBTestCases(unittest.TestCase):
 
 
 		# a regular update should work
-		self.ndb.update_observation_end_time(srv, key, end_time, end_time + 1)
+		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
 
 		# trying to set end time < current time should fail
-		self.ndb.update_observation_end_time(srv, key, end_time + 1, end_time - 10)
+		self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time - 10)
 		obs = self.ndb.get_observations(srv)
 		ob_count = 0
 		for ob in obs:
@@ -192,7 +192,7 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.assertTrue(ob_count == 1)
 
 		# trying to set end time == current time should fail
-		self.ndb.update_observation_end_time(srv, key, end_time + 1, end_time + 1)
+		self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time + 1)
 		obs = self.ndb.get_observations(srv)
 		ob_count = 0
 		for ob in obs:
@@ -201,10 +201,10 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.assertTrue(ob_count == 1)
 
 		# null values should be ignored
-		self.ndb.update_observation_end_time(None, key, end_time, end_time)
-		self.ndb.update_observation_end_time(srv, None, end_time, end_time)
-		self.ndb.update_observation_end_time(srv, key, None, end_time)
-		self.ndb.update_observation_end_time(srv, key, end_time, None)
+		self.ndb._update_observation_end_time(None, key, end_time, end_time)
+		self.ndb._update_observation_end_time(srv, None, end_time, end_time)
+		self.ndb._update_observation_end_time(srv, key, None, end_time)
+		self.ndb._update_observation_end_time(srv, key, end_time, None)
 
 	def test_report_observation(self):
 		self.ndb.report_observation('report_observation_test:443,2', 'aa:bb')
