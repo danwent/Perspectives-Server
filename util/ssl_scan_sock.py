@@ -171,19 +171,14 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 		sock.close()
 		return fp 
 
-	# make sure we always close the socket, but still propogate the exception
-	except socket.gaierror, e:
-		print >> sys.stderr, "socket.gaierror: Name or service '%s' is not known." % (dns)
+	except (socket.error, socket.herror, socket.gaierror, socket.timeout) as e:
+		print >> sys.stderr, "ERROR: socket error for service {0}:{1}: {2}".format(dns, port, e)
+	# propogate non-socket exceptions so we can better troubleshoot
+	finally:
 		try: 
 			sock.close()
 		except: 
 			pass
-	except Exception, e:
-		try:
-			sock.close()
-		except:
-			pass
-		raise
 
 def _get_standard_client_hello():
 	return "8077010301004e0000002000003900003800003500001600001300000a0700c000003300003200002f0300800000050000040100800000150000120000090600400000140000110000080000060400800000030200800000ff9c82ce1e4bc89df2c726b7cebe211ef80a611945d140834eede5674b597be487" 
