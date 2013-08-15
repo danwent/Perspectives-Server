@@ -18,6 +18,7 @@ Format:
 * Fix bug: do not update previous key's observation end time when adding a new key.
 * Remove ServiceScanKeyUpdated metric types (they're not needed)
 + Add data validation to database and code for Observation records
++ Track the number of open database connections so we can see if we're leaking any
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
 * Add --verbose switch to scanner to generate less log data.
 
