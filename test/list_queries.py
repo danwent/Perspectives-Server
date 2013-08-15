@@ -146,6 +146,13 @@ class NotarySQLEnumeration(unittest.TestCase):
 
 if __name__ == '__main__':
 
+	if (os.path.exists(NotarySQLEnumeration.TEST_DATABASE) and (os.path.isfile(NotarySQLEnumeration.TEST_DATABASE))):
+		try:
+			print "Deleting test database file {0}".format(NotarySQLEnumeration.TEST_DATABASE)
+			os.remove(NotarySQLEnumeration.TEST_DATABASE)
+		except (Exception) as e:
+			print >> sys.stderr, "Error deleting test database: '{0}'. WARNING - tests may not run properly.".format(e)
+
 	test_suite = unittest.TestLoader().loadTestsFromTestCase(NotarySQLEnumeration)
 	unittest.main(verbosity=2)
 
