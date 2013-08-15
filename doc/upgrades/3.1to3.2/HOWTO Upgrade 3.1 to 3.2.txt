@@ -20,27 +20,154 @@ How to upgrade the database:
 
 	Most databases, including postgresql:
 
+		-- 1) drop machine name data
 		ALTER TABLE t_metrics DROP COLUMN machine_id;
 		DROP TABLE t_machines;
 
-	sqlite:
-	(sqlite does not allow you to drop columns from a table)
+		-- 2) update the observations table
 
+		ALTER TABLE t_observations DROP CONSTRAINT t_observations_pkey
+
+		CREATE SEQUENCE t_observations_observation_id_seq;
+
+		ALTER TABLE t_observations ADD COLUMN observation_id integer;
+
+		ALTER TABLE t_observations ALTER COLUMN observation_id SET DEFAULT NEXTVAL('t_observations_observation_id_seq');
+
+		UPDATE t_observations SET observation_id = NEXTVAL('t_observations_observation_id_seq');
+
+		ALTER TABLE t_observations ADD PRIMARY KEY (observation_id)
+
+		-- 3) see if any records need updating before adding checks
+		SELECT service_id, key, start, "end"
+		FROM t_observations
+		WHERE start < 0
+
+			-- if any exist, fix them with
+			UPDATE t_observations
+			SET start = 0
+			WHERE start < 0
+
+		SELECT service_id, key, start, "end"
+		FROM t_observations
+		WHERE t_observations.end < 0
+
+			-- if any exist, fix them with
+			UPDATE t_observations
+			SET "end" = 0
+			WHERE t_observations.end < 0
+
+		SELECT service_id, key, start, "end", (start - "end")
+		FROM t_observations
+		WHERE "end" < start
+
+			-- if any exist, fix them with something like
+			UPDATE t_observations
+			SET "end" = start
+			WHERE "end" < start
+
+		-- 4) add check constraints
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_start CHECK (start >= 0)
+
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_end CHECK (t_observations.end >= 0)
+
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_start_end CHECK (start <= t_observations.end)
+
+		-- TODO! add unique constraints x2
+		-- need to clean up records that don't match :-/
+		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
+		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, end)
+
+		-- 5) add NOT NULL
+
+		ALTER TABLE t_services ALTER COLUMN service_id SET NOT NULL;
+		ALTER TABLE t_services ALTER COLUMN name SET NOT NULL;
+		ALTER TABLE t_observations ALTER COLUMN service_id SET NOT NULL;
+		ALTER TABLE t_observations ALTER COLUMN key SET NOT NULL;
+		ALTER TABLE t_observations ALTER COLUMN start SET NOT NULL;
+		ALTER TABLE t_observations ALTER COLUMN "end" SET NOT NULL;
+		ALTER TABLE t_event_types ALTER COLUMN event_type_id SET NOT NULL;
+		ALTER TABLE t_event_types ALTER COLUMN name SET NOT NULL;
+		ALTER TABLE t_metrics ALTER COLUMN event_id SET NOT NULL;
+		ALTER TABLE t_metrics ALTER COLUMN event_type_id SET NOT NULL;
+		ALTER TABLE t_metrics ALTER COLUMN date SET NOT NULL;
+
+
+	sqlite:
+
+		-- 1) drop machine name data
+		-- (sqlite does not allow you to drop columns from a table)
 		ALTER TABLE t_metrics RENAME TO t_metrics_old;
 
 		CREATE TABLE t_metrics (
-				event_id INTEGER NOT NULL,
-				event_type_id INTEGER,
-				date INTEGER,
-				comment VARCHAR,
-				PRIMARY KEY (event_id),
-				FOREIGN KEY(event_type_id) REFERENCES t_event_types (event_type_id)
+		    event_id      INTEGER NOT NULL,
+		    event_type_id INTEGER NOT NULL,
+		    date          INTEGER NOT NULL,
+		    comment       VARCHAR,
+		    PRIMARY KEY ( event_id ),
+		    FOREIGN KEY ( event_type_id ) REFERENCES t_event_types ( event_type_id )
 		);
 
 		INSERT INTO t_metrics SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
 
 		DROP TABLE t_metrics_old;
 		DROP TABLE t_machines;
+
+
+		-- 2) update the observations table
+
+		ALTER TABLE t_observations RENAME TO t_observations_old;
+
+		CREATE TABLE t_observations (
+			observation_id INTEGER NOT NULL,
+			service_id     INTEGER NOT NULL,
+			[key]          VARCHAR NOT NULL,
+			start          INTEGER NOT NULL,
+			[end]          INTEGER NOT NULL,
+			PRIMARY KEY ( observation_id ),
+			UNIQUE ( service_id, [key], start ),
+			UNIQUE ( service_id, [key], [end] ),
+			CHECK ( start >= 0 ),
+			CHECK ( END >= 0 ),
+			CHECK ( start <= END ),
+			FOREIGN KEY ( service_id ) REFERENCES t_services ( service_id )
+		);
+
+
+		-- 3) see if any records need updating before adding checks
+		SELECT service_id, key, start, end
+		FROM t_observations_old
+		WHERE start < 0
+
+			-- if any exist, fix them with
+			UPDATE t_observations_old
+			SET start = 0
+			WHERE start < 0
+
+		SELECT service_id, key, start, end
+		FROM t_observations_old
+		WHERE end < 0
+
+			-- if any exist, fix them with
+			UPDATE t_observations_old
+			SET end = 0
+			WHERE end < 0
+
+		SELECT service_id, key, start, end, (start - end)
+		FROM t_observations_old
+		WHERE end < start
+
+			-- if any exist, fix them with something like
+			UPDATE t_observations_old
+			SET end = start
+			WHERE end < start
+
+		-- 4) migrate data
+
+		INSERT INTO t_observations (service_id, key, start, end) SELECT service_id, key, start, end FROM t_observations_old;
+
+		DROP TABLE t_observations_old;
+
 
 
 4. Restart your notary with the new code
