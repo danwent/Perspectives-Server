@@ -125,8 +125,7 @@ def record_observations_in_db(res_list):
 		return
 	try: 
 		for r in res_list: 
-			notary_common.report_observation_with_db( \
-						ndb, r[0], r[1])
+			ndb.report_observation(r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
 		print "DB Error: Failed to write res_list of length %s" % \

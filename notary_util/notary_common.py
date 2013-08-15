@@ -18,8 +18,6 @@
 
 import time
 
-from notary_db import ndb
-
 SSH_TYPE = "1"
 SSL_TYPE = "2"
 SERVICE_TYPES = {SSH_TYPE: "ssh",
@@ -28,35 +26,5 @@ PORTS = {SSH_TYPE: 22,
 		SSL_TYPE: 443}
 
 
-def report_observation_with_db(ndb, service, fp):
-	"""Insert or update an Observation record in the notary database."""
-
-	cur_time = int(time.time()) 
-	obs = ndb.get_observations(service)
-	most_recent_time_by_key = {}
-
-	most_recent_key = None
-	most_recent_time = 0
-
-	# calculate the most recently seen key
-	for (service, key, start, end) in obs:
-		if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
-			most_recent_time_by_key[key] = end
-
-		for k in most_recent_time_by_key:
-			if most_recent_time_by_key[k] > most_recent_time:
-				most_recent_key = k
-				most_recent_time = most_recent_time_by_key[k]
-	ndb.close_session()
-
-	if most_recent_key == fp: # "fingerprint"
-		# this key matches the most recently seen key before this observation.
-		# just update the observation 'end' time.
-		ndb.update_observation_end_time(service, fp, most_recent_time, cur_time)
-	else: 
-		# the key has changed or no observations exist yet for this service.
-		# add a new entry for this key with start and end set to the current time
-		ndb.insert_observation(service, fp, cur_time, cur_time)
-		# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
 
 

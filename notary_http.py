@@ -337,7 +337,7 @@ class OnDemandScanThread(threading.Thread):
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
-			notary_common.report_observation_with_db(db, self.sid, fp)
+			db.report_observation(self.sid, fp)
 		except Exception as e:
 			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)

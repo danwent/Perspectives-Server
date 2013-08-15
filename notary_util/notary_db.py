@@ -735,6 +735,38 @@ class ndb:
 		finally:
 			self.close_session()
 
+	def report_observation(self, service, fp):
+		"""Insert or update an Observation record."""
+
+		cur_time = int(time.time())
+		obs = self.get_observations(service)
+		most_recent_time_by_key = {}
+
+		most_recent_key = None
+		most_recent_time = 0
+
+		# calculate the most recently seen key
+		# TODO: there has got to be a more efficient way to do this with a query
+		for (service, key, start, end) in obs:
+			if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+				most_recent_time_by_key[key] = end
+
+			for k in most_recent_time_by_key:
+				if most_recent_time_by_key[k] > most_recent_time:
+					most_recent_key = k
+					most_recent_time = most_recent_time_by_key[k]
+		self.close_session()
+
+		if most_recent_key == fp: # "fingerprint"
+			# this key matches the most recently seen key before this observation.
+			# just update the observation 'end' time.
+			self.update_observation_end_time(service, fp, most_recent_time, cur_time)
+		else:
+			# the key has changed or no observations exist yet for this service.
+			# add a new entry for this key with start and end set to the current time
+			self.insert_observation(service, fp, cur_time, cur_time)
+			# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
+
 	# rate limit metrics so spamming queries doesn't take down the system.
 	# TODO: we could group metrics up to report in one big transaction, or use a background worker
 	@ratelimited(1)
