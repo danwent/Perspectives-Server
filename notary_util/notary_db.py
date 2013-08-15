@@ -332,7 +332,7 @@ class ndb:
 		# saves us from having to look up the ID every time we insert a metric record.
 
 		# __init__ happens in its own thread, so create and remove a local Session
-		session = self.open_session()
+		session = self._open_session()
 		for name in self.EVENT_TYPE_NAMES:
 			try:
 				evt = session.query(EventTypes).filter(EventTypes.name == name).first()
@@ -546,7 +546,7 @@ class ndb:
 
 		return good_args
 
-	def open_session(self):
+	def _open_session(self):
 		"""
 		Open a session with the database. *ALL* callers should use this to create new sessions,
 		and call close_session() afterward to close them.
@@ -582,30 +582,30 @@ class ndb:
 
 	def count_services(self):
 		"""Return a count of the service records."""
-		session = self.open_session()
+		session = self._open_session()
 		count = session.query(Services.service_id).count()
 		self.close_session()
 		return count
 
 	def get_all_services(self):
 		"""Get all service names."""
-		return self.open_session().query(Services.name).all()
+		return self._open_session().query(Services.name).all()
 
 	def get_newest_services(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return self.open_session().query(Services.name).join(Observations).\
+		return self._open_session().query(Services.name).join(Observations).\
 			filter(Observations.end > end_limit)
 
 	def get_oldest_services(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return self.open_session().query(Services).join(Observations).filter(\
+		return self._open_session().query(Services).join(Observations).filter(\
 			~Services.name.in_(\
 				self.get_newest_services(end_limit))).\
 			values(Services.name)
 
 	def insert_service(self, service_name):
 		"""Add a new Service to the database."""
-		session = self.open_session()
+		session = self._open_session()
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
@@ -664,21 +664,21 @@ class ndb:
 	#######
 	def count_observations(self):
 		"""Return a count of the observation records."""
-		session = self.open_session()
+		session = self._open_session()
 		count = session.query(Observations.observation_id).count()
 		self.close_session()
 		return count
 
 	def get_all_observations(self):
 		"""Get all observations."""
-		return self.open_session().query(Services).join(Observations).\
+		return self._open_session().query(Services).join(Observations).\
 			order_by(Services.name).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
 	def get_observations(self, service):
 		"""Get all observations for a given service."""
 		try:
-			return self.open_session().query(Services).join(Observations).\
+			return self._open_session().query(Services).join(Observations).\
 				filter(Services.name == service).\
 				values(Services.name, Observations.key, Observations.start, Observations.end)
 		except Exception as e:
@@ -693,7 +693,7 @@ class ndb:
 		srv = self.insert_service(service)
 		if (srv != None):
 			try:
-				session = self.open_session()
+				session = self._open_session()
 				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
 				newob.validate()
 				session.add(newob)
@@ -718,7 +718,7 @@ class ndb:
 			old_end_time = curtime
 
 		try:
-			session = self.open_session()
+			session = self._open_session()
 			ob = session.query(Observations).join(Services)\
 				.filter(Services.name == service)\
 				.filter(Observations.key == fp)\
@@ -783,7 +783,7 @@ class ndb:
 				if (self.metricsdb):
 					# wrap metric write attempts in a try/catch block so errors don't bring down the server
 					try:
-						session = self.open_session()
+						session = self._open_session()
 						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
 							date=int(time.time()), comment=str(comment))
 						session.add(metric)
