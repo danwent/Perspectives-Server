@@ -92,7 +92,9 @@ class ScanThread(threading.Thread):
 	def run(self): 
 		try: 
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
-			res_list.append((self.sid,fp))
+			if (fp != None):
+				res_list.append((self.sid,fp))
+			# else error already logged
 		except Exception, e:
 			self.record_failure(e) 
 

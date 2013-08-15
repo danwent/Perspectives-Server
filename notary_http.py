@@ -337,7 +337,9 @@ class OnDemandScanThread(threading.Thread):
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
-			db.report_observation(self.sid, fp)
+			if (fp != None):
+				db.report_observation(self.sid, fp)
+			# else error already logged
 		except Exception as e:
 			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)

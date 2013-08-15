@@ -239,7 +239,9 @@ if __name__ == "__main__":
 	try:
  
 		fp = attempt_observation_for_service(service, 10, args.sni)
-		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
+		if (fp != None):
+			print "Successful scan complete: '%s' has key '%s' " % (service,fp)
+			# else error already logged
 	except:
 		print >> sys.stderr, "Error scanning for %s" % (service)
 		traceback.print_exc(file=sys.stderr)
