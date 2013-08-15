@@ -303,7 +303,7 @@ class NotaryHTTPServer:
 		if (port == None and (service_type in notary_common.PORTS)):
 			port = str(notary_common.PORTS[service_type])
 
-		if (host == None or port == None or service_type == None):
+		if (host == None or host == '' or port == None or service_type == None):
 			raise cherrypy.HTTPError(400) # 400 Bad Request
 
 		if (service_type not in notary_common.SERVICE_TYPES):
