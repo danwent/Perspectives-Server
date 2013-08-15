@@ -93,6 +93,10 @@ class NotarySQLEnumeration(unittest.TestCase):
 			"SQL Statement {0} - {1}".format(NotarySQLEnumeration.test_case_count,
 			self.id()))
 
+	def tearDown(self):
+		self.ndb.close_session()
+		self.assertTrue(self.ndb.get_connection_count() == 0)
+
 	#######
 
 	# important SQL: used frequently by the main app
