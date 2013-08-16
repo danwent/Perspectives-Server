@@ -560,7 +560,10 @@ class ndb:
 
 	def count_services(self):
 		"""Return a count of the service records."""
-		return self.Session().query(Services.service_id).count()
+		session = self.open_session()
+		count = session.query(Services.service_id).count()
+		self.close_session()
+		return count
 
 	def get_all_services(self):
 		"""Get all service names."""
@@ -639,7 +642,10 @@ class ndb:
 	#######
 	def count_observations(self):
 		"""Return a count of the observation records."""
-		return self.Session().query(Observations.observation_id).count()
+		session = self.open_session()
+		count = session.query(Observations.observation_id).count()
+		self.close_session()
+		return count
 
 	def get_all_observations(self):
 		"""Get all observations."""
