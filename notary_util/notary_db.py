@@ -30,7 +30,9 @@ import ConfigParser
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
+from sqlalchemy.event import listen
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, validates
+from sqlalchemy.pool import Pool
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy.schema import CheckConstraint, UniqueConstraint
 from sqlalchemy.sql import select
@@ -214,6 +216,8 @@ class ndb:
 	EVENT_TYPES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
 
+	_open_connections = 0
+
 	def __init__(self, args):
 		"""
 		Initialize a new ndb object.
@@ -311,6 +315,9 @@ class ndb:
 
 		self._Session = scoped_session(sessionmaker(bind=self.db))
 
+		listen(Pool, 'checkout', self._on_connection_checkout)
+		listen(Pool, 'checkin', self._on_connection_checkin)
+
 		# cache data used when logging metrics
 		self.__init_event_types()
 
@@ -349,6 +356,10 @@ class ndb:
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
+
+		if (self.get_connection_count() != 0):
+			print >> sys.stderr, "ERROR: {0} database sessions remain open! Please close them with close_session() after you are finished.".format(
+				self.get_connection_count())
 
 		if ((hasattr(self, '_Session')) and (self._Session != None)):
 			try:
@@ -555,6 +566,17 @@ class ndb:
 			except Exception as e:
 				print >> sys.stderr, "Error closing database session: '{0}'".format(e)
 
+	def _on_connection_checkout(self, dbapi_connection, connection_record, connection_proxy):
+		"""Count when a connection is checked out of the connection pool."""
+		self._open_connections += 1
+
+	def _on_connection_checkin(self, dbapi_connection, connection_record):
+		"""Count when a connection is checked back in to the connection pool."""
+		self._open_connections -= 1
+
+	def get_connection_count(self):
+		"""Return the count of open database connections."""
+		return self._open_connections
 
 	# actual data methods follow
 
