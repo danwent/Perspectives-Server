@@ -193,7 +193,8 @@ class NotaryHTTPServer:
 			except Exception as e:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
-		if (self.ndb and (self.ndb.Session != None)):
+		#TODO: don't reference session directly
+		if (self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, host, port, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
