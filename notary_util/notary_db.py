@@ -252,7 +252,7 @@ class ndb:
 		"""
 
 		connstr = ''
-		self.Session = None
+		self._Session = None
 		self.metricsdb = metricsdb
 		self.metricslog = metricslog
 
@@ -299,17 +299,17 @@ class ndb:
 
 		# in most cases we expect callers to handle any exceptions that get thrown here.
 		# we still want to make sure the error is logged, however.
-		# for now we only check that (self.Session != None) in a few places that may be called accidentally,
+		# for now we only check that (self._Session != None) in a few places that may be called accidentally,
 		# since callers really shouldn't be calling methods if the database couldn't connect.
 		# we could add more checks if that's warranted.
 		try:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
-			self.Session = None
+			self._Session = None
 			raise
 
-		self.Session = scoped_session(sessionmaker(bind=self.db))
+		self._Session = scoped_session(sessionmaker(bind=self.db))
 
 		# cache data used when logging metrics
 		self.__init_event_types()
@@ -325,7 +325,7 @@ class ndb:
 		# saves us from having to look up the ID every time we insert a metric record.
 
 		# __init__ happens in its own thread, so create and remove a local Session
-		session = self.Session()
+		session = self.open_session()
 		for name in self.EVENT_TYPE_NAMES:
 			try:
 				evt = session.query(EventTypes).filter(EventTypes.name == name).first()
@@ -345,18 +345,18 @@ class ndb:
 					print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
 					break
 
-		self.Session.remove()
+		self.close_session()
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
 
-		if ((hasattr(self, 'Session')) and (self.Session != None)):
+		if ((hasattr(self, '_Session')) and (self._Session != None)):
 			try:
-				self.Session.close_all()
-				self.Session.remove()
-				del self.Session
+				self._Session.close_all()
+				self._Session.remove()
+				del self._Session
 			except Exception as e:
-				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+				print >> sys.stderr, "Error closing database session in destructor: '%s'" % (e)
 
 		if (hasattr(self, 'db')):
 			self.db.dispose()
@@ -535,16 +535,25 @@ class ndb:
 
 		return good_args
 
+	def open_session(self):
+		"""
+		Open a session with the database. *ALL* callers should use this to create new sessions,
+		and call close_session() afterward to close them.
+		Do not access the session object directly.
+		"""
+		session = self._Session()
+		return session
+
 	def close_session(self):
 		"""
-		Clean up the session after any caller is done using results.
-		Call this after any SQL method to make sure database connections are not left open.
+		Close any thread-local database sessions.
+		Call this after you are finished working with any database records returned by another function.
 		"""
-		if ((hasattr(self, 'Session')) and (self.Session != None)):
+		if ((hasattr(self, '_Session')) and (self._Session != None)):
 			try:
-				self.Session.remove()
+				self._Session.remove()
 			except Exception as e:
-				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+				print >> sys.stderr, "Error closing database session: '{0}'".format(e)
 
 
 	# actual data methods follow
@@ -555,23 +564,23 @@ class ndb:
 
 	def get_all_services(self):
 		"""Get all service names."""
-		return self.Session().query(Services.name).all()
+		return self.open_session().query(Services.name).all()
 
 	def get_newest_services(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return self.Session().query(Services.name).join(Observations).\
+		return self.open_session().query(Services.name).join(Observations).\
 			filter(Observations.end > end_limit)
 
 	def get_oldest_services(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return self.Session().query(Services).join(Observations).filter(\
+		return self.open_session().query(Services).join(Observations).filter(\
 			~Services.name.in_(\
 				self.get_newest_services(end_limit))).\
 			values(Services.name)
 
 	def insert_service(self, service_name):
 		"""Add a new Service to the database."""
-		session = self.Session()
+		session = self.open_session()
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
@@ -582,7 +591,7 @@ class ndb:
 			except ProgrammingError as e:
 				print >> sys.stderr, "Error committing service '%s': '%s'" % (service_name, e)
 				session.rollback()
-				self.Session.remove()
+				self.close_session()
 				srv = None
 
 		return srv
@@ -634,14 +643,14 @@ class ndb:
 
 	def get_all_observations(self):
 		"""Get all observations."""
-		return self.Session().query(Services).join(Observations).\
+		return self.open_session().query(Services).join(Observations).\
 			order_by(Services.name).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
 	def get_observations(self, service):
 		"""Get all observations for a given service."""
 		try:
-			return self.Session().query(Services).join(Observations).\
+			return self.open_session().query(Services).join(Observations).\
 				filter(Services.name == service).\
 				values(Services.name, Observations.key, Observations.start, Observations.end)
 		except Exception as e:
@@ -656,7 +665,7 @@ class ndb:
 		srv = self.insert_service(service)
 		if (srv != None):
 			try:
-				session = self.Session()
+				session = self.open_session()
 				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
 				newob.validate()
 				session.add(newob)
@@ -665,7 +674,7 @@ class ndb:
 				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
 				session.rollback()
 			finally:
-				self.Session.remove()
+				self.close_session()
 		# else error already logged by previous function
 
 	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
@@ -678,7 +687,7 @@ class ndb:
 			old_end_time = curtime
 
 		try:
-			session = self.Session()
+			session = self.open_session()
 			ob = session.query(Observations).join(Services)\
 				.filter(Services.name == service)\
 				.filter(Observations.key == fp)\
@@ -696,7 +705,7 @@ class ndb:
 		except (ValueError) as e:
 			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
 		finally:
-			self.Session.remove()
+			self.close_session()
 
 	# rate limit metrics so spamming queries doesn't take down the system.
 	# TODO: we could group metrics up to report in one big transaction, or use a background worker
@@ -709,29 +718,21 @@ class ndb:
 				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
 			else:
 				if (self.metricsdb):
-					if (self.Session != None):
-						# note: if we need even more speed we could try spawning this on its own thread
-
-						# wrap metric write attempts in a try/catch block so errors don't bring down the server
-						# even if its getting hammered with requests
-						session = self.Session()
-						try:
-							metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
-								date=int(time.time()), comment=str(comment))
-							session.add(metric)
-							session.commit()
-						except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
-							# ResourceClosedError can happen when the database is under heavy load
-							print >> sys.stderr, "Error committing metric: '%s'" % e
-							print >> sys.stderr, "Was trying to log the following metric:"
-							self.__print_metric(event_type, comment)
-							session.rollback()
-						finally:
-							self.Session.remove()
-					else:
-						print >> sys.stderr, "There is no database session to connect with! Please check your logs for a database connection error."
+					# wrap metric write attempts in a try/catch block so errors don't bring down the server
+					try:
+						session = self.open_session()
+						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
+							date=int(time.time()), comment=str(comment))
+						session.add(metric)
+						session.commit()
+					except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
+						# ResourceClosedError can happen when the database is under heavy load
+						print >> sys.stderr, "Error committing metric: '%s'" % e
 						print >> sys.stderr, "Was trying to log the following metric:"
 						self.__print_metric(event_type, comment)
+						session.rollback()
+					finally:
+						self.close_session()
 				else:
 					self.__print_metric(event_type, comment)
 
