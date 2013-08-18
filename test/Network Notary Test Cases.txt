@@ -78,18 +78,18 @@ Failing Gracefully:
 
 In-memory caching with pycache:
 -------------------------------
-- If the cache is below the memory limit, are new keys continually added upon request?
+- (A) If the cache is below the memory limit, are new keys continually added upon request?
 - If adding a new key would use too much memory, does the cache remove an entry and then store the key?
 	- Is the least recently used entry removed?
 	- If removing one entry doesn't clear enough RAM, does the cache remove multiple entries until it has enough space?
 	- Do both the hash and the heap size go down?
-- If a requested object is bigger than total RAM allowed, do we log a warning and not store it?
+- (A) If a requested object is bigger than total RAM allowed, do we log a warning and not store it?
 - When an existing entry is retrieved from the cache is it's 'last viewed' time updated?
 
 expiry:
 - Are expired entries removed during get() calls and None returned instead?
 - Are expired entries cleaned up as they are encountered when clearing new memory?
-- Are negative expiry times rejected and cache entries not created?
+- (A) Are non-positive expiry times rejected and cache entries not created?
 
 pycache threads:
 - Do we only create a single cache and return the proper results regardless of how many threads the server uses?
