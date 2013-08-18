@@ -87,7 +87,7 @@ In-memory caching with pycache:
 - When an existing entry is retrieved from the cache is it's 'last viewed' time updated?
 
 expiry:
-- Are expired entries removed during get() calls and None returned instead?
+- (A) Are expired entries removed during get() calls and None returned instead?
 - Are expired entries cleaned up as they are encountered when clearing new memory?
 - (A) Are non-positive expiry times rejected and cache entries not created?
 
