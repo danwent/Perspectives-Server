@@ -1,6 +1,10 @@
 Test cases for Perspectives Server code. Feel free to add more!
 
 Each utility module can be unit-tested on its own as well.
+Tests that can be tested automatically by the unit test modules are marked with '(A)'
+(see the modules in the /test directory and their '-h' usage statements for details).
+
+-------
 
 
 - Does the server start up?
@@ -53,10 +57,10 @@ How to count connections for various database types:
 
 Database Transactions:
 ----------------------
-- Does the database throw an error if we try to insert an observation with a start time < 0?
-- Does the database throw an error if we try to insert an observation with an end time < 0?
-- Does the database throw an error if we try to insert an observation with an end time < the start time?
-	- Does the code check for these conditions as well, in case they cannot be enforced by the database?
+- (A) Does the database throw an error if we try to insert an observation with a start time < 0?
+- (A) Does the database throw an error if we try to insert an observation with an end time < 0?
+- (A) Does the database throw an error if we try to insert an observation with an end time < the start time?
+	- (A) Does the code check for these conditions as well, in case they cannot be enforced by the database?
 
 
 Failing Gracefully:
