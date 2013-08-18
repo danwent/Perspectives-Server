@@ -183,6 +183,16 @@ def set_cache_size(size):
 			max_mem = size
 
 
+def get_cache_size():
+	"""Return the current total memory being used, in bytes."""
+	return current_mem
+
+
+def get_cache_count():
+	"""Return the current number of entries in the cache."""
+	return len(cache)
+
+
 def set(key, data, expiry):
 	"""Save the value to a given key."""
 	global current_mem
