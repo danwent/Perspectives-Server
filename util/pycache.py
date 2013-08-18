@@ -108,6 +108,12 @@ class Heap(object):
 		del self.heap
 		del self.current_entries
 
+	def clear(self):
+		"""Remove all items from the heap."""
+		self.current_entries.clear()
+		del self.heap
+		self.heap = []
+
 	def push(self, cache_entry):
 		"""Add an entry onto the heap."""
 		# use an iterator to break ties if multiple keys are added in the same second;
@@ -191,6 +197,16 @@ def get_cache_size():
 def get_cache_count():
 	"""Return the current number of entries in the cache."""
 	return len(cache)
+
+
+def clear():
+	"""Delete all entries from the cache."""
+	global current_mem
+
+	with mem_lock:
+		cache.clear()
+		heap.clear()
+		current_mem = 0
 
 
 def set(key, data, expiry):
