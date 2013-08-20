@@ -688,7 +688,7 @@ class ndb:
 			# as opposed to there being no observation records
 			raise
 
-	def insert_observation(self, service, key, start_time, end_time):
+	def _insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
 		srv = self.insert_service(service)
 		if (srv != None):
@@ -739,7 +739,11 @@ class ndb:
 			self.close_session()
 
 	def report_observation(self, service, fp):
-		"""Insert or update an Observation record."""
+		"""
+		Insert or update an Observation record.
+		All callers should use this instead of calling _insert or _update directly,
+		to ensure entries are valid.
+		"""
 
 		cur_time = int(time.time())
 		obs = self.get_observations(service)
@@ -767,7 +771,7 @@ class ndb:
 		else:
 			# the key has changed or no observations exist yet for this service.
 			# add a new entry for this key with start and end set to the current time
-			self.insert_observation(service, fp, cur_time, cur_time)
+			self._insert_observation(service, fp, cur_time, cur_time)
 			# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
 
 	# rate limit metrics so spamming queries doesn't take down the system.

@@ -120,7 +120,7 @@ class NotarySQLEnumeration(unittest.TestCase):
 		self.ndb.get_observations('get_obs_test:443,2')
 
 	def test_insert_observation(self):
-		self.ndb.insert_observation('insert_obs_test:443,2', 'aa:bb', 1, 2)
+		self.ndb._insert_observation('insert_obs_test:443,2', 'aa:bb', 1, 2)
 
 	def test_update_observation_end_time(self):
 		# insert the service and observation first to make sure we get no errors
@@ -129,7 +129,7 @@ class NotarySQLEnumeration(unittest.TestCase):
 		end_time = 2
 
 		self.ndb.insert_service(srv)
-		self.ndb.insert_observation(srv, key, end_time - 1, end_time)
+		self.ndb._insert_observation(srv, key, end_time - 1, end_time)
 		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
 
 	def test_report_observation(self):

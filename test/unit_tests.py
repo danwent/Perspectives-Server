@@ -210,54 +210,54 @@ class NotaryDBTestCases(unittest.TestCase):
 
 		# inserting a regular record should work
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, base_start, base_end)
+		self.ndb._insert_observation(service, key, base_start, base_end)
 		self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
 
 		# start time == 0 should work
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, 0, 100)
+		self.ndb._insert_observation(service, key, 0, 100)
 		self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
 
 		# start time < 0 should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, -10, 2)
+		self.ndb._insert_observation(service, key, -10, 2)
 		self.assertTrue(self.ndb.count_observations() == count_obs_before)
 
 		# end time == 0 should work (use a different service name so they don't clash)
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service + 'a', key, 0, 0)
+		self.ndb._insert_observation(service + 'a', key, 0, 0)
 		self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
 
 		# end time < 0 should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, 1, -10)
+		self.ndb._insert_observation(service, key, 1, -10)
 		self.assertTrue(self.ndb.count_observations() == count_obs_before)
 
 		# start time > end time should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, 15, 10)
+		self.ndb._insert_observation(service, key, 15, 10)
 		self.assertTrue(self.ndb.count_observations() == count_obs_before)
 
 		# trying to insert a duplicate observation should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, base_start, base_end)
+		self.ndb._insert_observation(service, key, base_start, base_end)
 		self.assertTrue(count_obs_before == self.ndb.count_observations())
 
 		# same key, same start, different end should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, base_start, base_end + 1)
+		self.ndb._insert_observation(service, key, base_start, base_end + 1)
 		self.assertTrue(count_obs_before == self.ndb.count_observations())
 
 		# same key, same end, different start should fail
 		count_obs_before = self.ndb.count_observations()
-		self.ndb.insert_observation(service, key, base_start + 1, base_end)
+		self.ndb._insert_observation(service, key, base_start + 1, base_end)
 		self.assertTrue(count_obs_before == self.ndb.count_observations())
 
 		# null values should be ignored
-		self.ndb.insert_observation(None, key, 1, 2)
-		self.ndb.insert_observation(service, None, 1, 2)
-		self.ndb.insert_observation(service, key, None, 2)
-		self.ndb.insert_observation(service, key, 1, None)
+		self.ndb._insert_observation(None, key, 1, 2)
+		self.ndb._insert_observation(service, None, 1, 2)
+		self.ndb._insert_observation(service, key, None, 2)
+		self.ndb._insert_observation(service, key, 1, None)
 
 	def test_update_observation_end_time(self):
 		# this function should only be called internally by the class during normal use,
@@ -268,7 +268,7 @@ class NotaryDBTestCases(unittest.TestCase):
 
 		# insert the service and observation first to make sure we get no errors
 		self.ndb.insert_service(srv)
-		self.ndb.insert_observation(srv, key, end_time - 1, end_time)
+		self.ndb._insert_observation(srv, key, end_time - 1, end_time)
 
 
 		# a regular update should work

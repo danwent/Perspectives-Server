@@ -107,7 +107,11 @@ def import_records(infile):
 		print "Found %s observations. Adding to database." % len(observations)
 		#TODO: need to get the service_ids after services are inserted
 		for (service, key, start, end) in observations:
-			ndb.insert_observation(service, key, start, end)
+			# NOTE! this is a special case use of _insert_observation() -
+			# we only call this because database records are assumed to be valid already,
+			# but won't necessarily be inserted in chronological order.
+			# you should use report_observation() during normal use.
+			ndb._insert_observation(service, key, start, end)
 
 
 parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=__doc__,
