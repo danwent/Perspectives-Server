@@ -38,6 +38,7 @@ While Running:
 	- Are the public key and version number displayed?
 	- Is the metric on/off status displayed on the page?
 - If the service_type is unknown do they get a 400 error?
+- If any extra, unknown parameters are passed does the server raise a 400 error?
 - Does the favicon work?
 - If enabled, are metrics properly logged to the database for each type of event?
 	- If enabled, are they properly printed to the log?
