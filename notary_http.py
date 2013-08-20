@@ -361,6 +361,12 @@ from cherrypy.process import servers
 def fake_wait_for_occupied_port(host, port): return
 servers.wait_for_occupied_port = fake_wait_for_occupied_port
 
+# do not log any information about clients.
+# if we don't override this function,
+# access information is still logged when screen echoing is turned on.
+def fake_access(): return
+cherrypy.log.access = fake_access
+
 cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
 			 'request.show_tracebacks' : False,  
