@@ -290,7 +290,12 @@ class NotaryHTTPServer:
 		return xml
 
 	@cherrypy.expose
-	def index(self, host=None, port=None, service_type=None):
+	def index(self, host=None, port=None, service_type=None, **invalid_params):
+		if(len(invalid_params) > 0):
+			# invalid_params will catch any other parameters sent to the web server.
+			# if we have any it's an invalid request.
+			raise cherrypy.HTTPError(400) # 400 Bad Request
+
 		if (host == None and port == None and service_type == None):
 			# probably a visitor that doesn't know what this server is for.
 			# serve a static explanation page
