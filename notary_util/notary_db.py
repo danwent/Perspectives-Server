@@ -767,7 +767,13 @@ class ndb:
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.
 			# just update the observation 'end' time.
-			self._update_observation_end_time(service, fp, most_recent_time, cur_time)
+			if ((cur_time - most_recent_time) <= (60 * 60 * 48)): # 2 days
+				self._update_observation_end_time(service, fp, most_recent_time, cur_time)
+			else:
+				# more than 2 days have passed. don't update this observation -
+				# that could fill in a LOT of data we haven't observed.
+				# instead just create a new record.
+				self._insert_observation(service, fp, cur_time, cur_time)
 		else:
 			# the key has changed or no observations exist yet for this service.
 			# add a new entry for this key with start and end set to the current time
