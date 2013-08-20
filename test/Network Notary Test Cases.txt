@@ -37,7 +37,7 @@ While Running:
 - If the visitor simply goes to the index do they get the HTML explanation page?
 	- Are the public key and version number displayed?
 	- Is the metric on/off status displayed on the page?
-- If the service_type is unknown do they get a 404 error?
+- If the service_type is unknown do they get a 400 error?
 - Does the favicon work?
 - If enabled, are metrics properly logged to the database for each type of event?
 	- If enabled, are they properly printed to the log?
