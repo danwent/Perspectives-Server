@@ -299,7 +299,42 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.ndb._update_observation_end_time(srv, key, end_time, None)
 
 	def test_report_observation(self):
-		self.ndb.report_observation('report_observation_test:443,2', 'aa:bb')
+		service = 'report_observation_test:443,2'
+		key = 'aa:bb'
+
+		# inserting a new record should work
+		count_obs_before = self.ndb.count_observations()
+		orig_insert_time = int(time.time())
+		self.ndb.report_observation(service, key)
+		self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
+
+		# updating a record 1 day or less after insertion should update the same record:
+
+		# 1. update within a few seconds should update the same record
+		time.sleep(1) # make sure our new end time will be at least 1 second later
+		count_obs_before = self.ndb.count_observations()
+		new_insert_time = int(time.time())
+		self.assertTrue(new_insert_time > orig_insert_time)
+		self.assertTrue(new_insert_time - orig_insert_time <= (60 * 60 * 24))
+		self.ndb.report_observation(service, key)
+		self.assertTrue(self.ndb.count_observations() == count_obs_before)
+		# TODO: check to make sure the end time was actually updated.
+
+		# 2. update within 1 day should update the same record
+		count_obs_before = self.ndb.count_observations()
+		# 100 - give ourselves a bit of buffer time for the test to run.
+		second_insert_time = new_insert_time + (60 * 60 * 24) - 100
+		# TODO: currently you'd have to alter your system clock to test this
+		#self.ndb.report_observation(service, key, second_insert_time)
+		#self.assertTrue(self.ndb.count_observations() == count_obs_before)
+		# TODO: check to make sure the end time was actually updated.
+
+		# updating a record more than 1 day after the end time should insert a new record
+		# TODO: currently you'd have to alter your system clock to test this
+		#count_obs_before = self.ndb.count_observations()
+		#third_insert_time = second_insert_time + (60 * 60 * 24) + 100
+		#self.ndb.report_observation(service, key, third_insert_time)
+		#self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
 
 	# less important SQL - used less often or in the background
 	def test_count_services(self):
