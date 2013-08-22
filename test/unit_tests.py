@@ -320,21 +320,74 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.assertTrue(self.ndb.count_observations() == count_obs_before)
 		# TODO: check to make sure the end time was actually updated.
 
+		# NOTE: currently you'd have to alter your system clock to run
+		# the remainder of these report_observation tests,
+		# or change report_observation() to accept the end time as a parameter.
+		# feel free to do the the latter when testing,
+		# but we do NOT want to have the code like that for production use.
+		# the rest of these tests are commented out.
+
 		# 2. update within 1 day should update the same record
-		count_obs_before = self.ndb.count_observations()
+		##count_obs_before = self.ndb.count_observations()
 		# 100 - give ourselves a bit of buffer time for the test to run.
-		second_insert_time = new_insert_time + (60 * 60 * 24) - 100
-		# TODO: currently you'd have to alter your system clock to test this
-		#self.ndb.report_observation(service, key, second_insert_time)
-		#self.assertTrue(self.ndb.count_observations() == count_obs_before)
+		##second_insert_time = new_insert_time + (60 * 60 * 24) - 100
+		##self.ndb.report_observation(service, key, second_insert_time)
+		##self.assertTrue(self.ndb.count_observations() == count_obs_before)
 		# TODO: check to make sure the end time was actually updated.
 
-		# updating a record more than 1 day after the end time should insert a new record
-		# TODO: currently you'd have to alter your system clock to test this
+		# 3. updating a record more than 1 day after the end time should insert a new record
 		#count_obs_before = self.ndb.count_observations()
 		#third_insert_time = second_insert_time + (60 * 60 * 24) + 100
 		#self.ndb.report_observation(service, key, third_insert_time)
 		#self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
+
+		# 4:
+		# insert an observation with a range...
+		##service2 = 'service_inside.com:443,2'
+		##start1 = 100
+		##end1 = 200
+		##self.assertTrue(start1 < end1)
+		##count_obs_before = self.ndb.count_observations()
+		##self.ndb._insert_observation(service2, key, start1, end1)
+		##self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
+
+		# ... now if we try to insert a record inside that range, it should fail. i.e.
+		# |--------------- original observation time -----------------|
+		#         {=== new observation time ===}
+		##diff = 10
+		##start2 = start1 + diff
+		##end2 = end1 - diff
+		##self.assertTrue(start2 < end2)
+		##self.assertTrue(start1 < start2 < end1)
+		##self.assertTrue(start1 < end2 < end1)
+		##count_obs_before = self.ndb.count_observations()
+		##self.ndb.report_observation(service2, key, end2)
+		##self.assertTrue(self.ndb.count_observations() == count_obs_before)
+
+		# 5:
+		# insert a different record for each of these tests so they can be tested
+		# independently of the other's results.
+		##service2 = 'service_before.com:443,2'
+		##self.assertTrue(start1 < end1)
+		##count_obs_before = self.ndb.count_observations()
+		##self.ndb._insert_observation(service2, key, start1, end1)
+		##self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
+
+		# ... now if only the end of a new record is inside the range, it should also fail. i.e.
+		#        |--------------- original observation time -----------------|
+		# {=== new observation time ===}
+		##diff = 10
+		##start2 = start1 - diff
+		##end2 = end1 - diff
+		##self.assertTrue(start2 < start1 < end1)
+		##self.assertTrue(start1 < end2 < end1)
+		##count_obs_before = self.ndb.count_observations()
+		##self.ndb.report_observation(service2, key, end2)
+		##self.assertTrue(self.ndb.count_observations() == count_obs_before)
+
+		# the other two cases will both update the end time of an existing record.
+		# so long as callers use report_obseration() instead of _insert_observation()
+		# no invalid data will be put into the database.
 
 	# less important SQL - used less often or in the background
 	def test_count_services(self):
