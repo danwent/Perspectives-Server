@@ -253,6 +253,12 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.ndb._insert_observation(service, key, base_start + 1, base_end)
 		self.assertTrue(count_obs_before == self.ndb.count_observations())
 
+		# inserting the same service/key combination but different start/end should work
+		# (this is important or we can't have the same key more than once per service)
+		count_obs_before = self.ndb.count_observations()
+		self.ndb._insert_observation(service, key, base_start * 10, base_end * 10)
+		self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
+
 		# null values should be ignored
 		self.ndb._insert_observation(None, key, 1, 2)
 		self.ndb._insert_observation(service, None, 1, 2)
