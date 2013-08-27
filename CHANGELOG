@@ -11,16 +11,24 @@ Format:
 + Add support for caching data with local system memory only (--pycache).
 	This makes it easy to cache data and improve notary performance even if you are unable to use a dedicated caching server.
 + Add default URL parameters so 'service_type' and 'port' are not required.
+* Ignore requests with an empty 'host' string (raise HTTP 400 Bad Request)
+* Ignore requests with additional, invalid parameters (raise HTTP 400 Bad Request. Thanks Angel!)
+* Raise HTTP 400 for invalid service types rather than HTTP 404 (we'll never find any records, so don't give clients the impression that they should requery)
 * Convert hardcoded SNI setting to command-line argument, so it's easier to toggle (Thanks Carl A.!)
 * Turn off logging of request headers during errors and exceptions; we do not want to record any private or sensitive client information.
 * Completely remove logging of access messages, even when log messages are sent to stdout.
 * Fix bug with incorrect Primary Key on Observations.
 	It's perfectly reasonable that we might see the same certificate used on the same site in non-contiguous blocks of time. Allow such changes to be stored in the database. (this has only been a bug since v3.0)
 * Fix bug: do not update previous key's observation end time when adding a new key.
+* Similarly, for updating an observation with the same key: create a new observation instead of updating the existing one if a large period of time has passed.
 * Remove ServiceScanKeyUpdated metric types (they're not needed)
 + Add data validation to database and code for Observation records
++ Add 'NOT NULL' to database fields that shouldn't allow null
 + Track the number of open database connections so we can see if we're leaking any
-* Stop generating Traceback for socket exceptions; simply log the error and continue.
+* Refactor database function report_observation() into the ndb class
++ Add some automated unit tests to help with refactoring and testing (more are always welcome!)
+* Fix several 'raise' statements to properly re-raise exceptions
+* Stop generating Traceback for socket exceptions when scanning; simply log the error and continue.
 	This *significantly* improves speed and response times for scans that didn't work
 	(and we're not losing any information).
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
