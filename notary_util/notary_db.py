@@ -301,6 +301,8 @@ class ndb:
 		# set up sqlalchemy objects
 		self.db = create_engine(connstr, echo=dbecho)
 
+		self._Session = scoped_session(sessionmaker(bind=self.db))
+
 		# in most cases we expect callers to handle any exceptions that get thrown here.
 		# we still want to make sure the error is logged, however.
 		# for now we only check that (self._Session != None) in a few places that may be called accidentally,
@@ -312,8 +314,6 @@ class ndb:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
 			self._Session = None
 			raise
-
-		self._Session = scoped_session(sessionmaker(bind=self.db))
 
 		listen(Pool, 'checkout', self._on_connection_checkout)
 		listen(Pool, 'checkin', self._on_connection_checkin)
