@@ -213,21 +213,20 @@ class NotaryHTTPServer:
 
 		try:
 			# TODO: can we grab this all in one query instead of looping?
-			obs = self.ndb.get_observations(service)
-			if (obs != None):
-				for (name, key, start, end) in obs:
-					num_rows += 1
-					if key not in keys:
-						timestamps_by_key[key] = []
-						keys.append(key)
-					timestamps_by_key[key].append((start, end))
+			with self.ndb.get_session() as session:
+				obs = self.ndb.get_observations(session, service)
+				if (obs != None):
+					for (name, key, start, end) in obs:
+						num_rows += 1
+						if key not in keys:
+							timestamps_by_key[key] = []
+							keys.append(key)
+						timestamps_by_key[key].append((start, end))
 		except Exception as e:
 			# error already logged inside get_observations.
 			# we can also see InterfaceError or AttributeError when looping through observation records
 			# if the database is under heavy load.
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
-		finally:
-			self.ndb.close_session()
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes
@@ -348,9 +347,6 @@ class OnDemandScanThread(threading.Thread):
 			traceback.print_exc(file=sys.stdout)
 		finally:
 			self.server_obj.active_threads -= 1
-			db.close_session()
-
-
 
 
 # create an instance here so command-line args will be automatically passed and parsed

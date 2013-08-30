@@ -104,11 +104,11 @@ args = parser.parse_args()
 ndb = ndb(args)
 
 output_file = args.output_file
-obs = ndb.get_all_observations()
+with ndb.get_session() as session:
+	obs = ndb.get_all_observations(session)
 
-if (args.long):
-	print_long_output(obs)
-else:
-	print_tuples(obs)
+	if (args.long):
+		print_long_output(obs)
+	else:
+		print_tuples(obs)
 
-ndb.close_session()

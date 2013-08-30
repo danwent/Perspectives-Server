@@ -59,19 +59,19 @@ if (args.all == False and args.newer == None and args.older == None):
 
 ids = None
 
-if args.all:
-	ids = ndb.get_all_services()
-else:
-	cur_time = int(time.time())
+with ndb.get_session() as session:
 
-	if args.older:
-		ids = ndb.get_oldest_services(int(cur_time - (3600 * 24 * args.older)))
+	if args.all:
+		ids = ndb.get_all_services(session)
 	else:
-		ids = ndb.get_newest_services(int(cur_time - (3600 * 24 * args.newer)))
+		cur_time = int(time.time())
 
-ndb.close_session()
+		if args.older:
+			ids = ndb.get_oldest_services(session, int(cur_time - (3600 * 24 * args.older)))
+		else:
+			ids = ndb.get_newest_services(session, int(cur_time - (3600 * 24 * args.newer)))
 
-if (ids != None):
-	for (name) in ids:
-		# print as string instead of tuple, to make it easier to use elsewhere
-		print >> output_file, name[0]
+	if (ids != None):
+		for (name) in ids:
+			# print as string instead of tuple, to make it easier to use elsewhere
+			print >> output_file, name[0]

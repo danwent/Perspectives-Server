@@ -83,7 +83,6 @@ class NotarySQLEnumeration(unittest.TestCase):
 		logging.getLogger(self.SQL_LOG_CHANNEL).setLevel(logging.INFO)
 
 	def __del__(self):
-		self.ndb.close_session()
 		del self.ndb
 
 	def setUp(self):
@@ -94,30 +93,34 @@ class NotarySQLEnumeration(unittest.TestCase):
 			self.id()))
 
 	def tearDown(self):
-		self.ndb.close_session()
 		self.assertTrue(self.ndb.get_connection_count() == 0)
 
 	#######
 
 	# important SQL: used frequently by the main app
 	def test_get_all_services(self):
-		self.ndb.get_all_services()
+		with self.ndb.get_session() as session:
+			self.ndb.get_all_services(session)
 
 	def test_get_newest_services(self):
-		self.ndb.get_newest_services(0)
+		with self.ndb.get_session() as session:
+			self.ndb.get_newest_services(session, 0)
 
 	def test_get_oldest_services(self):
-		self.ndb.get_oldest_services(0)
+		with self.ndb.get_session() as session:
+			self.ndb.get_oldest_services(session, 0)
 
 	def test_report_metric(self):
 		self.ndb.report_metric('CacheHit')
 
 	def test_insert_service(self):
-		self.ndb.insert_service('insert_service_test:443,2')
+		with self.ndb.get_session() as session:
+			self.ndb.insert_service(session, 'insert_service_test:443,2')
 
 	def test_get_observations(self):
 		# TODO: can we profile this even with no obs in the db?
-		self.ndb.get_observations('get_obs_test:443,2')
+		with self.ndb.get_session() as session:
+			self.ndb.get_observations(session, 'get_obs_test:443,2')
 
 	def test_insert_observation(self):
 		self.ndb._insert_observation('insert_obs_test:443,2', 'aa:bb', 1, 2)
@@ -128,9 +131,10 @@ class NotarySQLEnumeration(unittest.TestCase):
 		key = 'aa:bb'
 		end_time = 2
 
-		self.ndb.insert_service(srv)
-		self.ndb._insert_observation(srv, key, end_time - 1, end_time)
-		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
+		with self.ndb.get_session() as session:
+			self.ndb.insert_service(session, srv)
+			self.ndb._insert_observation(srv, key, end_time - 1, end_time)
+			self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
 
 	def test_report_observation(self):
 		self.ndb.report_observation('report_observation_test:443,2', 'aa:bb')
@@ -143,7 +147,8 @@ class NotarySQLEnumeration(unittest.TestCase):
 		self.ndb.count_observations()
 
 	def test_get_all_observations(self):
-		self.ndb.get_all_observations()
+		with self.ndb.get_session() as session:
+			self.ndb.get_all_observations(session)
 
 	def test_insert_bulk_services(self):
 		self.ndb.insert_bulk_services(
