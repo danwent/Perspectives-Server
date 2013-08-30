@@ -182,7 +182,7 @@ class ndb:
 	Currently this class is only intended to be called by modules that
 	extend its argparser. i.e.
 
-	parser = argparse.ArgumentParser(parents=[ndb.get_parser() #...
+	parser = argparse.ArgumentParser(parents=[ndb.get_parser() ...])
 	# ...
 	args = parser.parse_args()
 	ndb = ndb(args)
