@@ -331,6 +331,7 @@ class ndb:
 		# if we're using metrics, caching these values now
 		# saves us from having to look up the ID every time we insert a metric record.
 
+		if self.is_metrics_enabled():
 			with self.get_session() as session:
 				for name in self.EVENT_TYPE_NAMES:
 					try:
@@ -785,12 +786,18 @@ class ndb:
 			self._insert_observation(service, fp, cur_time, cur_time)
 			# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
 
+	def is_metrics_enabled(self):
+		"""Retun true if the metrics tracking system is currently running, false otherwise."""
+		if (self.metricsdb or self.metricslog):
+			return True
+		return False
+
 	# rate limit metrics so spamming queries doesn't take down the system.
 	# TODO: we could group metrics up to report in one big transaction, or use a background worker
 	@ratelimited(1)
 	def report_metric(self, event_type, comment=""):
 		"""Record a metric event in the database or the log."""
-		if (self.metricsdb or self.metricslog):
+		if self.is_metrics_enabled():
 			if (event_type not in self.EVENT_TYPES):
 				print >> sys.stderr, "Unknown event type '%s'. Please check your call to report_metric()." % event_type
 				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
