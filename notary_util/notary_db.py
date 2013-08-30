@@ -312,7 +312,6 @@ class ndb:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
-			self._Session = None
 			raise
 
 		listen(Pool, 'checkout', self._on_connection_checkout)
@@ -367,7 +366,7 @@ class ndb:
 				self._Session.remove()
 				del self._Session
 			except Exception as e:
-				print >> sys.stderr, "Error closing database session in destructor: '%s'" % (e)
+				print >> sys.stderr, "Error closing database sessions in destructor: '%s'" % (e)
 
 		if (hasattr(self, 'db')):
 			self.db.dispose()
