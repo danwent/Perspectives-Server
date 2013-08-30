@@ -42,7 +42,6 @@ class NotaryHTTPServer:
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
-	PROBE_LIMIT = 10 # simultaneous scans for new services
 
 	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
 
@@ -111,7 +110,6 @@ class NotaryHTTPServer:
 			self.cache = cache.Pycache(args.pycache)
 
 		self.use_sni = args.sni
-		self.active_threads = 0 
 		self.create_static_index()
 		self.args = args
 
@@ -230,12 +228,27 @@ class NotaryHTTPServer:
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes
-			if self.active_threads < self.PROBE_LIMIT:
-				self.ndb.report_metric('ScanForNewService', service)
-				t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
-				t.start()
+			global scan_semaphore
+			global scan_sites
+			global scan_sites_lock
+
+			if (scan_semaphore.acquire(False)):
+				do_scan = False
+				with scan_sites_lock:
+					if (service not in scan_sites):
+						# only scan a given site with one thread at a time
+						scan_sites[service] = True
+						do_scan = True
+
+				if (do_scan):
+					t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
+					t.start()
+					# report the metrics *after* launching so the scanning thread can get started
+					self.ndb.report_metric('ScanForNewService', service)
+				else:
+					scan_semaphore.release()
 			else: 
-				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
+				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404) # 404 Not Found
 	
@@ -288,6 +301,17 @@ class NotaryHTTPServer:
 
 		return xml
 
+	def scan_finished(self, service):
+		"""Clean up any state used for on-deman scans."""
+		global scan_semaphore
+		global scan_sites
+		global scan_sites_lock
+
+		with scan_sites_lock:
+			if service in scan_sites:
+				del scan_sites[service]
+		scan_semaphore.release()
+
 	@cherrypy.expose
 	def index(self, host=None, port=None, service_type=None, **invalid_params):
 		if(len(invalid_params) > 0):
@@ -324,7 +348,6 @@ class OnDemandScanThread(threading.Thread):
 		self.server_obj = server_obj
 		self.db = db
 		threading.Thread.__init__(self)
-		self.server_obj.active_threads += 1
 
 	def __del__(self):
 		"""Clean up after scanning."""
@@ -342,7 +365,14 @@ class OnDemandScanThread(threading.Thread):
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
 		finally:
-			self.server_obj.active_threads -= 1
+			self.server_obj.scan_finished(self.sid)
+
+
+# track locks at the module level so we only use them once across all cherrypy threads
+PROBE_LIMIT = 10 # simultaneous scans for new services
+scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
+scan_sites = {}
+scan_sites_lock = threading.Lock()
 
 
 # create an instance here so command-line args will be automatically passed and parsed
