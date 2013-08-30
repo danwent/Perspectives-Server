@@ -152,15 +152,9 @@ class NotaryDBTestCases(unittest.TestCase):
 		args.metricsdb = True
 		self.ndb = ndb(args)
 
-	def __del__(self):
-		if (hasattr(self, 'ndb')):
-			self.ndb.close_session()
-			del self.ndb
-
 	def tearDown(self):
 		# do *not* call close_session() here -
 		# that would hide errors if a function is being used incorrectly.
-		# each test should know whether or not it needs to close the session afterward.
 		# test the connection count to catch any improper usage.
 		self.assertTrue(self.ndb.get_connection_count() == 0)
 
@@ -168,39 +162,47 @@ class NotaryDBTestCases(unittest.TestCase):
 
 	# important SQL: used frequently by the main app
 	def test_get_all_services(self):
-		self.ndb.get_all_services()
-		self.ndb.close_session()
+		with self.ndb.get_session() as session:
+			self.ndb.get_all_services(session)
 
 	def test_get_newest_services(self):
-		self.ndb.get_newest_services(0)
-		self.ndb.close_session()
+		with self.ndb.get_session() as session:
+			self.ndb.get_newest_services(session, 0)
 
 	def test_get_oldest_services(self):
-		self.ndb.get_oldest_services(0)
-		self.ndb.close_session()
+		with self.ndb.get_session() as session:
+			self.ndb.get_oldest_services(session, 0)
 
 	def test_report_metric(self):
-		self.ndb.report_metric('CacheHit')
-		self.ndb.report_metric('SomeEventNotInTheDatabase')
+		orig = self.ndb.metricsdb
+		# metrics logging must be turned on for this function to be properly exercised
+		self.ndb.metricsdb = True
+		try:
+			self.ndb.report_metric('CacheHit')
+			self.ndb.report_metric('SomeEventNotInTheDatabase')
+		finally:
+			self.ndb.metricsdb = orig
 
 	def test_insert_service(self):
 		service = 'insert_service_test:443,2'
 
-		count_srv_before = self.ndb.count_services()
-		self.ndb.insert_service(service)
-		self.assertTrue(self.ndb.count_services() == (count_srv_before + 1))
+		with self.ndb.get_session() as session:
 
-		# inserting a service that already exists should be ignored
-		count_srv_before = self.ndb.count_services()
-		self.ndb.insert_service(service)
-		self.assertTrue(self.ndb.count_services() == count_srv_before)
+			count_srv_before = self.ndb.count_services()
+			self.ndb.insert_service(session, service)
+			self.assertTrue(self.ndb.count_services() == (count_srv_before + 1))
 
-		# null values should be ignored
-		self.ndb.insert_service(None)
+			# inserting a service that already exists should be ignored
+			count_srv_before = self.ndb.count_services()
+			self.ndb.insert_service(session, service)
+			self.assertTrue(self.ndb.count_services() == count_srv_before)
+
+			# null values should be ignored
+			self.ndb.insert_service(session, None)
 
 	def test_get_observations(self):
-		self.ndb.get_observations('get_obs_test:443,2')
-		self.ndb.close_session()
+		with self.ndb.get_session() as session:
+			self.ndb.get_observations(session, 'get_obs_test:443,2')
 
 	def test_insert_observation(self):
 		service = 'insert_obs_test:443,2'
@@ -273,36 +275,36 @@ class NotaryDBTestCases(unittest.TestCase):
 		end_time = 2
 
 		# insert the service and observation first to make sure we get no errors
-		self.ndb.insert_service(srv)
-		self.ndb._insert_observation(srv, key, end_time - 1, end_time)
+		with self.ndb.get_session() as session:
+			self.ndb.insert_service(session, srv)
+			self.ndb._insert_observation(srv, key, end_time - 1, end_time)
 
+			# a regular update should work
+			self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
 
-		# a regular update should work
-		self.ndb._update_observation_end_time(srv, key, end_time, end_time + 1)
+			# trying to set end time < current time should fail
+			self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time - 10)
+			obs = self.ndb.get_observations(session, srv)
+			ob_count = 0
+			for ob in obs:
+				ob_count = ob_count + 1
+				self.assertTrue(ob.end == (end_time + 1))
+			self.assertTrue(ob_count == 1)
 
-		# trying to set end time < current time should fail
-		self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time - 10)
-		obs = self.ndb.get_observations(srv)
-		ob_count = 0
-		for ob in obs:
-			ob_count = ob_count + 1
-			self.assertTrue(ob.end == (end_time + 1))
-		self.assertTrue(ob_count == 1)
+			# trying to set end time == current time should fail
+			self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time + 1)
+			obs = self.ndb.get_observations(session, srv)
+			ob_count = 0
+			for ob in obs:
+				ob_count = ob_count + 1
+				self.assertTrue(ob.end == (end_time + 1))
+			self.assertTrue(ob_count == 1)
 
-		# trying to set end time == current time should fail
-		self.ndb._update_observation_end_time(srv, key, end_time + 1, end_time + 1)
-		obs = self.ndb.get_observations(srv)
-		ob_count = 0
-		for ob in obs:
-			ob_count = ob_count + 1
-			self.assertTrue(ob.end == (end_time + 1))
-		self.assertTrue(ob_count == 1)
-
-		# null values should be ignored
-		self.ndb._update_observation_end_time(None, key, end_time, end_time)
-		self.ndb._update_observation_end_time(srv, None, end_time, end_time)
-		self.ndb._update_observation_end_time(srv, key, None, end_time)
-		self.ndb._update_observation_end_time(srv, key, end_time, None)
+			# null values should be ignored
+			self.ndb._update_observation_end_time(None, key, end_time, end_time)
+			self.ndb._update_observation_end_time(srv, None, end_time, end_time)
+			self.ndb._update_observation_end_time(srv, key, None, end_time)
+			self.ndb._update_observation_end_time(srv, key, end_time, None)
 
 	def test_report_observation(self):
 		service = 'report_observation_test:443,2'
@@ -405,8 +407,8 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.assertTrue(count >= 0)
 
 	def test_get_all_observations(self):
-		self.ndb.get_all_observations()
-		self.ndb.close_session()
+		with self.ndb.get_session() as session:
+			self.ndb.get_all_observations(session)
 
 	def test_insert_bulk_services(self):
 		services = ['bulkinserttest:443,2', 'bulkinserttest_2:443,2', 'bulkinserttest_3:443,2']

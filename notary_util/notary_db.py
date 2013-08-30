@@ -22,6 +22,7 @@ and keeps things modular for easier refactoring.
 """
 
 import argparse
+from contextlib import contextmanager
 import os
 import re
 import sys
@@ -330,34 +331,31 @@ class ndb:
 		# if we're using metrics, caching these values now
 		# saves us from having to look up the ID every time we insert a metric record.
 
-		# __init__ happens in its own thread, so create and remove a local Session
-		session = self._open_session()
-		for name in self.EVENT_TYPE_NAMES:
-			try:
-				evt = session.query(EventTypes).filter(EventTypes.name == name).first()
+			with self.get_session() as session:
+				for name in self.EVENT_TYPE_NAMES:
+					try:
+						evt = session.query(EventTypes).filter(EventTypes.name == name).first()
 
-				if (evt == None):
-					evt = EventTypes(name = name)
-					session.add(evt)
-					session.commit()
+						if (evt == None):
+							evt = EventTypes(name = name)
+							session.add(evt)
+							session.commit()
 
-				self.EVENT_TYPES[name] = evt.event_type_id
+						self.EVENT_TYPES[name] = evt.event_type_id
 
-			except ProgrammingError as e:
-				print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
-				session.rollback()
-				if (self.metricsdb):
-					self.metricsdb = False
-					print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
-					break
-
-		self.close_session()
+					except ProgrammingError as e:
+						print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
+						session.rollback()
+						if (self.metricsdb):
+							self.metricsdb = False
+							print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
+							break
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
 
 		if (self.get_connection_count() != 0):
-			print >> sys.stderr, "ERROR: {0} database sessions remain open! Please close them with close_session() after you are finished.".format(
+			print >> sys.stderr, "ERROR: {0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
 				self.get_connection_count())
 
 		if ((hasattr(self, '_Session')) and (self._Session != None)):
@@ -549,25 +547,39 @@ class ndb:
 
 		return good_args
 
-	def _open_session(self):
+	@contextmanager
+	def get_session(self):
 		"""
 		Open a session with the database. *ALL* callers should use this to create new sessions,
-		and call close_session() afterward to close them.
+		and use a 'with' statement to make sure the session is properly closed afterward.
+
+		For example:
+
+			with self.ndb.get_session() as session:
+				database_obs = self.ndb.foo(session)
+				#... do some work here with database objects
+
+			#continue with rest of non-database code.
+
+		Every function that returns database records requires a session as a function parameter.
+		Create one as above and pass it in, so sessions can be properly scoped and managed.
+
 		Do not access the session object directly.
+		Do not try to close your own session.
+		Let the ndb's contextmanager handle session closing.
+
+		Any database changes that are partically completed but not committed will be rolled back
+		if an exception is raised.
 		"""
 		session = self._Session()
-		return session
+		try:
+			yield session
+		except:
+			session.rollback()
+			raise
+		finally:
+			session.close()
 
-	def close_session(self):
-		"""
-		Close any thread-local database sessions.
-		Call this after you are finished working with any database records returned by another function.
-		"""
-		if ((hasattr(self, '_Session')) and (self._Session != None)):
-			try:
-				self._Session.remove()
-			except Exception as e:
-				print >> sys.stderr, "Error closing database session: '{0}'".format(e)
 
 	def _on_connection_checkout(self, dbapi_connection, connection_record, connection_proxy):
 		"""Count when a connection is checked out of the connection pool."""
@@ -585,30 +597,29 @@ class ndb:
 
 	def count_services(self):
 		"""Return a count of the service records."""
-		session = self._open_session()
-		count = session.query(Services.service_id).count()
-		self.close_session()
-		return count
+		with self.get_session() as session:
+			count = session.query(Services.service_id).count()
+			return count
 
-	def get_all_services(self):
+	def get_all_services(self, session):
 		"""Get all service names."""
-		return self._open_session().query(Services.name).all()
+		return session.query(Services.name).all()
 
-	def get_newest_services(self, end_limit):
+	def get_newest_services(self, session, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return self._open_session().query(Services.name).join(Observations).\
+		return session.query(Services.name).join(Observations).\
 			filter(Observations.end > end_limit)
 
-	def get_oldest_services(self, end_limit):
+	def get_oldest_services(self, session, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return self._open_session().query(Services).join(Observations).filter(\
+		return session.query(Services).join(Observations).filter(\
 			~Services.name.in_(\
-				self.get_newest_services(end_limit))).\
+				self.get_newest_services(session, end_limit))).\
 			values(Services.name)
 
-	def insert_service(self, service_name):
-		"""Add a new Service to the database."""
-		session = self._open_session()
+	def insert_service(self, session, service_name):
+		"""Add a new Service to the database, and return the Service object."""
+		#TODO: could overload to also have insert services and return nothing, not requiring a session.
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
@@ -618,8 +629,6 @@ class ndb:
 				session.commit()
 			except (ProgrammingError, IntegrityError) as e:
 				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
-				session.rollback()
-				self.close_session()
 				srv = None
 
 		return srv
@@ -667,46 +676,41 @@ class ndb:
 	#######
 	def count_observations(self):
 		"""Return a count of the observation records."""
-		session = self._open_session()
-		count = session.query(Observations.observation_id).count()
-		self.close_session()
-		return count
+		with self.get_session() as session:
+			count = session.query(Observations.observation_id).count()
+			return count
 
-	def get_all_observations(self):
-		"""Get all observations."""
-		return self._open_session().query(Services).join(Observations).\
+	def get_all_observations(self, session):
+		"""Get all observations in the database."""
+		return session.query(Services).join(Observations).\
 			order_by(Services.name).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
-	def get_observations(self, service):
+	def get_observations(self, session, service):
 		"""Get all observations for a given service."""
 		try:
-			return self._open_session().query(Services).join(Observations).\
+			return session.query(Services).join(Observations).\
 				filter(Services.name == service).\
 				values(Services.name, Observations.key, Observations.start, Observations.end)
 		except Exception as e:
 			print >> sys.stderr, "Error getting observations: '%s'" % (e)
-			self.close_session()
 			# re-raise the error so the caller definitely knows something bad happened,
 			# as opposed to there being no observation records
 			raise
 
 	def _insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
-		srv = self.insert_service(service)
-		if (srv != None):
-			try:
-				session = self._open_session()
-				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
-				newob.validate()
-				session.add(newob)
-				session.commit()
-			except (ProgrammingError, IntegrityError, ValueError) as e:
-				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
-				session.rollback()
-			finally:
-				self.close_session()
-		# else error already logged by previous function
+		with self.get_session() as session:
+			srv = self.insert_service(session, service)
+			if (srv != None):
+				try:
+					newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
+					newob.validate()
+					session.add(newob)
+					session.commit()
+				except (ProgrammingError, IntegrityError, ValueError) as e:
+					print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
+			# else error already logged by previous function
 
 	def _update_observation_end_time(self, service, fp, old_end_time, new_end_time):
 		"""
@@ -721,25 +725,23 @@ class ndb:
 			old_end_time = curtime
 
 		try:
-			session = self._open_session()
-			ob = session.query(Observations).join(Services)\
-				.filter(Services.name == service)\
-				.filter(Observations.key == fp)\
-				.filter(Observations.end == old_end_time).first()
-			if (ob != None):
-				if (new_end_time <= ob.end):
-					raise ValueError('New end time must be > current end time. (attempted to use new end time {0})'.format(
-						new_end_time))
-				ob.validate()
-				ob.end = new_end_time
-				session.commit()
-			else:
-				print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
-					but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
+			with self.get_session() as session:
+				ob = session.query(Observations).join(Services)\
+					.filter(Services.name == service)\
+					.filter(Observations.key == fp)\
+					.filter(Observations.end == old_end_time).first()
+				if (ob != None):
+					if (new_end_time <= ob.end):
+						raise ValueError('New end time must be > current end time. (attempted to use new end time {0})'.format(
+							new_end_time))
+					ob.validate()
+					ob.end = new_end_time
+					session.commit()
+				else:
+					print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
+						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
 		except (ValueError) as e:
 			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
-		finally:
-			self.close_session()
 
 	def report_observation(self, service, fp):
 		"""
@@ -749,23 +751,23 @@ class ndb:
 		"""
 
 		cur_time = int(time.time())
-		obs = self.get_observations(service)
 		most_recent_time_by_key = {}
-
 		most_recent_key = None
 		most_recent_time = 0
 
-		# calculate the most recently seen key
-		# TODO: there has got to be a more efficient way to do this with a query
-		for (service, key, start, end) in obs:
-			if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
-				most_recent_time_by_key[key] = end
+		with self.get_session() as session:
+			obs = self.get_observations(session, service)
 
-			for k in most_recent_time_by_key:
-				if most_recent_time_by_key[k] > most_recent_time:
-					most_recent_key = k
-					most_recent_time = most_recent_time_by_key[k]
-		self.close_session()
+			# calculate the most recently seen key
+			# TODO: there has got to be a more efficient way to do this with a query
+			for (service, key, start, end) in obs:
+				if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+					most_recent_time_by_key[key] = end
+
+				for k in most_recent_time_by_key:
+					if most_recent_time_by_key[k] > most_recent_time:
+						most_recent_key = k
+						most_recent_time = most_recent_time_by_key[k]
 
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.
@@ -796,19 +798,16 @@ class ndb:
 				if (self.metricsdb):
 					# wrap metric write attempts in a try/catch block so errors don't bring down the server
 					try:
-						session = self._open_session()
-						metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
-							date=int(time.time()), comment=str(comment))
-						session.add(metric)
-						session.commit()
+						with self.get_session() as session:
+							metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
+								date=int(time.time()), comment=str(comment))
+							session.add(metric)
+							session.commit()
 					except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
 						# ResourceClosedError can happen when the database is under heavy load
 						print >> sys.stderr, "Error committing metric: '%s'" % e
 						print >> sys.stderr, "Was trying to log the following metric:"
 						self.__print_metric(event_type, comment)
-						session.rollback()
-					finally:
-						self.close_session()
 				else:
 					self.__print_metric(event_type, comment)
 
