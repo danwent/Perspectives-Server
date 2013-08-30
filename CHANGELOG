@@ -31,6 +31,11 @@ Format:
 * Stop generating Traceback for socket exceptions when scanning; simply log the error and continue.
 	This *significantly* improves speed and response times for scans that didn't work
 	(and we're not losing any information).
+* Change to use contextmanager for database sessions (i.e. 'with ndb.get_session():' blocks).
+	This ensures session scope is obvious and properly cleaned up after use.
+* Pass the existing db instance to on-demand scan threads. This way we don't waste time re-connecting, and connections are properly created and disposed.
+* Use a semaphore and lock to rate-limit on-demand scans, to properly handle multithreading
+	We now only scan a given site once at a time (i.e. do not launch multiple scans for the same site if one is already in progress).
 + Add documentation and script for upgrading from notary version 2.x to version 3.x.
 * Add --verbose switch to scanner to generate less log data.
 
