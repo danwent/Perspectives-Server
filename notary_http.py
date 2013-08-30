@@ -232,7 +232,7 @@ class NotaryHTTPServer:
 			# rate-limit on-demand probes
 			if self.active_threads < self.PROBE_LIMIT:
 				self.ndb.report_metric('ScanForNewService', service)
-				t = OnDemandScanThread(service, 10 , self.use_sni, self, self.args)
+				t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
 				t.start()
 			else: 
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
@@ -317,33 +317,29 @@ class NotaryHTTPServer:
 
 class OnDemandScanThread(threading.Thread): 
 
-	def __init__(self, sid, timeout_sec, use_sni, server_obj, args):
+	def __init__(self, sid, timeout_sec, use_sni, server_obj, db):
 		self.sid = sid
 		self.timeout_sec = timeout_sec
 		self.use_sni = use_sni
 		self.server_obj = server_obj
-		self.args = args
+		self.db = db
 		threading.Thread.__init__(self)
 		self.server_obj.active_threads += 1
 
-	def run(self): 
+	def __del__(self):
+		"""Clean up after scanning."""
+		del self.db
 
-		# create a new db instance, since we're on a new thread
-		# pass through any args we have so we'll connect to the same database in the same way
-		try:
-			db = ndb(self.args)
-		except Exception as e:
-			print >> sys.stderr, "Database error: '%s'. Did not run on-demand scan." % (str(e))
-			self.server_obj.active_threads -= 1
-			return
+	def run(self): 
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
 			if (fp != None):
-				db.report_observation(self.sid, fp)
+				self.db.report_observation(self.sid, fp)
 			# else error already logged
+			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
 		except Exception as e:
-			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
+			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
 		finally:
 			self.server_obj.active_threads -= 1
