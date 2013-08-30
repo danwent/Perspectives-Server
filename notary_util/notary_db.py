@@ -386,7 +386,11 @@ class ndb:
 		# We let them access and extend our arg parser so we can keep the code in one place.
 		# Note: do not use 'None' as a default for aguments: it interferes with _set_config_args().
 
-		parser = argparse.ArgumentParser(add_help=False) #don't specify description or epilogue so the module that includes us can write their own.
+		if __name__ == '__main__':
+			parser = argparse.ArgumentParser(description=self.__doc__)
+		else:
+			# don't specify description or epilogue so the module that includes us can write their own.
+			parser = argparse.ArgumentParser(add_help=False)
 		dbgroup = parser.add_argument_group('optional database arguments')
 
 		# dburl: unfortunately argparse doesn't make it easy to make one switch mutually exclusive from multiple other switches,
@@ -812,3 +816,6 @@ class ndb:
 	def __print_metric(self, event_type, comment):
 		"""Print metric to stdout. External callers should use report_metric() instead."""
 		print "%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment))
+
+if __name__ == "__main__":
+	args = ndb.get_parser().parse_args()
