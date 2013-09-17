@@ -31,6 +31,8 @@ Arguments
 While Running:
 --------------
 - If we get a request for an unknown service, does the server spawn a query process to ask about it?
+	- Do only a limited number of process spawn, even across threads?
+	- Does a process not start up if another process is already querying that service?
 	- Are the results properly reported back to the database?
 - If we have data do we display the results?
 	- Including multiple keys for a given service?
