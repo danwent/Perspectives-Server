@@ -217,6 +217,19 @@ class ndb:
 	EVENT_TYPES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
 
+	# if the scanner does not run regularly and consistently,
+	# blindly updating an observation's end time
+	# could incorrectly fill in a large block of time
+	# where we may have no proof that the key was seen.
+	# thus put a cap on how far back we will alter data.
+
+	# allowing updates within this window still allows the notary
+	# to show a continual block of data, with some wiggle room for
+	# the scan not running *exactly* every 24 hours
+	# (e.g. the scan may start every 24 hours but sites may be updated in a random order)
+	OBSERVATION_UPDATE_LIMIT = 60 * 60 * 48 # 2 days
+
+
 	_open_connections = 0
 
 	def __init__(self, args):
@@ -773,10 +786,10 @@ class ndb:
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.
 			# just update the observation 'end' time.
-			if ((cur_time - most_recent_time) <= (60 * 60 * 48)): # 2 days
+			if ((cur_time - most_recent_time) <= self.OBSERVATION_UPDATE_LIMIT):
 				self._update_observation_end_time(service, fp, most_recent_time, cur_time)
 			else:
-				# more than 2 days have passed. don't update this observation -
+				# too many days have passed. don't update this observation -
 				# that could fill in a LOT of data we haven't observed.
 				# instead just create a new record.
 				self._insert_observation(service, fp, cur_time, cur_time)
@@ -784,7 +797,9 @@ class ndb:
 			# the key has changed or no observations exist yet for this service.
 			# add a new entry for this key with start and end set to the current time
 			self._insert_observation(service, fp, cur_time, cur_time)
-			# do *not* update the end time for the previous key - that would be adding data we don't have evidence for.
+			if ((most_recent_key != None) and ((cur_time - most_recent_time) <= self.OBSERVATION_UPDATE_LIMIT)):
+				# if there was a previous key that ended within the time cutoff, update its end time.
+				self._update_observation_end_time(service, most_recent_key, most_recent_time, cur_time - 1)
 
 	def is_metrics_enabled(self):
 		"""Retun true if the metrics tracking system is currently running, false otherwise."""
