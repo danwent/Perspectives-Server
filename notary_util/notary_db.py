@@ -569,7 +569,7 @@ class ndb:
 		Do not try to close your own session.
 		Let the ndb's contextmanager handle session closing.
 
-		Any database changes that are partically completed but not committed will be rolled back
+		Any database changes that are partially completed but not committed will be rolled back
 		if an exception is raised.
 		"""
 		session = self._Session()
