@@ -323,7 +323,7 @@ class NotaryDBTestCases(unittest.TestCase):
 		count_obs_before = self.ndb.count_observations()
 		new_insert_time = int(time.time())
 		self.assertTrue(new_insert_time > orig_insert_time)
-		self.assertTrue(new_insert_time - orig_insert_time <= (60 * 60 * 24))
+		self.assertTrue(new_insert_time - orig_insert_time <= (self.ndb.OBSERVATION_UPDATE_LIMIT))
 		self.ndb.report_observation(service, key)
 		self.assertTrue(self.ndb.count_observations() == count_obs_before)
 		# TODO: check to make sure the end time was actually updated.
@@ -335,17 +335,17 @@ class NotaryDBTestCases(unittest.TestCase):
 		# but we do NOT want to have the code like that for production use.
 		# the rest of these tests are commented out.
 
-		# 2. update within 1 day should update the same record
+		# 2. update within the time limit should update the same record
 		##count_obs_before = self.ndb.count_observations()
 		# 100 - give ourselves a bit of buffer time for the test to run.
-		##second_insert_time = new_insert_time + (60 * 60 * 24) - 100
+		##second_insert_time = new_insert_time + (self.ndb.OBSERVATION_UPDATE_LIMIT) - 100
 		##self.ndb.report_observation(service, key, second_insert_time)
 		##self.assertTrue(self.ndb.count_observations() == count_obs_before)
 		# TODO: check to make sure the end time was actually updated.
 
-		# 3. updating a record more than 1 day after the end time should insert a new record
+		# 3. updating a record after the time limit should insert a new record
 		#count_obs_before = self.ndb.count_observations()
-		#third_insert_time = second_insert_time + (60 * 60 * 24) + 100
+		#third_insert_time = second_insert_time + (self.ndb.OBSERVATION_UPDATE_LIMIT) + 100
 		#self.ndb.report_observation(service, key, third_insert_time)
 		#self.assertTrue(self.ndb.count_observations() == (count_obs_before + 1))
 
