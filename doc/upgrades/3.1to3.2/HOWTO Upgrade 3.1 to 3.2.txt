@@ -92,6 +92,16 @@ How to upgrade the database:
 		ALTER TABLE t_metrics ALTER COLUMN event_type_id SET NOT NULL;
 		ALTER TABLE t_metrics ALTER COLUMN date SET NOT NULL;
 
+		-- 6) delete old, unneeded metric records
+		-- (these metric types are no longer used)
+		DELETE FROM t_metrics
+		WHERE t_metrics.event_type_id IN (
+			SELECT event_type_id FROM t_event_types WHERE
+			t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated'))
+
+		DELETE from t_event_types
+		WHERE t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated')
+
 
 	sqlite:
 
@@ -107,6 +117,16 @@ How to upgrade the database:
 		    PRIMARY KEY ( event_id ),
 		    FOREIGN KEY ( event_type_id ) REFERENCES t_event_types ( event_type_id )
 		);
+
+		-- 1a) delete old, unneeded metric records
+		-- (these metric types are no longer used)
+		DELETE FROM t_metrics_old
+		WHERE t_metrics_old.event_type_id IN (
+			SELECT event_type_id FROM t_event_types WHERE
+			t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated'))
+
+		DELETE from t_event_types
+		WHERE t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated')
 
 		INSERT INTO t_metrics SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
 
