@@ -15,17 +15,75 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Export Observation data from a network notary database.
+Export Observation data from a version 2x notary database into
+the format for a version 3x database.
 """
 
-import time
 import argparse
+import os
+import sys
+import time
 
-from notary_db import ndb
-import notary_common
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.engine import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String
 
 
 DEFAULT_OUTFILE = "-"
+DEFAULT_DB = 'notary.sqlite'
+
+SSH_TYPE = "1"
+SSL_TYPE = "2"
+SERVICE_TYPES = {SSH_TYPE: "ssh",
+				 SSL_TYPE: "ssl"}
+
+
+# class to base ORM classes on
+ORMBase = declarative_base()
+
+class Observations(ORMBase):
+	"""
+	Version 2x schema observations
+	"""
+	__tablename__ = 'observations'
+	service_id = Column(String, primary_key=True)
+	key = Column(String)
+	start = Column(Integer)
+	end = Column(Integer)
+
+
+class ndb2x:
+	"""
+	This is a pared-down version of the notary database class
+	solely so we can export our data.
+	Don't use this for production deployment!
+	"""
+
+	def __init__(self, dbname):
+		"""Connect to the database."""
+		self.db = create_engine('sqlite:///' + dbname)
+		self.Session = sessionmaker(bind=self.db)
+
+	def __del__(self):
+		"""Clean up any remaining database connections."""
+
+		if ((hasattr(self, 'Session')) and (self.Session != None)):
+			try:
+				self.Session.close_all()
+				del self.Session
+			except Exception as e:
+				print >> sys.stderr, "Error closing database connection: '%s'" % ((e))
+
+		self.db.dispose()
+		del self.db
+
+	def get_all_observations(self):
+		"""Get all observations."""
+		return self.Session().query(Observations).\
+			order_by(Observations.service_id).\
+			values(Observations.service_id, Observations.key, Observations.start, Observations.end)
+
 
 
 def print_long_output(obs):
@@ -42,7 +100,7 @@ def print_long_output(obs):
 			if num_sids % 1000 == 0:
 				print "processed %s service-ids" % num_sids
 			if old_sid is not None:
-				print_sid_info(old_sid, key_to_obs)
+				_print_sid_info(old_sid, key_to_obs)
 			key_to_obs = {}
 			old_sid = sid
 
@@ -50,23 +108,23 @@ def print_long_output(obs):
 			key_to_obs[key] = []
 		key_to_obs[key].append((start, end))
 
-		print_sid_info(sid, key_to_obs)
+		_print_sid_info(sid, key_to_obs)
 
-def print_sid_info(sid, key_to_obs):
+def _print_sid_info(sid, key_to_obs):
 	"""Print all of the keys for a single service."""
 	s_type = sid.split(",")[1]
-	
-	if (s_type not in notary_common.SERVICE_TYPES):
-		return	
-	
+
+	if (s_type not in SERVICE_TYPES):
+		return
+
 	print >> output_file, ""
 	print >> output_file, "Start Host: '%s'" % sid
-	key_type_text = notary_common.SERVICE_TYPES[s_type]
+	key_type_text = SERVICE_TYPES[s_type]
 	for key in key_to_obs:
-		if key is None: 
-			continue 
+		if key is None:
+			continue
 		print >> output_file, "%s key: %s" % (key_type_text,key)
-		for ts in key_to_obs[key]: 
+		for ts in key_to_obs[key]:
 			print >> output_file, "start:\t%s - %s" % (ts[0],time.ctime(ts[0]))
 			print >> output_file, "end:\t%s - %s" % (ts[1],time.ctime(ts[1]))
 		print >> output_file, ""
@@ -78,17 +136,22 @@ def print_tuples(obs):
 	# note: lines starting with '#' should be ignored by the importer.
 
 	output = [] # use list appending for better performance than string concatenation
-	output.append("# Export of network notary Observations from %s" %args.dbname)
+	output.append("# Export of network notary version 2.x Observations from %s" %args.dbname)
 	output.append("# %s\n" % time.ctime())
 	for (service, key, start, end) in obs:
 		output.append("(%s, %s, %s, %s)" % (service, key, start, end))
 
-	output = '\n'.join(output)
-	print >> output_file, output
+	#output = '\n'.join(output)
+	for line in output:
+		print >> output_file, line, '\n'
 
 
 
-parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=__doc__)
+
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--dbname', '--db-name', '-n', default=DEFAULT_DB,
+			help='Name of database to connect to. Default: \'%(default)s\'')
 parser.add_argument('output_file', type=argparse.FileType('w'), nargs='?', default=DEFAULT_OUTFILE,
 			help="File to write data to. Use '-' to write to stdout. Writing to stdout is the default.")
 formats = parser.add_mutually_exclusive_group()
@@ -100,15 +163,17 @@ formats.add_argument('--long', action='store_true',
 
 args = parser.parse_args()
 
-# pass ndb the args so it can use any relevant ones from its own parser
-ndb = ndb(args)
+if not os.path.exists(args.dbname):
+	raise ValueError("Database '%s' does not exist." % (args.dbname,))
+	exit(1)
+
+ndb = ndb2x(args.dbname)
 
 output_file = args.output_file
-with ndb.get_session() as session:
-	obs = ndb.get_all_observations(session)
+obs = ndb.get_all_observations()
 
-	if (args.long):
-		print_long_output(obs)
-	else:
-		print_tuples(obs)
+if (args.long):
+	print_long_output(obs)
+else:
+	print_tuples(obs)
 

@@ -111,7 +111,10 @@ class Memcache(CacheBase):
 		"""Retrieve the value for a given key, or None if no key exists."""
 		if (self.pool != None):
 			with self.pool.reserve() as mc:
-				return mc.get(str(key))
+				try:
+					return mc.get(str(key))
+				except Exception as e:
+					print >> sys.stderr, "cache get() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "Cache does not exist! Create it first"
 			return None
@@ -120,7 +123,10 @@ class Memcache(CacheBase):
 		"""Save the value to a given key name."""
 		if (self.pool != None):
 			with self.pool.reserve() as mc:
-				mc.set(str(key), data, time=expiry)
+				try:
+					mc.set(str(key), data, time=expiry)
+				except Exception as e:
+					print >> sys.stderr, "cache set() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "Cache does not exist! Create it first"
 
@@ -195,7 +201,10 @@ class Redis(CacheBase):
 	def get(self, key):
 		"""Retrieve the value for a given key, or None if no key exists."""
 		if (self.redis != None):
-			return self.redis.get(key)
+			try:
+				return self.redis.get(key)
+			except Exception, e:
+				print >> sys.stderr, "redis get() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
 			return None
@@ -203,8 +212,11 @@ class Redis(CacheBase):
 	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
 		"""Save the value to a given key name."""
 		if (self.redis != None):
-			self.redis.set(key, data)
-			self.redis.expire(key, expiry)
+			try:
+				self.redis.set(key, data)
+				self.redis.expire(key, expiry)
+			except Exception, e:
+				print >> sys.stderr, "redis set() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
 
@@ -276,7 +288,10 @@ class Pycache(CacheBase):
 	def get(self, key):
 		"""Retrieve the value for a given key, or None if no key exists."""
 		if (self.cache != None):
-			return self.cache.get(key)
+			try:
+				return self.cache.get(key)
+			except Exception, e:
+				print >> sys.stderr, "pycache get() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "pycache get() error: cache does not exist! create it before retrieving values."
 			return None
@@ -287,6 +302,6 @@ class Pycache(CacheBase):
 			try:
 				self.cache.set(key, data, expiry)
 			except Exception, e:
-				print >> sys.stderr, "pycache set() error: '%s'." % (e)
+				print >> sys.stderr, "pycache set() error: '{0}'.".format(e)
 		else:
 			print >> sys.stderr, "pycache set() error: cache does not exist! create it before setting values."

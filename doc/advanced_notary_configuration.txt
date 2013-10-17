@@ -7,3 +7,10 @@ Data caching will significantly increase your notary's performance.
 
 For best performance you may want to use a dedicated caching server such as memcached, memcachier, or redis. If you do not have access to or don't want to set up a dedicated caching server, use the built-in python caching with '--pycache'.
 
+
+2. Enable SNI scanning
+
+Using 'Server Name Indication' causes notaries to provide extra information when scanning sites - some sites require this to retrieve the correct SSL certificate.
+
+Add the '--sni' argument to both your main notary server (notary_http.py) and your routine scanning job (e.g. scans done with notary_util/threaded_scanner.py). This will ensure the notary has the correct certificate for all sites.
+

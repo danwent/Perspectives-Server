@@ -37,12 +37,11 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "pre3.2a"
+	VERSION = "3.2"
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
-	PROBE_LIMIT = 10 # simultaneous scans for new services
 
 	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
 
@@ -57,6 +56,9 @@ class NotaryHTTPServer:
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
+		parser.add_argument('--sni', action='store_true', default=False,
+			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			 Default: \'%(default)s\'")
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
@@ -86,9 +88,6 @@ class NotaryHTTPServer:
 		if (self.notary_public_key == None or self.notary_priv_key == None):
 			print >> sys.stderr, "Could not get public and private keys."
 			exit(1)
-		print "Using public key\n" + self.notary_public_key
-
-		self.create_static_index()
 
 		self.web_port = self.DEFAULT_WEB_PORT
 		if (args.envport):
@@ -110,8 +109,24 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		self.active_threads = 0 
+		self.use_sni = args.sni
+		self.create_static_index()
 		self.args = args
+
+		print "Using public key\n" + self.notary_public_key
+
+	def _create_status_row(self, name, enabled, description):
+		"""Generate the HTML to display one particular server option."""
+
+		css_class = 'td-status-off'
+		status_text = 'Off'
+
+		if (enabled):
+			css_class = 'td-status-on'
+			status_text = 'On'
+
+		return "<tr><td>{0}</td><td class='{1}'>{2}</td><td>{3}</td></tr>\n".format(\
+			name, css_class, status_text, description)
 
 	def create_static_index(self):
 		"""Create a static index page."""
@@ -122,23 +137,39 @@ class NotaryHTTPServer:
 		with open(template,'r') as t:
 			lines = str(t.read())
 
-		metrics_class = 'td-status-off'
-		metrics_status = 'Off'
-		metrics_text = 'This server does not track any performance-related metrics.'
+		options = ""
+
+
+		# performance metrics
+		metrics_name = "Performance Metrics"
+		metrics_text = 'This notary does not track any performance-related metrics.'
 
 		if ((self.ndb) and (self.ndb.metricsdb or self.ndb.metricslog)):
-			metrics_class = 'td-status-on'
-			metrics_status = 'On'
 			# TODO: add link to FAQ on website once it is up.
-			metrics_text = 'This server tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
+			metrics_text = 'This notary tracks a small number of performance-related metrics to help its owner keep things running smoothly.\
 			 This does not affect your privacy in any way.\
 			 For details see <a href="http://perspectives-project.org">http://perspectives-project.org</a>.'
+			options += self._create_status_row(metrics_name, True, metrics_text)
+		else:
+			options += self._create_status_row(metrics_name, False, metrics_text)
+
+		# SNI scanning
+		# Note: this assumes that if you set --sni for server on-demand scans that it is *also*
+		# set for routine scanning. We do not currently verify that though -
+		# it's up to the server owner to maintain.
+		sni_name = 'Server Name Indication'
+		sni_text = "This notary does not use Server Name Indication when scanning websites."
+
+		if (self.use_sni):
+			sni_text = 'This notary uses <a href="https://en.wikipedia.org/wiki/Server_Name_Indication">Server Name Indication</a> when scanning websites.'
+			options += self._create_status_row(sni_name, True, sni_text)
+		else:
+			options += self._create_status_row(sni_name, False, sni_text)
 
 
 		lines = lines.replace('<!-- ::VERSION:: -->', "- version %s" % self.VERSION)
 		lines = lines.replace('<!-- ::PUBLIC_KEY:: -->', self.notary_public_key)
-		lines = lines.replace('<!-- ::OPTIONS_METRICS:: -->',
-			"<tr><td>Performance Metrics</td><td class='%s'>%s</td><td>%s</td></tr>" % (metrics_class, metrics_status, metrics_text))
+		lines = lines.replace('<!-- ::OPTIONS:: -->', options)
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:
@@ -160,7 +191,8 @@ class NotaryHTTPServer:
 			except Exception as e:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
-		if (self.ndb and (self.ndb.Session != None)):
+		#TODO: don't reference session directly
+		if (self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, host, port, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
@@ -179,30 +211,44 @@ class NotaryHTTPServer:
 
 		try:
 			# TODO: can we grab this all in one query instead of looping?
-			obs = self.ndb.get_observations(service)
-			if (obs != None):
-				for (name, key, start, end) in obs:
-					num_rows += 1
-					if key not in keys:
-						timestamps_by_key[key] = []
-						keys.append(key)
-					timestamps_by_key[key].append((start, end))
+			with self.ndb.get_session() as session:
+				obs = self.ndb.get_observations(session, service)
+				if (obs != None):
+					for (name, key, start, end) in obs:
+						num_rows += 1
+						if key not in keys:
+							timestamps_by_key[key] = []
+							keys.append(key)
+						timestamps_by_key[key].append((start, end))
 		except Exception as e:
 			# error already logged inside get_observations.
 			# we can also see InterfaceError or AttributeError when looping through observation records
 			# if the database is under heavy load.
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
-		finally:
-			self.ndb.close_session()
 
 		if num_rows == 0: 
 			# rate-limit on-demand probes
-			if self.active_threads < self.PROBE_LIMIT:
-				self.ndb.report_metric('ScanForNewService', service)
-				t = OnDemandScanThread(service, 10 , self, self.args)
-				t.start()
+			global scan_semaphore
+			global scan_sites
+			global scan_sites_lock
+
+			if (scan_semaphore.acquire(False)):
+				do_scan = False
+				with scan_sites_lock:
+					if (service not in scan_sites):
+						# only scan a given site with one thread at a time
+						scan_sites[service] = True
+						do_scan = True
+
+				if (do_scan):
+					t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
+					t.start()
+					# report the metrics *after* launching so the scanning thread can get started
+					self.ndb.report_metric('ScanForNewService', service)
+				else:
+					scan_semaphore.release()
 			else: 
-				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(self.PROBE_LIMIT) + " Service: " + service)
+				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404) # 404 Not Found
 	
@@ -255,18 +301,39 @@ class NotaryHTTPServer:
 
 		return xml
 
+	def scan_finished(self, service):
+		"""Clean up any state used for on-deman scans."""
+		global scan_semaphore
+		global scan_sites
+		global scan_sites_lock
+
+		with scan_sites_lock:
+			if service in scan_sites:
+				del scan_sites[service]
+		scan_semaphore.release()
+
 	@cherrypy.expose
-	def index(self, host=None, port=None, service_type=None):
+	def index(self, host=None, port=None, service_type=None, **invalid_params):
+		if(len(invalid_params) > 0):
+			# invalid_params will catch any other parameters sent to the web server.
+			# if we have any it's an invalid request.
+			raise cherrypy.HTTPError(400) # 400 Bad Request
+
 		if (host == None and port == None and service_type == None):
 			# probably a visitor that doesn't know what this server is for.
 			# serve a static explanation page
 			path = os.path.join(cherrypy.request.app.config['/']['tools.staticfile.root'], self.STATIC_INDEX)
 			return cherrypy.lib.static.serve_file(path)
-		elif (host == None or port == None or service_type == None):
-			raise cherrypy.HTTPError(400) # 400 Bad Request
 
-		if (service_type not in notary_common.SERVICE_TYPES):
-			raise cherrypy.HTTPError(404) # 404 Not Found
+		if (service_type == None):
+			service_type = notary_common.SSL_TYPE
+
+		if (port == None and (service_type in notary_common.PORTS)):
+			port = str(notary_common.PORTS[service_type])
+
+		if (host == None or host == '' or port == None or \
+			service_type not in notary_common.SERVICE_TYPES):
+			raise cherrypy.HTTPError(400) # 400 Bad Request
 			
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
 		return self.get_xml(host, port, service_type)
@@ -274,36 +341,38 @@ class NotaryHTTPServer:
 
 class OnDemandScanThread(threading.Thread): 
 
-	def __init__(self, sid,timeout_sec,server_obj, args):
+	def __init__(self, sid, timeout_sec, use_sni, server_obj, db):
 		self.sid = sid
-		self.server_obj = server_obj
 		self.timeout_sec = timeout_sec
-		self.args = args
+		self.use_sni = use_sni
+		self.server_obj = server_obj
+		self.db = db
 		threading.Thread.__init__(self)
-		self.server_obj.active_threads += 1
+
+	def __del__(self):
+		"""Clean up after scanning."""
+		del self.db
 
 	def run(self): 
 
-		# create a new db instance, since we're on a new thread
-		# pass through any args we have so we'll connect to the same database in the same way
 		try:
-			db = ndb(self.args)
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
+			if (fp != None):
+				self.db.report_observation(self.sid, fp)
+			# else error already logged
+			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
 		except Exception as e:
-			print >> sys.stderr, "Database error: '%s'. Did not run on-demand scan." % (str(e))
-			self.server_obj.active_threads -= 1
-			return
-
-		try:
-			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
-			notary_common.report_observation_with_db(db, self.sid, fp)
-		except Exception as e:
-			db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
+			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
 		finally:
-			self.server_obj.active_threads -= 1
-			db.close_session()
+			self.server_obj.scan_finished(self.sid)
 
 
+# track locks at the module level so we only use them once across all cherrypy threads
+PROBE_LIMIT = 10 # simultaneous scans for new services
+scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
+scan_sites = {}
+scan_sites_lock = threading.Lock()
 
 
 # create an instance here so command-line args will be automatically passed and parsed
@@ -317,10 +386,20 @@ from cherrypy.process import servers
 def fake_wait_for_occupied_port(host, port): return
 servers.wait_for_occupied_port = fake_wait_for_occupied_port
 
+# do not log any information about clients.
+# if we don't override this function,
+# access information is still logged when screen echoing is turned on.
+def fake_access(): return
+cherrypy.log.access = fake_access
+
 cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
 			 'request.show_tracebacks' : False,  
-			 'log.access_file' : None,  # default for production 
+			 # IMPORTANT PRIVACY SETTINGS!
+			 # we do *not* want to record any information about clients
+			 'log.access_file' : None,
+			 'server.log_request_headers': False,
+			 # end of privacy settings
 			 'log.error_file' : 'error.log', 
 			 'log.screen' : False } ) 
 
@@ -328,10 +407,6 @@ if (notary.args.echo_screen):
 	cherrypy.config.update({
 			 'log.error_file' : None,
 			 'log.screen' : True } )
-else:
-	cherrypy.config.update({
-			 'log.error_file' : 'error.log',
-			 'log.screen' : False } )
 
 static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
 notary_config = { '/': {'tools.staticfile.root' : static_root,

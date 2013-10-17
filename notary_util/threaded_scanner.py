@@ -48,12 +48,13 @@ DEFAULT_INFILE = "-"
 
 class ScanThread(threading.Thread): 
 
-	def __init__(self, sid, global_stats,timeout_sec): 
+	def __init__(self, sid, global_stats,timeout_sec, sni):
 		self.sid = sid
 		self.global_stats = global_stats
 		self.global_stats.active_threads += 1
 		threading.Thread.__init__(self)
 		self.timeout_sec = timeout_sec
+		self.sni = sni
 		self.global_stats.threads[sid] = time.time() 
 		self.timeout_exc = SSLScanTimeoutException() 
 		self.alert_exc = SSLAlertException("foo")
@@ -90,8 +91,10 @@ class ScanThread(threading.Thread):
 
 	def run(self): 
 		try: 
-			fp = attempt_observation_for_service(self.sid, self.timeout_sec)
-			res_list.append((self.sid,fp))
+			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
+			if (fp != None):
+				res_list.append((self.sid,fp))
+			# else error already logged
 		except Exception, e:
 			self.record_failure(e) 
 
@@ -124,8 +127,7 @@ def record_observations_in_db(res_list):
 		return
 	try: 
 		for r in res_list: 
-			notary_common.report_observation_with_db( \
-						ndb, r[0], r[1])
+			ndb.report_observation(r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
 		print "DB Error: Failed to write res_list of length %s" % \
@@ -143,6 +145,11 @@ parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAU
 			help="How many scans to run per second. Default: %(default)s.")
 parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
 			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+parser.add_argument('--sni', action='store_true', default=False,
+			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			Default: \'%(default)s\'")
+parser.add_argument('--verbose', '-v', default=False, action='store_true',
+			help="Verbose mode. Print more info about each scan.")
 
 args = parser.parse_args()
 
@@ -173,7 +180,7 @@ for sid in all_sids:
 		# TODO: use a regex instead
 		if sid.split(",")[1] == notary_common.SSL_TYPE:
 			stats.num_started += 1
-			t = ScanThread(sid,stats,timeout_sec)
+			t = ScanThread(sid,stats,timeout_sec,args.sni)
 			t.start()
  
 		if (stats.num_started % rate) == 0: 
@@ -181,33 +188,35 @@ for sid in all_sids:
 			record_observations_in_db(res_list) 
 			res_list = [] 
 			so_far = int(time.time() - start_time)
-			print "%s seconds passed.  %s complete, %s " \
-				"failures.  %s Active threads" % \
-				(so_far, stats.num_completed, 
-					stats.failures, stats.active_threads)
-			print "  details: timeouts = %s, " \
-				"ssl-alerts = %s, no-route = %s, " \
-				"conn-refused = %s, conn-reset = %s,"\
-				"dns = %s, other = %s" % \
-				(stats.failure_timeouts,
-				stats.failure_ssl_alert,
-				stats.failure_no_route,
-				stats.failure_conn_refused,
-				stats.failure_conn_reset,
-				stats.failure_dns, 
-				stats.failure_other)
-			sys.stdout.flush()
+			if (args.verbose):
+				print "%s seconds passed.  %s complete, %s " \
+					"failures.  %s Active threads" % \
+					(so_far, stats.num_completed,
+						stats.failures, stats.active_threads)
+				print "  details: timeouts = %s, " \
+					"ssl-alerts = %s, no-route = %s, " \
+					"conn-refused = %s, conn-reset = %s,"\
+					"dns = %s, other = %s" % \
+					(stats.failure_timeouts,
+					stats.failure_ssl_alert,
+					stats.failure_no_route,
+					stats.failure_conn_refused,
+					stats.failure_conn_reset,
+					stats.failure_dns,
+					stats.failure_other)
+				sys.stdout.flush()
 
 		if stats.num_started  % 1000 == 0: 
-			print "long running threads" 
-			cur_time = time.time() 
-			for sid in stats.threads.keys(): 
-				spawn_time = stats.threads.get(sid,cur_time)
-				duration = cur_time - spawn_time
-				if duration > 20: 
-					print "'%s' has been running for %s" %\
-					 (sid,duration) 
-			sys.stdout.flush()
+			if (args.verbose):
+				print "long running threads"
+				cur_time = time.time()
+				for sid in stats.threads.keys():
+					spawn_time = stats.threads.get(sid,cur_time)
+					duration = cur_time - spawn_time
+					if duration > 20:
+						print "'%s' has been running for %s" %\
+						 (sid,duration)
+				sys.stdout.flush()
 
 	except IndexError:
 		print >> sys.stderr, "Service '%s' has no index [1] after splitting on ','.\n" % (sid)
@@ -224,8 +233,7 @@ while stats.active_threads > 0:
 
 # record any observations made since we finished the
 # main for-loop			
-record_observations_in_db(res_list) 
-ndb.close_session()
+record_observations_in_db(res_list)
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )

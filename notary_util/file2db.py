@@ -20,10 +20,14 @@ Can be used to seed a notary database from another notary's list of services.
 
 File is expected to be a list of tuples, one per line.
 Tuples look like:
-  (servicename:port,servicetype, rsakey, starttime, endtime)
+  (servicename:port, servicetype, rsakey, starttime, endtime)
 
 e.g.
   (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
+
+If you have a large number of records to insert (i.e. millions)
+you may want to run this *without* echoing database statements,
+both to improve speed and to avoid memory issues.
 """
 
 import sys
@@ -38,16 +42,27 @@ DEFAULT_INFILE = "-"
 
 def import_records(infile):
 	"""Read a file of tuples and extract service and observation data."""
+
+	print "Reading records from '{0}'.".format(infile.name)
+
 	lines = infile.readlines()
 	infile.close()
 
-	service_names = {}
+	services = {}
 	observations = []
+	invalid_lines = []
+	invalid_file = "invalid_lines.txt"
 	num_lines = 0
+	num_invalid_lines = 0
 
 	# tuples will be formatted like this:
 	# (domain.com:443,2, aa:bb:cc:dd:ee:ff, 123, 456)
-	valid_tuple = re.compile("^\(([\w:,.]+), *([0-9a-fA-F:]+), *(\d)+, *(\d+)\)$")
+	#TODO: get correct regex for URLs
+	valid_tuple = re.compile("^ *\(([\w\-:,.]+), *([0-9a-fA-F:]+), *(\d+), *(\d+)\) *$")
+
+	# some lines may contain service-only tuples, like
+	# (domain.com:443,2, None, None, None)
+	site_tuple = re.compile("^ *\(([\w\-:,.]+), *\w+, *\w+, *\w+\) *$")
 
 	for line in lines:
 
@@ -60,24 +75,43 @@ def import_records(infile):
 			start = int(match.group(3))
 			end = int(match.group(4))
 
-			if (service not in service_names):
-				service_names[service] = True
-
+			services[service] = True
 			observations.append((service, key, start, end))
 
+		elif (site_tuple.match(line)):
+			service = str(site_tuple.match(line).group(1))
+			services[service] = True
+
+		# ignore comments and blank lines
+		elif ((not line.startswith('#')) and (line not in ['\n', '\r\n'])):
+			invalid_lines.append(line)
+
 		num_lines += 1
-		if (num_lines) % 1000 == 0:
-			print "Finished %s lines..." % num_lines
+		if (num_lines) % 100000 == 0:
+			print "Finished reading {0} lines...".format(num_lines)
 
-	print "Found %s services. Adding to database." % (len(service_names))
+	print "Found {0} invalid lines. Exporting to {1}.".format(
+		len(invalid_lines), invalid_file)
+	with open(invalid_file,'w') as outfile:
+		for line in invalid_lines:
+			print >> outfile, line
 
-	for name in service_names.keys():
-		ndb.insert_service(name)
+	service_count = len(services)
+	if (service_count > 0):
+		print "Found {0} services. Adding to database.".format(service_count)
+		ndb.insert_bulk_services(services.keys())
+	else:
+		print "No services found."
 
 	if not args.services_only:
 		print "Found %s observations. Adding to database." % len(observations)
+		#TODO: need to get the service_ids after services are inserted
 		for (service, key, start, end) in observations:
-			ndb.insert_observation(service, key, start, end)
+			# NOTE! this is a special case use of _insert_observation() -
+			# we only call this because database records are assumed to be valid already,
+			# but won't necessarily be inserted in chronological order.
+			# you should use report_observation() during normal use.
+			ndb._insert_observation(service, key, start, end)
 
 
 parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=__doc__,

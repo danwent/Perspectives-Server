@@ -22,8 +22,8 @@ and keeps things modular for easier refactoring.
 """
 
 import argparse
+from contextlib import contextmanager
 import os
-import platform
 import re
 import sys
 import time
@@ -31,8 +31,12 @@ import ConfigParser
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref
+from sqlalchemy.event import listen
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, validates
+from sqlalchemy.pool import Pool
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
+from sqlalchemy.schema import CheckConstraint, UniqueConstraint
+from sqlalchemy.sql import select
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -47,7 +51,7 @@ class Services(ORMBase):
 	Service names take the form 'host:port,servicetype' - e.g. github.com:443,2
 	"""
 	__tablename__ = 't_services'
-	service_id = Column(Integer, primary_key=True)
+	service_id = Column(Integer, nullable=False, primary_key=True)
 	name = Column(String, nullable=False, unique=True)
 
 class Observations(ORMBase):
@@ -55,12 +59,51 @@ class Observations(ORMBase):
 	The time ranges observed for each key used by a service.
 	"""
 	__tablename__ = 't_observations'
-	service_id = Column(Integer, ForeignKey('t_services.service_id'), primary_key=True)
-	key = Column(String, primary_key=True)			#certificate key supplied by a service - e.g. aa:bb:cc:dd:00
-	start = Column(Integer) 						#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
-	end = Column(Integer)							#another unix timestamp.  The most recent time we saw a key for a given service.
+	observation_id = Column(Integer, nullable=False, primary_key=True)
+	service_id = Column(Integer, ForeignKey('t_services.service_id'), nullable=False)
+	key = Column(String, nullable=False)	#md5 certificate key supplied by a service - e.g. aa:bb:cc:dd:00
+	start = Column(Integer, nullable=False)	#unix timestamp - number of seconds since the epoch. The first time we saw a key for a given service.
+	end = Column(Integer, nullable=False)	#another unix timestamp.  The most recent time we saw a key for a given service.
+
+	__table_args__ = (
+		UniqueConstraint('service_id', 'key', 'start'),
+		UniqueConstraint('service_id', 'key', 'end'),
+		CheckConstraint('start >= 0'),
+		CheckConstraint('end >= 0'),
+		CheckConstraint('start <= end'),
+		)
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
+
+	# add validation for individual fields, in case the database itself cannot.
+	@validates('start')
+	def validates_start(self, key, start):
+		"""Validate the 'start' field when creating a new Observation."""
+		if (start < 0):
+			raise ValueError('Observation start time cannot be < 0 (attempted to use {0})'.format(start))
+		return start
+
+	@validates('end')
+	def validates_end(self, key, end):
+		"""Validate the 'end' field when creating a new Observation."""
+		if (end < 0):
+			raise ValueError('Observation end time cannot be < 0 (attempted to use {0})'.format(end))
+		return end
+
+	def validate(self):
+		"""
+		Check whether an Observation is a valid record that can be inserted in the database,
+		and raise an exception if it is not.
+		Keeping the code inside one function makes it easy to call from any insert or update methods.
+
+		This function contains logic that cannot be run inside sqlalchemy @validates functions -
+		either because it operates on multiple fields and requires the object to be completely instantiated,
+		or for some other reason.
+		"""
+		if (self.end < self.start):
+			raise ValueError('Observation end time must be >= start time (attempted to use start {0} and end {1})'.format(
+				self.start, self.end))
+
 
 # create indexes to speed up queries
 Index('ix_services_name', Services.name)
@@ -75,7 +118,7 @@ class EventTypes(ORMBase):
 	# see the ndb class and ndb.init_event_types()
 	# for a list of possible event types
 	__tablename__ = 't_event_types'
-	event_type_id = Column(Integer, primary_key=True)
+	event_type_id = Column(Integer, nullable=False, primary_key=True)
 	name = Column(String, nullable=False, unique=True)
 
 class Metrics(ORMBase):
@@ -83,23 +126,14 @@ class Metrics(ORMBase):
 	A log of interesting events that happen while a notary server runs. Mainly used for diagnostic or performance tracking.
 	"""
 	__tablename__ = 't_metrics'
-	event_id = Column(Integer, primary_key=True)
-	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'))
-	machine_id = Column(Integer, ForeignKey('t_machines.machine_id'))
-	date = Column(Integer) # unix timestamp - number of seconds since the epoch.
+	event_id = Column(Integer, nullable=False, primary_key=True)
+	event_type_id = Column(Integer, ForeignKey('t_event_types.event_type_id'), nullable=False)
+	date = Column(Integer, nullable=False) # unix timestamp - number of seconds since the epoch.
 	comment = Column(String) # anything worth noting. do NOT track ip address or any private/personally identifiable information.
 
 # purposely don't create any indexes on metrics tables -
 # we want writing data to be as fast as possible.
 # analysis can be done later on a copy of the data so it doesn't slow down the actual notary machine.
-
-class Machines(ORMBase):
-	"""
-	Computers that run notary software.
-	"""
-	__tablename__ = 't_machines'
-	machine_id = Column(Integer, primary_key=True)
-	name = Column(String)
 
 
 def ratelimited(max_per_second=1):
@@ -149,7 +183,7 @@ class ndb:
 	Currently this class is only intended to be called by modules that
 	extend its argparser. i.e.
 
-	parser = argparse.ArgumentParser(parents=[ndb.get_parser() #...
+	parser = argparse.ArgumentParser(parents=[ndb.get_parser() ...])
 	# ...
 	args = parser.parse_args()
 	ndb = ndb(args)
@@ -178,12 +212,25 @@ class ndb:
 	CONFIG_SECTION = 'NotaryDB'
 
 	EVENT_TYPE_NAMES=['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
-		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanKeyUpdated',
-		'ServiceScanPrevKeyUpdated', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
+		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
 		'OnDemandServiceScanFailure', 'EventTypeUnknown']
 	EVENT_TYPES={}
-	MACHINES={}
 	METRIC_PREFIX = "NOTARY_METRIC"
+
+	# if the scanner does not run regularly and consistently,
+	# blindly updating an observation's end time
+	# could incorrectly fill in a large block of time
+	# where we may have no proof that the key was seen.
+	# thus put a cap on how far back we will alter data.
+
+	# allowing updates within this window still allows the notary
+	# to show a continual block of data, with some wiggle room for
+	# the scan not running *exactly* every 24 hours
+	# (e.g. the scan may start every 24 hours but sites may be updated in a random order)
+	OBSERVATION_UPDATE_LIMIT = 60 * 60 * 48 # 2 days
+
+
+	_open_connections = 0
 
 	def __init__(self, args):
 		"""
@@ -193,21 +240,21 @@ class ndb:
 		"""
 
 		# sanity/safety check:
-		# filter the args and send only those that are relevant to __actual_init__.
+		# filter the args and send only those that are relevant to __actual_init().
 		# this makes it simple for callers that extend our argparser to use us
 		# (i.e. by just calling 'ndb = ndb(args)')
 		# but ensures we pass only the correct parameters,
 		# so there are no errors.
-		good_args = ndb.filter_args(vars(args))
+		good_args = ndb.__filter_args(vars(args))
 
 		if (good_args['read_config_file']):
-			good_args = self.set_config_args()
+			good_args = self._set_config_args()
 
-		self.__actual_init__(**good_args)
+		self.__actual_init(**good_args)
 
-	# note: keep these arg names the same as the argparser args - see filter_args()
+	# note: keep these arg names the same as the argparser args - see __filter_args()
 	# we supply default values so everything can be passed as a named argument.
-	def __actual_init__(self, dburl=False,
+	def __actual_init(self, dburl=False,
 						dbname=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultdbname'],
 						dbuser=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaultusername'],
 						dbhost=SUPPORTED_DBS[DEFAULT_DB_TYPE]['defaulthostname'],
@@ -223,7 +270,7 @@ class ndb:
 		"""
 
 		connstr = ''
-		self.Session = None
+		self._Session = None
 		self.metricsdb = metricsdb
 		self.metricslog = metricslog
 
@@ -233,7 +280,10 @@ class ndb:
 		# TODO: ALL INPUT IS EVIL
 		# regex check these variables
 		if (dburl):
-			connstr = os.environ[self.DB_URL_FIELD]
+			try:
+				connstr = os.environ[self.DB_URL_FIELD]
+			except KeyError:
+				raise KeyError("There is no environment variable named '%s'" % (self.DB_URL_FIELD))
 		elif (dbtype in self.SUPPORTED_DBS):
 
 			self.DB_PASSWORD = ''
@@ -265,100 +315,74 @@ class ndb:
 		# set up sqlalchemy objects
 		self.db = create_engine(connstr, echo=dbecho)
 
+		self._Session = scoped_session(sessionmaker(bind=self.db))
+
 		# in most cases we expect callers to handle any exceptions that get thrown here.
 		# we still want to make sure the error is logged, however.
-		# for now we only check that (self.Session != None) in a few places that may be called accidentally,
+		# for now we only check that (self._Session != None) in a few places that may be called accidentally,
 		# since callers really shouldn't be calling methods if the database couldn't connect.
 		# we could add more checks if that's warranted.
 		try:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
-			self.Session = None
-			raise e
+			raise
 
-		self.Session = scoped_session(sessionmaker(bind=self.db))
+		listen(Pool, 'checkout', self._on_connection_checkout)
+		listen(Pool, 'checkin', self._on_connection_checkin)
 
 		# cache data used when logging metrics
-		self.__init_event_types__()
-		self.__init_machine_names__()
+		self.__init_event_types()
 
 		if (write_config_file):
-			self.write_db_config(locals())
+			self._write_db_config(locals())
 
 
-	def __init_event_types__(self):
+	def __init_event_types(self):
 		"""Create entries in the EventTypes table, if necessary, and store their IDs in the EVENT_TYPES dictionary."""
 
 		# if we're using metrics, caching these values now
 		# saves us from having to look up the ID every time we insert a metric record.
 
-		# __init__ happens in its own thread, so create and remove a local Session
-		session = self.Session()
-		for name in self.EVENT_TYPE_NAMES:
-			try:
-				evt = session.query(EventTypes).filter(EventTypes.name == name).first()
+		if self.is_metrics_enabled():
+			with self.get_session() as session:
+				for name in self.EVENT_TYPE_NAMES:
+					try:
+						evt = session.query(EventTypes).filter(EventTypes.name == name).first()
 
-				if (evt == None):
-					evt = EventTypes(name = name)
-					session.add(evt)
-					session.commit()
+						if (evt == None):
+							evt = EventTypes(name = name)
+							session.add(evt)
+							session.commit()
 
-				self.EVENT_TYPES[name] = evt.event_type_id
+						self.EVENT_TYPES[name] = evt.event_type_id
 
-			except ProgrammingError as e:
-				print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
-				session.rollback()
-				if (self.metricsdb):
-					self.metricsdb = False
-					print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
-					break
-
-		self.Session.remove()
-
-	def __init_machine_names__(self):
-		"""Create entries in the Machines table, if necessary, and store their IDs in the MACHINES dictionary."""
-
-		machine_name = platform.node()
-		self.machine_name = machine_name
-
-		# if we're using metrics, caching these values now
-		# saves us from having to look up the ID every time we insert a metric record.
-
-		# __init__ happens in its own thread, so create and remove a local Session
-		session = self.Session()
-		try:
-			machine = session.query(Machines).filter(Machines.name == machine_name).first()
-
-			if (machine == None):
-				machine = Machines(name = machine_name)
-				session.add(machine)
-				session.commit()
-
-			self.MACHINES[machine_name] = machine.machine_id
-
-		except ProgrammingError as e:
-			print >> sys.stderr, "Error creating Machine name '%s': '%s'" % (machine_name, e)
-			session.rollback()
-			if (self.metricsdb):
-				self.metricsdb = False
-				print >> sys.stderr, "Cannot log performance metrics without event types - metrics will be disabled."
-
-		self.Session.remove()
+					except ProgrammingError as e:
+						print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
+						session.rollback()
+						if (self.metricsdb):
+							self.metricsdb = False
+							print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
+							break
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
 
-		if ((hasattr(self, 'Session')) and (self.Session != None)):
-			try:
-				self.Session.close_all()
-				self.Session.remove()
-				del self.Session
-			except Exception as e:
-				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+		if (self.get_connection_count() != 0):
+			print >> sys.stderr, "ERROR: {0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
+				self.get_connection_count())
 
-		self.db.dispose()
-		del self.db
+		if ((hasattr(self, '_Session')) and (self._Session != None)):
+			try:
+				self._Session.close_all()
+				self._Session.remove()
+				del self._Session
+			except Exception as e:
+				print >> sys.stderr, "Error closing database sessions in destructor: '%s'" % (e)
+
+		if (hasattr(self, 'db')):
+			self.db.dispose()
+			del self.db
 
 	@classmethod
 	def get_parser(self):
@@ -367,13 +391,17 @@ class ndb:
 		Can be used by calling modules that need to connect to a notary database to build their own parser on top.
 		"""
 
-		# IMPORTANT: For every switch here, add a named argument by the same name to __actual_init__.
-		# See filter_args()for details.
+		# IMPORTANT: For every switch here, add a named argument by the same name to __actual_init().
+		# See __filter_args()for details.
 		# Several other modules use us to connect to notary databases.
 		# We let them access and extend our arg parser so we can keep the code in one place.
-		# Note: do not use 'None' as a default for aguments: it interferes with set_config_args().
+		# Note: do not use 'None' as a default for aguments: it interferes with _set_config_args().
 
-		parser = argparse.ArgumentParser(add_help=False) #don't specify description or epilogue so the module that includes us can write their own.
+		if __name__ == '__main__':
+			parser = argparse.ArgumentParser(description=self.__doc__)
+		else:
+			# don't specify description or epilogue so the module that includes us can write their own.
+			parser = argparse.ArgumentParser(add_help=False)
 		dbgroup = parser.add_argument_group('optional database arguments')
 
 		# dburl: unfortunately argparse doesn't make it easy to make one switch mutually exclusive from multiple other switches,
@@ -398,7 +426,7 @@ class ndb:
 			# use default 0 but const 1 so we get the expected behaviour if the argument is passed with no parameter.
 			default=self.DEFAULT_ECHO, const=1,
 			metavar='0/1', type=int,
-			help='Echo all SQL statements and other database messages to stdout. If passed with no value echo defaults to true.')
+			help='Echo all SQL statements and other database messages to stdout. Not recommended for production use as this generates a lot of log data. If passed with no value echo defaults to true.')
 		dbgroup.add_argument('--write-config-file', '--wcf', action='store_true', default=False,
 			help='After successfully connecting, save all database arguments to a config file.')
 		dbgroup.add_argument('--read-config-file', '--rcf', action='store_true', default=False,
@@ -414,7 +442,7 @@ class ndb:
 		return parser
 
 	@classmethod
-	def filter_args(self, argsdict):
+	def __filter_args(self, argsdict):
 		"""
 		Filter a dictionary of arguments and return only ones that are applicable to ndb.
 
@@ -425,7 +453,7 @@ class ndb:
 		Thus we use this function internally to filter incoming args
 		and make sure that only the parameters applicable to ndb are used.
 		"""
-		valid_args = ndb.__actual_init__.func_code.co_varnames[:ndb.__actual_init__.func_code.co_argcount]
+		valid_args = ndb.__actual_init.func_code.co_varnames[:ndb.__actual_init.func_code.co_argcount]
 		d = dict((key, val) for key, val in argsdict.iteritems() if key in valid_args)
 
 		if 'self' in d:
@@ -433,10 +461,10 @@ class ndb:
 
 		return d
 
-	def write_db_config(self, args):
+	def _write_db_config(self, args):
 		"""Write all ndb args to the config file."""
 
-		good_args = ndb.filter_args(args)
+		good_args = ndb.__filter_args(args)
 
 		# don't store keys related to config actions
 		del good_args['write_config_file']
@@ -458,7 +486,7 @@ class ndb:
 
 		print "Notary database config saved in %s." % self.NOTARY_CONFIG_FILE
 
-	def read_db_config(self):
+	def _read_db_config(self):
 		"""Read ndb args from the config file and return as a list."""
 
 		config = ConfigParser.SafeConfigParser()
@@ -470,11 +498,11 @@ class ndb:
 			print >> sys.stderr, "Could not read config file. Please write one with --write-config-file before reading"
 			return ()
 
-	def set_config_args(self):
+	def _set_config_args(self):
 		"""Sanitize and set up ndb arguments read from a config file."""
 
 		print "Reading config data from %s." % self.NOTARY_CONFIG_FILE
-		temp_args = self.read_db_config()
+		temp_args = self._read_db_config()
 		good_args = {}
 
 
@@ -533,40 +561,79 @@ class ndb:
 
 		return good_args
 
-	def close_session(self):
+	@contextmanager
+	def get_session(self):
 		"""
-		Clean up the session after any caller is done using results.
-		Call this after any SQL method to make sure database connections are not left open.
-		"""
-		if ((hasattr(self, 'Session')) and (self.Session != None)):
-			try:
-				self.Session.remove()
-			except Exception as e:
-				print >> sys.stderr, "Error closing database connection: '%s'" % (e)
+		Open a session with the database. *ALL* callers should use this to create new sessions,
+		and use a 'with' statement to make sure the session is properly closed afterward.
 
+		For example:
+
+			with self.ndb.get_session() as session:
+				database_obs = self.ndb.foo(session)
+				#... do some work here with database objects
+
+			#continue with rest of non-database code.
+
+		Every function that returns database records requires a session as a function parameter.
+		Create one as above and pass it in, so sessions can be properly scoped and managed.
+
+		Do not access the session object directly.
+		Do not try to close your own session.
+		Let the ndb's contextmanager handle session closing.
+
+		Any database changes that are partially completed but not committed will be rolled back
+		if an exception is raised.
+		"""
+		session = self._Session()
+		try:
+			yield session
+		except:
+			session.rollback()
+			raise
+		finally:
+			session.close()
+
+
+	def _on_connection_checkout(self, dbapi_connection, connection_record, connection_proxy):
+		"""Count when a connection is checked out of the connection pool."""
+		self._open_connections += 1
+
+	def _on_connection_checkin(self, dbapi_connection, connection_record):
+		"""Count when a connection is checked back in to the connection pool."""
+		self._open_connections -= 1
+
+	def get_connection_count(self):
+		"""Return the count of open database connections."""
+		return self._open_connections
 
 	# actual data methods follow
 
-	def get_all_services(self):
-		"""Get all service names."""
-		return self.Session().query(Services.name).all()
+	def count_services(self):
+		"""Return a count of the service records."""
+		with self.get_session() as session:
+			count = session.query(Services.service_id).count()
+			return count
 
-	def get_newest_services(self, end_limit):
+	def get_all_services(self, session):
+		"""Get all service names."""
+		return session.query(Services.name).all()
+
+	def get_newest_services(self, session, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return self.Session().query(Services.name).join(Observations).\
+		return session.query(Services.name).join(Observations).\
 			filter(Observations.end > end_limit)
 
-	def get_oldest_services(self, end_limit):
+	def get_oldest_services(self, session, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return self.Session().query(Services).join(Observations).filter(\
+		return session.query(Services).join(Observations).filter(\
 			~Services.name.in_(\
-				self.get_newest_services(end_limit))).\
+				self.get_newest_services(session, end_limit))).\
 			values(Services.name)
 
-	def insert_service(self, service_name):
-		"""Add a new Service to the database."""
-		# if this is too slow we could add bulk insertion
-		session = self.Session()
+	def insert_service(self, session, service_name):
+		"""Add a new Service to the database, and return the Service object."""
+		#TODO: could overload to also have insert services and return nothing, not requiring a session.
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
@@ -574,54 +641,96 @@ class ndb:
 			try:
 				session.add(srv)
 				session.commit()
-			except ProgrammingError as e:
-				print >> sys.stderr, "Error committing service '%s': '%s'" % (service_name, e)
-				session.rollback()
-				self.Session.remove()
+			except (ProgrammingError, IntegrityError) as e:
+				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
 				srv = None
 
 		return srv
 
-	def get_all_observations(self):
-		"""Get all observations."""
-		return self.Session().query(Services).join(Observations).\
+	def insert_bulk_services(self, services):
+		"""
+		Add multiple Services to the database at once.
+		This is much faster than adding them one record at a time.
+
+		'services': a list of service names.
+		"""
+		if len(services) < 1:
+			print >> sys.stderr, "Could not add services - no services in list."
+			return
+
+		try:
+			conn = self.db.connect()
+
+			# select duplicates that already exist in the database
+			dupes = conn.execute(select([Services.name], Services.name.in_(services))).fetchall()
+
+			# convert dupes to dictionary so we can easily test against them
+			dupes_dict = dict((dup[0], True) for dup in dupes)
+
+			# remove any entries that already exist in the database
+			# so that inserting bulk records doesn't throw an IntegrityError.
+			# At the same time, modify entries to be dictionaries
+			# with the correct key/value mapping to be used in a bulk insert.
+			# doing this at the same time saves us from looping through the list twice.
+			services = [{'name': service_name} for service_name in services
+				if service_name not in dupes_dict]
+
+			# any services left in the list will be new entries
+			if (len(services)) > 0:
+				conn.execute(Services.__table__.insert(), services)
+
+		except IntegrityError as e:
+			print >> sys.stderr, "Error adding bulk services: '{0}'".format(e)
+
+		finally:
+			conn.close()
+
+		return
+
+	#######
+	def count_observations(self):
+		"""Return a count of the observation records."""
+		with self.get_session() as session:
+			count = session.query(Observations.observation_id).count()
+			return count
+
+	def get_all_observations(self, session):
+		"""Get all observations in the database."""
+		return session.query(Services).join(Observations).\
 			order_by(Services.name).\
 			values(Services.name, Observations.key, Observations.start, Observations.end)
 
-	def get_observations(self, service):
+	def get_observations(self, session, service):
 		"""Get all observations for a given service."""
 		try:
-			return self.Session().query(Services).join(Observations).\
+			return session.query(Services).join(Observations).\
 				filter(Services.name == service).\
 				values(Services.name, Observations.key, Observations.start, Observations.end)
 		except Exception as e:
 			print >> sys.stderr, "Error getting observations: '%s'" % (e)
-			self.close_session()
 			# re-raise the error so the caller definitely knows something bad happened,
 			# as opposed to there being no observation records
-			raise e
+			raise
 
-	def insert_observation(self, service, key, start_time, end_time):
+	def _insert_observation(self, service, key, start_time, end_time):
 		"""Insert a new Observation about a service/key pair."""
-		srv = self.insert_service(service)
-		if (srv != None):
-			try:
-				session = self.Session()
-				newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
-				session.add(newob)
-				session.commit()
-			except IntegrityError:
-				print >> sys.stderr, "IntegrityError: Observation for (%s, %s) already present. \
-					If you want to update it call that function instead. Ignoring." % (service, key)
-				session.rollback()
-			except ProgrammingError as e:
-				print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
-				session.rollback()
-			finally:
-				self.Session.remove()
+		with self.get_session() as session:
+			srv = self.insert_service(session, service)
+			if (srv != None):
+				try:
+					newob = Observations(service_id=srv.service_id, key=key, start=start_time, end=end_time)
+					newob.validate()
+					session.add(newob)
+					session.commit()
+				except (ProgrammingError, IntegrityError, ValueError) as e:
+					print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
+			# else error already logged by previous function
 
-	def update_observation_end_time(self, service, fp, old_end_time, new_end_time):
-		"""Update the end time for a given Observation."""
+	def _update_observation_end_time(self, service, fp, old_end_time, new_end_time):
+		"""
+		Update the end time for a given Observation.
+		External callers shouldn't use this - call report_observation() instead.
+		"""
 		curtime = int(time.time())
 
 		if (new_end_time == None):
@@ -629,56 +738,104 @@ class ndb:
 		if (old_end_time == None):
 			old_end_time = curtime
 
-		session = self.Session()
-		ob = session.query(Observations).join(Services)\
-			.filter(Services.name == service)\
-			.filter(Observations.key == fp)\
-			.filter(Observations.end == old_end_time).first()
-		if (ob != None):
-			ob.end = new_end_time
-			session.commit()
+		try:
+			with self.get_session() as session:
+				ob = session.query(Observations).join(Services)\
+					.filter(Services.name == service)\
+					.filter(Observations.key == fp)\
+					.filter(Observations.end == old_end_time).first()
+				if (ob != None):
+					if (new_end_time <= ob.end):
+						raise ValueError('New end time must be > current end time. (attempted to use new end time {0})'.format(
+							new_end_time))
+					ob.validate()
+					ob.end = new_end_time
+					session.commit()
+				else:
+					print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
+						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
+		except (ValueError) as e:
+			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
+
+	def report_observation(self, service, fp):
+		"""
+		Insert or update an Observation record.
+		All callers should use this instead of calling _insert or _update directly,
+		to ensure entries are valid.
+		"""
+
+		cur_time = int(time.time())
+		most_recent_time_by_key = {}
+		most_recent_key = None
+		most_recent_time = 0
+
+		with self.get_session() as session:
+			obs = self.get_observations(session, service)
+
+			# calculate the most recently seen key
+			# TODO: there has got to be a more efficient way to do this with a query
+			for (service, key, start, end) in obs:
+				if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+					most_recent_time_by_key[key] = end
+
+				for k in most_recent_time_by_key:
+					if most_recent_time_by_key[k] > most_recent_time:
+						most_recent_key = k
+						most_recent_time = most_recent_time_by_key[k]
+
+		if most_recent_key == fp: # "fingerprint"
+			# this key matches the most recently seen key before this observation.
+			# just update the observation 'end' time.
+			if ((cur_time - most_recent_time) <= self.OBSERVATION_UPDATE_LIMIT):
+				self._update_observation_end_time(service, fp, most_recent_time, cur_time)
+			else:
+				# too many days have passed. don't update this observation -
+				# that could fill in a LOT of data we haven't observed.
+				# instead just create a new record.
+				self._insert_observation(service, fp, cur_time, cur_time)
 		else:
-			print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
-				but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
-		self.Session.remove()
+			# the key has changed or no observations exist yet for this service.
+			# add a new entry for this key with start and end set to the current time
+			self._insert_observation(service, fp, cur_time, cur_time)
+			if ((most_recent_key != None) and ((cur_time - most_recent_time) <= self.OBSERVATION_UPDATE_LIMIT)):
+				# if there was a previous key that ended within the time cutoff, update its end time.
+				self._update_observation_end_time(service, most_recent_key, most_recent_time, cur_time - 1)
+
+	def is_metrics_enabled(self):
+		"""Retun true if the metrics tracking system is currently running, false otherwise."""
+		if (self.metricsdb or self.metricslog):
+			return True
+		return False
 
 	# rate limit metrics so spamming queries doesn't take down the system.
 	# TODO: we could group metrics up to report in one big transaction, or use a background worker
 	@ratelimited(1)
 	def report_metric(self, event_type, comment=""):
 		"""Record a metric event in the database or the log."""
-		if (self.metricsdb or self.metricslog):
+		if self.is_metrics_enabled():
 			if (event_type not in self.EVENT_TYPES):
 				print >> sys.stderr, "Unknown event type '%s'. Please check your call to report_metric()." % event_type
 				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
 			else:
 				if (self.metricsdb):
-					if (self.Session != None):
-						# note: if we need even more speed we could try spawning this on its own thread
-
-						# wrap metric write attempts in a try/catch block so errors don't bring down the server
-						# even if its getting hammered with requests
-						session = self.Session()
-						try:
-							metric = Metrics(event_type_id=self.EVENT_TYPES[event_type], machine_id=self.MACHINES[self.machine_name],\
+					# wrap metric write attempts in a try/catch block so errors don't bring down the server
+					try:
+						with self.get_session() as session:
+							metric = Metrics(event_type_id=self.EVENT_TYPES[event_type],\
 								date=int(time.time()), comment=str(comment))
 							session.add(metric)
 							session.commit()
-						except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
-							# ResourceClosedError can happen when the database is under heavy load
-							print >> sys.stderr, "Error committing metric: '%s'" % e
-							print >> sys.stderr, "Was trying to log the following metric:"
-							self.__print_metric__(event_type, comment)
-							session.rollback()
-						finally:
-							self.Session.remove()
-					else:
-						print >> sys.stderr, "There is no database session to connect with! Please check your logs for a database connection error."
+					except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
+						# ResourceClosedError can happen when the database is under heavy load
+						print >> sys.stderr, "Error committing metric: '%s'" % e
 						print >> sys.stderr, "Was trying to log the following metric:"
-						self.__print_metric__(event_type, comment)
+						self.__print_metric(event_type, comment)
 				else:
-					self.__print_metric__(event_type, comment)
+					self.__print_metric(event_type, comment)
 
-	def __print_metric__(self, event_type, comment):
+	def __print_metric(self, event_type, comment):
 		"""Print metric to stdout. External callers should use report_metric() instead."""
-		print "%s|%s|%s|%s|%s" % (self.METRIC_PREFIX, self.machine_name, event_type, int(time.time()), str(comment))
+		print "%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment))
+
+if __name__ == "__main__":
+	args = ndb.get_parser().parse_args()

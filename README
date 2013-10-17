@@ -43,7 +43,7 @@ Once your server is running, try asking it about a service:
 You can also fetch results with a webbrowser, though you may need to 'view source'
 to see the XML:
 
-  http://localhost:8080/?host=github.com&port=443&service_type=2
+  http://localhost:8080/?host=github.com
 
 
 The first time you query for a particular service, it's normal to get a 404 error
@@ -95,7 +95,7 @@ Here is an example crontab file to run scans twice a day (1 am and 1 pm) on all 
 that have been seen in the past 5 days, with a rate of 20 simultaneous probes and a timeout of 20 seconds
 per probe.  It also contains an entry to restart the server if the machine reboots:
 
-0 1,13 * * * cd /root/Perspectives-Server && python notary_utils/list_services.py | python notary_utils/threaded_scanner.py
+0 1,13 * * * cd /root/Perspectives-Server && python notary_util/list_services.py | python notary_util/threaded_scanner.py
 
 @reboot cd /root/Perspectives-Server && python notary_http.py
 
