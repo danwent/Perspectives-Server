@@ -73,10 +73,10 @@ How to upgrade the database:
 
 		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_start_end CHECK (start <= t_observations.end)
 
-		-- TODO! add unique constraints x2
-		-- need to clean up records that don't match :-/
-		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
-		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, end)
+		-- add unique constraints
+		-- TODO: clean up records that don't fit the constraint
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, end)
 
 		-- 5) add NOT NULL
 
