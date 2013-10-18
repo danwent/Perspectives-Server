@@ -6,12 +6,12 @@ You only need follow these steps in the unlikely event that you are upgrading a 
 
 ---
 
-How to upgrade the database:
+How to upgrade:
 
 
 1. Stop your notary
 
-2. Update/sinc the code
+2. Update/sync the code
 
 >git pull
 
@@ -76,7 +76,7 @@ How to upgrade the database:
 		-- add unique constraints
 		-- TODO: clean up records that don't fit the constraint
 		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
-		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, end)
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, "end")
 
 		-- 5) add NOT NULL
 
@@ -128,7 +128,8 @@ How to upgrade the database:
 		DELETE from t_event_types
 		WHERE t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated')
 
-		INSERT INTO t_metrics SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
+		INSERT INTO t_metrics (event_id, event_type_id, date, comment)
+		SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
 
 		DROP TABLE t_metrics_old;
 		DROP TABLE t_machines;
