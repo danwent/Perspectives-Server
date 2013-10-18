@@ -14,3 +14,11 @@ Using 'Server Name Indication' causes notaries to provide extra information when
 
 Add the '--sni' argument to both your main notary server (notary_http.py) and your routine scanning job (e.g. scans done with notary_util/threaded_scanner.py). This will ensure the notary has the correct certificate for all sites.
 
+
+3. Database tuning
+
+The observations table has many updates during normal behaviour as the end times for certificates are observed and extended. If you're using a database with configurable maintenance (e.g. vacuuming) it can be a good idea to increase the cleaning threshold for this table.
+
+For Postgres:
+	ALTER TABLE t_observations SET (autovacuum_vacuum_scale_factor = 0.1);
+
