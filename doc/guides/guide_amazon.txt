@@ -1,0 +1,69 @@
+Setup a Free Notary Server in 15 minutes with AWS
+ 
+
+Amazon Web Services (AWS) let's you easily create a server in the "cloud".  In fact, they even let you run a "micro" instance for free, thanks to something call the "free usage tier"
+
+This post will show you how you can get your own notary running in just 15 minutes using AWS.
+
+First, read about the free usage tier and sign up for an AWS account: http://aws.amazon.com/free/
+
+Then, access the AWS management console to create an instance: http://aws.amazon.com/console/
+
+Click on the "EC2" tab near the top left of the screen, then click the "Launch Instance" button in the main window pane.
+
+Choose an Ubuntu server AMI by clicking on the "Community AMIs" tab and finding a matching image.  Here are a couple things to keep in mind:
+
+    Make sure the image is free tier eligible (denoted by a yellow star).
+    I use an image with a "Root Store" of "ebs", as this means that even if this particular instance dies, I can spin up a new instance and reattach the same disk.
+    64-bit image is suggested.
+    I’ve done most of my testing on Ubuntu Maverick (10.10), but other recent Ubuntu platforms should work as well.  You can see the exact version for an image by reading the "Manifest" field.
+
+In the "U.S East" region, an AMI that matches these criteria is: ami-cef405a7
+
+Select your AMI, and keep the default "Micro" instance.
+
+You will need amazon to create a SSH keypair, which will automatically be "injected" into the instance, allowing you to access the instance remote without a password.  Give this key a name (e.g., notary) and download it to you filesystem.
+
+After downloading the key, make sure it is only accessible to your user:
+
+chmod 600 notary.pem
+
+Once you have launched the instance, you will need to modify its "security group", which by default drops all inbound traffic.  You should open up port 22 for SSH and port 8080 for the notary webserver.   Click on "Security Groups" on the left panel, click on the "default" security group in the table, and view the box at the bottom of the pane.  Select "Inbound" and add two rules:
+
+    Custom TCP Rule, port range = 8080, source = 0.0.0.0/0 , click "Add Rule"
+    Custom TCP Rule, port range = 22, source = 0.0.0.0/0 , click "Add Rule"
+    Click "Apply Rule Changes"
+
+Now you can access your machine remotely.  Click on "Instances" in the left panel and select your instance’s row in the main pane and view the details box at the bottom.  Note the "Public DNS" field, as this is how you will access the machine remotely.  For example, run:
+
+ssh -i notary.pem ubuntu@<insert-public-dns>
+
+Now we are on the Ubuntu server and the real fun can be begin.  We need to install the right dependencies and download the notary code and admin utilities.
+
+sudo apt-get install git-core python-sqlite python-m2crypto python-cherrypy3
+git clone git://github.com/danwent/Perspectives-Server.git
+git clone git://github.com/danwent/psv-admin.git
+
+Now, initialize the setup and start the webserver:
+
+psv-admin/setup.sh
+psv-admin/start_webserver.sh
+
+Now your notary is up and running!  It will respond to notary requests on port 8080 . To see the public key the notary uses to sign all requests, run:
+
+cat Perspectives-Server/notary.pub
+
+This is the public key that can be provided to a Perspectives client to authentic the notary response.  The server code comes with a simple client for you to test.  To query a website to monitor (called a "service-id" with Perspectives), specify it using the form ::2. For example for http://www.google.com, run:
+
+cd Perspectives-Server
+python utilities/simple_client.py www.google.com:443,2 localhost 8080 notary.pub
+
+The first time this you query the notary server, it will not know about a service and will return a 404 error, as the notary -server will launch an "on-demand" probe for that service.  Wait a couple seconds and run the same command again and it should succeed.
+
+A new version of the Perspectives Firefox Client will soon be released that will let you use your own notary servers as well.
+
+By default, this notary server will run a scan of all known service-ids twice a day, as configured using crontab. You can manually run a scan of all services at any point by running:
+
+psv-admin/start_scan.sh
+
+For more information look at Perspectives-Server/README and feel free to ask questions in the comments below.
