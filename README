@@ -19,9 +19,9 @@ Primary Author: Dan Wendlandt (danwent@gmail.com)
 	(e.g. sqlite3 for sqlite, psycopg2 for postgresql, etc.)
 
 
-On debian you can install these using: 
+On debian and ubuntu you can install these using:
 
-apt-get install python-sqlite python-m2crypto python-cherrypy3
+apt-get install python-sqlite python-m2crypto python-cherrypy3 python-sqlalchemy
 
 ==== SETUP ====
 
