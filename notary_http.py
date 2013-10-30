@@ -14,13 +14,13 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from xml.dom.minidom import parseString, getDOMImplementation
+import argparse
+import os
 import struct
 import sys
 import threading 
 import traceback 
-import argparse
-import os
+from xml.dom.minidom import getDOMImplementation
 
 import cherrypy
 
