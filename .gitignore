@@ -3,6 +3,7 @@
 *.priv
 *.pub
 *.sqlite
+*.sql
 
 error.log
 
