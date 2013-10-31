@@ -1,14 +1,17 @@
 #!/bin/bash 
 
-pid=`ps -Af | grep "python notary_http.py" | grep -v grep | awk '{print $2}'`
+logdir=../logs
+logfile=webserver.log
+command='python ../notary_http.py'
+pid=`ps -Af | grep "$command" | grep -v grep | awk '{print $2}'`
 
 if [ -n "$pid" ]
 then
 	kill $pid 
-	echo "Stopped notary_http.py"
+	echo "Stopped notary"
 	date=`date`
-	echo "notary_http.py stopped from script at $date" >> logs/webserver.log
+	echo "notary stopped from script at $date" >> $logdir/$logfile
 else
-	echo "No notary_http.py was running"
+	echo "No notary was running"
 fi 
 

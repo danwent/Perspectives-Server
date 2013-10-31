@@ -1,4 +1,8 @@
 
+sshdir=~/.ssh
+keyfile=id_rsa
+backupdir=../backup
+
 if [ $# != 2 ] 
 then 
 	echo "usage: <git-remote-server> <repo-name>" 
@@ -6,19 +10,19 @@ then
 fi 
 
 # setup backup 
-if ! [ -f ~/.ssh/id_rsa ]
+if ! [ -f $sshdir/$keyfile ]
 then 
 	echo "Generating new SSH key"
 	ssh-keygen -t rsa
 	echo "SSH public key:" 
-	cat ~/.ssh/id_rsa.pub
+	cat $sshdir/$keyfile.pub
 fi 
  
 
-if ! [ -d notary_backup ]  
+if ! [ -d $backupdir ]
 then 
-	mkdir notary_backup
-	cd notary_backup 
+	mkdir $backupdir
+	cd $backupdir
 	git init
 	git remote add origin $1:$2.git
 	git config user.name "$2"

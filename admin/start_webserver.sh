@@ -1,15 +1,17 @@
 #!/bin/bash 
 
-pid=`ps -Af | grep "python notary_http.py" | grep -v grep | awk '{print $2}'`
+logdir=../logs
+logfile=webserver.log
+command='python ../notary_http.py'
+pid=`ps -Af | grep "$command" | grep -v grep | awk '{print $2}'`
 
 if [ -n "$pid" ]
 then
-	echo "notary_http.py is already running" 
+	echo "notary is already running"
 	exit 1
 else
-	echo "starting notary.http.py"
+	echo "starting notary..."
 	date=`date`
-	echo "notary_http.py started from script at $date" >> logs/webserver.log
-	cd Perspectives-Server
-	python notary_http.py notary.sqlite notary.priv >> ../logs/webserver.log 2>&1 &
+	echo "notary started from script at $date" >> $logdir/$logfile
+	$command &
 fi 

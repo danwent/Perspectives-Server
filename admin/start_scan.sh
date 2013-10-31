@@ -3,15 +3,22 @@
 date=`date`
 rate=100
 timeout=10 
+logdir=../logs
+logfile=scanner.log
+command='python ../notary_util/threaded_scanner.py'
 
-if [ 1 -eq `ps -Af | grep "python threaded_scanner.py" | grep -v grep | wc -l` ] 
+if ! [ -d $logdir ]
 then
-	echo "ignoring request to start scan from script because scanner is already running. $date" >> logs/scanner.log
+	mkdir $logdir
+fi
+
+if [ 1 -eq `ps -Af | grep "$command" | grep -v grep | wc -l` ]
+then
+	echo "ignoring request to start scan from script because scanner is already running. $date" >> $logdir/$logfile
 	exit 1
 fi
 
 
-echo "starting scan from script at $date" >> logs/scanner.log
-cd Perspectives-Server
-python utilities/list_service_ids.py notary.sqlite all | python threaded_scanner.py notary.sqlite - $rate $timeout >> ../logs/scanner.log 2>&1 &
+echo "starting scan from script at $date" >> $logdir/$logfile
+python ../notary_util/list_services.py | $command --scans $rate --timeout $timeout >> ../$logdir/$logfile 2>&1 &
 
