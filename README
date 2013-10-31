@@ -120,6 +120,23 @@ for SSL services, though work to have it scan for SSH services is pretty minor.
 
 ==== MORE INFO ====
 
+This depo contains the following directories:
+
+	/admin			Shell scripts to help administer a running notary on unix machines.
+					May or may not be needed depending on your setup.
+	/client			Python modules for connecting to and querying notaries.
+					Only needed for testing your notary setup.
+	/doc			All documentation
+	/doc/upgrades	Step-by-step instructions for upgrading a notary from
+					each version to the next. Not needed if you are running
+					a notary for the first time.
+	/doc/guides		Guides on how to run a notary under various environments (e.g. Amazon)
+	/notary_static	Location of static files served by the notary during use
+	/notary_util	Python modules that depend on the notary database
+	/tests			Location of test scripts, both python modules and manual tests
+	/util			Python modules that do not depend on the notary database
+
+
 See doc/advanced_notary_configuration.txt for tips on improving notary performance.
 
 
