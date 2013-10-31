@@ -4,8 +4,9 @@
 *.pub
 *.sqlite
 *.sql
+*.log
 
-error.log
+logs/
 
 # files the notary may create:
 notary.db.config
