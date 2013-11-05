@@ -5,6 +5,7 @@
 *.sqlite
 *.sql
 *.log
+*.bz2
 
 logs/
 backup/
