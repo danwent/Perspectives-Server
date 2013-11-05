@@ -1,16 +1,17 @@
-#!/bin/bash 
+#!/bin/bash
 
-logdir=../logs
-logfile=webserver.log
-command='python ../notary_http.py'
-pid=`ps -Af | grep "$command" | grep -v grep | awk '{print $2}'`
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $dir/_common_functions.sh
 
-if [ -n "$pid" ]
+do_setup
+
+server_pid=$(get_server_pid)
+
+if [ -n "$server_pid" ]
 then
-	kill $pid 
+	kill $server_pid
 	echo "Stopped notary"
-	date=`date`
-	echo "notary stopped from script at $date" >> $logdir/$logfile
+	echo "notary stopped from script at $date" >> $logdir/$server_logfile
 else
 	echo "No notary was running"
 fi 

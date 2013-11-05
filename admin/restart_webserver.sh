@@ -1,6 +1,8 @@
-#!/bin/bash 
+#!/bin/bash
 
-stop_webserver.sh
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+$dir/stop_webserver.sh
 sleep 1
-start_webserver.sh
+$dir/start_webserver.sh
 

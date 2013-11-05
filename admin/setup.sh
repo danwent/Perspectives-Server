@@ -1,11 +1,9 @@
-#!/bin/bash 
+#!/bin/bash
 
-logdir=../logs
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $dir/_common_functions.sh
 
-if ! [ -d $logdir ]
-then 
-	mkdir $logdir
-fi 
+do_setup
 
 # on launch the database and key pair are automatically created if necessary
 

@@ -1,6 +1,8 @@
 #!/bin/bash 
 
-backupdir=../backup
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $dir/_common_functions.sh
+
 dumpfile=notary_dump.txt
 
 if ! [ -d $backupdir ]

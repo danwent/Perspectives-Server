@@ -1,7 +1,10 @@
+#!/bin/bash
+
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $dir/_common_functions.sh
 
 sshdir=~/.ssh
 keyfile=id_rsa
-backupdir=../backup
 
 if [ $# != 2 ] 
 then 

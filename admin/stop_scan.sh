@@ -1,21 +1,16 @@
-#!/bin/bash 
+#!/bin/bash
 
-logdir=../logs
-logfile=scanner.log
-command='python ../notary_util/threaded_scanner.py'
-pid=`ps -Af | grep "$command" | grep -v grep | awk '{print $2}'`
+dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $dir/_common_functions.sh
 
+do_setup
 
-if ! [ -d $logdir ]
+scan_pid=$(get_scan_pid)
+
+if [ -n "$scan_pid" ];
 then
-	mkdir $logdir
-fi
-
-if [ -n "$pid" ];
-then
-	date=`date`
-	echo "killing scanner from script at $date" >> $logdir/$logfile
-	kill $pid
+	echo "killing scanner from script at $date" >> $logdir/$scan_logfile
+	kill $scan_pid
 else
 	echo "Scanner is not running"
 fi
