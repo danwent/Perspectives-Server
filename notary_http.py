@@ -416,7 +416,10 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 # IMPORTANT PRIVACY SETTINGS!
 			 # we do *not* want to record any information about clients
 			 'log.access_file' : None,
+			 # disable all locations of logging request headers
 			 'server.log_request_headers': False,
+			 'cherrypy.lib.cptools.log_request_headers': False,
+			 'tools.log_headers.on': False,
 			 # end of privacy settings
 			 'log.error_file' : '{0}/{1}'.format(notary.LOG_DIR, notary.LOG_FILE),
 			 'log.screen' : False } ) 
