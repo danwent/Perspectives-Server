@@ -17,15 +17,37 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	Depending on your system, you may be able to use something like
 
 	>pip install SQLAlchemy
+	or
+	>sudo apt-get install python-sqlalchemy
 
 	sqlalchemy is used to talk to the database so we don't have hardcoded SQL strings.
 
 
-1. Back up your database (just in case):
+1. Back up your database.
 
->cp notary.slqite notary.sqlite.backup2x
+	Note that simply copying the database file is *NOT* a good solution: if any process is still holding on to the database or something bad happens (such as a power failure) this can result in database corruption.
 
-You can also use the db2file command from the next step.
+	The proper way to back up an sqlite database is:
+
+	TODO: set up screen first
+
+	>sqlite3 notary.sqlite
+	>.output backup.sql
+	>.dump
+	>.output stdout
+	>.quit
+
+	You can also use the db2file command from the next step.
+
+	(to recreate your database from a backup do this:
+
+	>sqlite3 newdb.sqlite
+	>.read backup.sql
+	>.quit
+
+	)
+
+
 
 
 2. Upgrade your database schema
@@ -44,28 +66,106 @@ You can also use the db2file command from the next step.
 	2a.ii) Migrate your data from the old schema to the new one:
 
 		INSERT INTO t_services (name)
-		SELECT DISTINCT service_id FROM observations
+		SELECT DISTINCT service_id FROM observations;
 
 	2a.iii)
 
-		DELETE FROM observations WHERE key IS NULL AND start IS NULL AND end IS NULL
+		DELETE FROM observations WHERE key IS NULL AND start IS NULL AND end IS NULL;
 
 	2a.iv)
 
 		UPDATE observations
 		SET service_id = (SELECT t_services.service_id
 							FROM t_services
-							WHERE t_services.name = observations.service_id )
+							WHERE t_services.name = observations.service_id );
 
-	2a.v)
+	2a.v) Fix any records that would violate check constraints
+		SELECT service_id, key, start, "end"
+		FROM observations
+		WHERE start < 0
+
+			-- if any exist, fix them with
+			UPDATE observations
+			SET start = 0
+			WHERE start < 0
+
+		SELECT service_id, key, start, "end"
+		FROM observations
+		WHERE observations.end < 0
+
+			-- if any exist, fix them with
+			UPDATE observations
+			SET "end" = 0
+			WHERE observations.end < 0
+
+		SELECT service_id, key, start, "end", (start - "end")
+		FROM observations
+		WHERE "end" < start
+
+			-- if any exist, fix them with something like
+			UPDATE observations
+			SET "end" = start
+			WHERE "end" < start
+
+	2a.vi) Fix any records that would violate uniqueness constraints
+
+		-- it's easy to delete records that are *exactly* the same across all fields
+		DELETE FROM observations WHERE ROWID NOT IN (
+			SELECT MIN(ROWID) FROM observations GROUP BY service_id, key, start, end);
+
+		-- rows that have the same end time but different start times (or vice versa) are trickier
+		-- NOTE: the remaining queries is this section may take a long time to run (e.g. 30 minutes or more) depending on the speed on your hardware.
+
+		.output dupes_end.sql
+		select rowid, service_id, key, end, min(start), max(start), max(start) - min(start) as Diff from observations group by service_id, key, end having count(*) > 1 order by Diff DESC;
+		.output stdout
+
+		-- examine that file (you may need to .quit first) and see if the data ranges are acceptable.
+		-- if so (e.g. 1 second difference), you can delete the service_id-key-end duplicates.
+		-- TODO: this query can probably be improved.
+
+		DELETE FROM observations
+		WHERE EXISTS(
+			SELECT NULL
+			FROM observations AS temp
+			WHERE observations.service_id = temp.service_id
+			AND observations.key = temp.key
+			AND observations.end = temp.end
+			GROUP BY service_id, key, end
+			having count(*) > 1
+			AND observations.start > MIN(temp.start)));
+
+		-- same for duplicates of service_id/key/start
+		.output dupes_end.sql
+		select rowid, service_id, key, start, min(end), max(end), max(end) - min(end) as Diff from observations group by service_id, key, start having count(*) > 1 order by Diff DESC;
+		.output stdout
+
+
+		DELETE FROM observations
+		WHERE EXISTS(
+			SELECT NULL
+			FROM observations AS temp
+			WHERE observations.service_id = temp.service_id
+			AND observations.key = temp.key
+			AND observations.start = temp.start
+			GROUP BY service_id, key, start
+			having count(*) > 1
+			AND observations.end < MAX(temp.end));
+
+
+	2a.vii) transfer data to the new table
 
 		INSERT INTO t_observations (service_id, key, start, end)
-			SELECT service_id, key, start, end FROM observations
+			SELECT DISTINCT service_id, key, start, end FROM observations;
 
 
-	2a.vi) Clean up the old schema:
+	2a.viii) Clean up the old schema:
 
 		DROP TABLE observations
+
+	2a.ix) Vacuum!
+
+		VACUUM
 
 
 	=======
