@@ -19,19 +19,19 @@ Scan a list of services and update Observation records in the notary database.
 For running scans without connecting to the database see util/simple_scanner.py.
 """
 
-import sys
-import time 
-import traceback 
-import threading
 import argparse
 import errno
+import os
+import sys
+import threading
+import time 
+import traceback 
 
 import notary_common
 from notary_db import ndb
 
 # TODO: HACK
 # add ..\util to the import path so we can import ssl_scan_sock
-import os
 sys.path.insert(0,
 	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
