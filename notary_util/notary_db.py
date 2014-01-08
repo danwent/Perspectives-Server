@@ -610,6 +610,21 @@ class ndb:
 		"""Return the count of open database connections."""
 		return self._open_connections
 
+	@contextmanager
+	def _get_connection(self):
+		"""
+		Open a raw connection with the database using the SQLAlchemy core, rather than the ORM.
+		Queries that are read-only or do not manipulate any records
+		may be much faster using this type of connection,
+		as raw connections avoid the overhead of ORM objects.
+		"""
+		conn = self.db.connect()
+		try:
+			yield conn
+		finally:
+			conn.close()
+
+
 	# actual data methods follow
 
 	def count_services(self):
