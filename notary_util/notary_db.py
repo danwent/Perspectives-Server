@@ -26,6 +26,7 @@ from contextlib import contextmanager
 import os
 import re
 import sys
+import threading
 import time
 import ConfigParser
 
@@ -229,7 +230,7 @@ class ndb:
 	# (e.g. the scan may start every 24 hours but sites may be updated in a random order)
 	OBSERVATION_UPDATE_LIMIT = 60 * 60 * 48 # 2 days
 
-
+	_conn_count_lock = threading.Lock()
 	_open_connections = 0
 
 	def __init__(self, args):
@@ -597,11 +598,13 @@ class ndb:
 
 	def _on_connection_checkout(self, dbapi_connection, connection_record, connection_proxy):
 		"""Count when a connection is checked out of the connection pool."""
-		self._open_connections += 1
+		with self._conn_count_lock:
+			self._open_connections += 1
 
 	def _on_connection_checkin(self, dbapi_connection, connection_record):
 		"""Count when a connection is checked back in to the connection pool."""
-		self._open_connections -= 1
+		with self._conn_count_lock:
+			self._open_connections -= 1
 
 	def get_connection_count(self):
 		"""Return the count of open database connections."""
