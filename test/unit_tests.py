@@ -162,8 +162,7 @@ class NotaryDBTestCases(unittest.TestCase):
 
 	# important SQL: used frequently by the main app
 	def test_get_all_services(self):
-		with self.ndb.get_session() as session:
-			self.ndb.get_all_services(session)
+		self.ndb.get_all_services()
 
 	def test_get_newest_services(self):
 		with self.ndb.get_session() as session:

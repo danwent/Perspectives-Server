@@ -633,9 +633,13 @@ class ndb:
 			count = session.query(Services.service_id).count()
 			return count
 
-	def get_all_services(self, session):
+	def get_all_services(self):
 		"""Get all service names."""
-		return session.query(Services.name).all()
+		# use raw SQL mode so we don't incur the extra overhead of ORM objects.
+		# the results of this function are not being updated; only read
+		with self._get_connection() as conn:
+			# TODO: could do a windowed amount if too big
+			return conn.execute(select([Services.name])).fetchall()
 
 	def get_newest_services(self, session, end_limit):
 		"""Get service names with an observation newer than end_limit."""

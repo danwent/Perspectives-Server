@@ -62,7 +62,7 @@ ids = None
 with ndb.get_session() as session:
 
 	if args.all:
-		ids = ndb.get_all_services(session)
+		ids = ndb.get_all_services()
 	else:
 		cur_time = int(time.time())
 
