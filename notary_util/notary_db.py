@@ -37,7 +37,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, 
 from sqlalchemy.pool import Pool
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy.schema import CheckConstraint, UniqueConstraint
-from sqlalchemy.sql import select, and_
+from sqlalchemy.sql import select, and_, func
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -629,9 +629,8 @@ class ndb:
 
 	def count_services(self):
 		"""Return a count of the service records."""
-		with self.get_session() as session:
-			count = session.query(Services.service_id).count()
-			return count
+		with self._get_connection() as conn:
+			return conn.execute(select([func.count(Services.service_id)])).first()[0]
 
 	def get_all_service_names(self):
 		"""Get all service names."""
@@ -721,9 +720,8 @@ class ndb:
 	#######
 	def count_observations(self):
 		"""Return a count of the observation records."""
-		with self.get_session() as session:
-			count = session.query(Observations.observation_id).count()
-			return count
+		with self._get_connection() as conn:
+			return conn.execute(select([func.count(Observations.observation_id)])).first()[0]
 
 	def get_all_observations(self, session):
 		"""Get all observations in the database."""
