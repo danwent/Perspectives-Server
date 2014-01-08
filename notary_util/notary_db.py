@@ -633,7 +633,7 @@ class ndb:
 			count = session.query(Services.service_id).count()
 			return count
 
-	def get_all_services(self):
+	def get_all_service_names(self):
 		"""Get all service names."""
 		# use raw SQL mode so we don't incur the extra overhead of ORM objects.
 		# the results of this function are not being updated; only read
@@ -641,12 +641,12 @@ class ndb:
 			# TODO: could do a windowed amount if too big
 			return conn.execute(select([Services.name])).fetchall()
 
-	def get_newest_services(self, end_limit):
+	def get_newest_service_names(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
 		with self._get_connection() as conn:
-			return self._get_newest_services(conn, end_limit)
+			return self._get_newest_service_names(conn, end_limit)
 
-	def _get_newest_services(self, conn, end_limit):
+	def _get_newest_service_names(self, conn, end_limit):
 		"""Get service names with an observation newer than end_limit."""
 		# internal function so we don't have to open a separate database connection
 		return conn.execute(select([Services.name]).where(\
@@ -654,12 +654,12 @@ class ndb:
 				Observations.end > end_limit\
 				))).fetchall()
 
-	def get_oldest_services(self, end_limit):
+	def get_oldest_service_names(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
 		with self._get_connection() as conn:
 			return conn.execute(select([Services.name]).where(\
 				and_(Services.service_id == Observations.service_id,\
-				~Services.name.in_(self._get_newest_services(conn, end_limit))\
+				~Services.name.in_(self._get_newest_service_names(conn, end_limit))\
 				))).fetchall()
 
 	def insert_service(self, session, service_name):

@@ -98,14 +98,14 @@ class NotarySQLEnumeration(unittest.TestCase):
 	#######
 
 	# important SQL: used frequently by the main app
-	def test_get_all_services(self):
-		self.ndb.get_all_services()
+	def test_get_all_service_names(self):
+		self.ndb.get_all_service_names()
 
-	def test_get_newest_services(self):
-		self.ndb.get_newest_services(0)
+	def test_get_newest_service_names(self):
+		self.ndb.get_newest_service_names(0)
 
-	def test_get_oldest_services(self):
-		self.ndb.get_oldest_services(0)
+	def test_get_oldest_service_names(self):
+		self.ndb.get_oldest_service_names(0)
 
 	def test_report_metric(self):
 		self.ndb.report_metric('CacheHit')

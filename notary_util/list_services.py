@@ -60,14 +60,14 @@ if (args.all == False and args.newer == None and args.older == None):
 ids = None
 
 if args.all:
-	ids = ndb.get_all_services()
+	ids = ndb.get_all_service_names()
 else:
 	cur_time = int(time.time())
 
 	if args.older:
-		ids = ndb.get_oldest_services(int(cur_time - (3600 * 24 * args.older)))
+		ids = ndb.get_oldest_service_names(int(cur_time - (3600 * 24 * args.older)))
 	else:
-		ids = ndb.get_newest_services(int(cur_time - (3600 * 24 * args.newer)))
+		ids = ndb.get_newest_service_names(int(cur_time - (3600 * 24 * args.newer)))
 
 if (ids != None):
 	for (name) in ids:
