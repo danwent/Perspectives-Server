@@ -37,7 +37,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, 
 from sqlalchemy.pool import Pool
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy.schema import CheckConstraint, UniqueConstraint
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, and_
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -641,17 +641,26 @@ class ndb:
 			# TODO: could do a windowed amount if too big
 			return conn.execute(select([Services.name])).fetchall()
 
-	def get_newest_services(self, session, end_limit):
+	def get_newest_services(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return session.query(Services.name).join(Observations).\
-			filter(Observations.end > end_limit)
+		with self._get_connection() as conn:
+			return self._get_newest_services(conn, end_limit)
 
-	def get_oldest_services(self, session, end_limit):
+	def _get_newest_services(self, conn, end_limit):
+		"""Get service names with an observation newer than end_limit."""
+		# internal function so we don't have to open a separate database connection
+		return conn.execute(select([Services.name]).where(\
+				and_(Services.service_id == Observations.service_id,\
+				Observations.end > end_limit\
+				))).fetchall()
+
+	def get_oldest_services(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return session.query(Services).join(Observations).filter(\
-			~Services.name.in_(\
-				self.get_newest_services(session, end_limit))).\
-			values(Services.name)
+		with self._get_connection() as conn:
+			return conn.execute(select([Services.name]).where(\
+				and_(Services.service_id == Observations.service_id,\
+				~Services.name.in_(self._get_newest_services(conn, end_limit))\
+				))).fetchall()
 
 	def insert_service(self, session, service_name):
 		"""Add a new Service to the database, and return the Service object."""

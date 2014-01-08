@@ -165,12 +165,10 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.ndb.get_all_services()
 
 	def test_get_newest_services(self):
-		with self.ndb.get_session() as session:
-			self.ndb.get_newest_services(session, 0)
+		self.ndb.get_newest_services(0)
 
 	def test_get_oldest_services(self):
-		with self.ndb.get_session() as session:
-			self.ndb.get_oldest_services(session, 0)
+		self.ndb.get_oldest_services(0)
 
 	def test_report_metric(self):
 		orig = self.ndb.metricsdb
