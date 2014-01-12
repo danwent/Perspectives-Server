@@ -20,17 +20,18 @@ then
 	echo "SSH public key:" 
 	cat $sshdir/$keyfile.pub
 fi 
- 
+
+cd $dir
+cd ..
 
 if ! [ -d $backupdir ]
 then 
 	mkdir $backupdir
-	cd $backupdir
-	git init
-	git remote add origin $1:$2.git
-	git config user.name "$2"
-	git config user.email "<none>"
-	git pull origin master # in case this is a rebuild
 fi 
 
-
+cd $backupdir
+git init
+git remote add origin $1:$2.git
+git config user.name "$2"
+git config user.email "<none>"
+git pull origin master # in case this is a rebuild
