@@ -1,9 +1,11 @@
 
 import base64
 import hashlib
-from M2Crypto import BIO, RSA, EVP
 import sys
 
+from M2Crypto import BIO, RSA
+
+#TODO: use argparse
 if len(sys.argv) != 3: 
 	print "usage: <notary-list-file> <private-key>" 
 	exit(1) 
