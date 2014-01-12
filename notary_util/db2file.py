@@ -80,12 +80,9 @@ def print_tuples(obs):
 	output = [] # use list appending for better performance than string concatenation
 	output.append("# Export of network notary Observations from %s" %args.dbname)
 	output.append("# %s\n" % time.ctime())
+
 	for (service, key, start, end) in obs:
-		output.append("(%s, %s, %s, %s)" % (service, key, start, end))
-
-	output = '\n'.join(output)
-	print >> output_file, output
-
+		output_file.write("({0}, {1}, {2}, {3})".format(service, key, start, end))
 
 
 parser = argparse.ArgumentParser(parents=[ndb.get_parser()], description=__doc__)
