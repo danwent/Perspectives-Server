@@ -671,7 +671,7 @@ class ndb:
 			try:
 				session.add(srv)
 				session.commit()
-			except (ProgrammingError, IntegrityError) as e:
+			except (ProgrammingError, IntegrityError, OperationalError) as e:
 				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
 				srv = None
 
@@ -747,7 +747,7 @@ class ndb:
 					newob.validate()
 					session.add(newob)
 					session.commit()
-				except (ProgrammingError, IntegrityError, ValueError) as e:
+				except (ProgrammingError, IntegrityError, OperationalError, ValueError) as e:
 					print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
 			# else error already logged by previous function
 
@@ -779,7 +779,7 @@ class ndb:
 				else:
 					print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
 						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
-		except (ValueError) as e:
+		except (OperationalError, ValueError) as e:
 			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
 
 	def report_observation(self, service, fp):
