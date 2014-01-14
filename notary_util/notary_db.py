@@ -794,19 +794,23 @@ class ndb:
 		most_recent_key = None
 		most_recent_time = 0
 
-		with self.get_session() as session:
-			obs = self.get_observations(session, service)
+		try:
+			with self.get_session() as session:
+				obs = self.get_observations(session, service)
 
-			# calculate the most recently seen key
-			# TODO: there has got to be a more efficient way to do this with a query
-			for (service, key, start, end) in obs:
-				if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
-					most_recent_time_by_key[key] = end
+				# calculate the most recently seen key
+				# TODO: there has got to be a more efficient way to do this with a query
+				for (service, key, start, end) in obs:
+					if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+						most_recent_time_by_key[key] = end
 
-				for k in most_recent_time_by_key:
-					if most_recent_time_by_key[k] > most_recent_time:
-						most_recent_key = k
-						most_recent_time = most_recent_time_by_key[k]
+					for k in most_recent_time_by_key:
+						if most_recent_time_by_key[k] > most_recent_time:
+							most_recent_key = k
+							most_recent_time = most_recent_time_by_key[k]
+		except Exception as e:
+			# error already reported by get_observations()
+			return
 
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.
