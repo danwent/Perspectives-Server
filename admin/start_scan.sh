@@ -18,6 +18,9 @@ fi
 
 
 echo "starting scan from script at $date" >> $logdir/$scan_logfile
+# Important: redirect stderr to stdout,
+# or python throws the error "IOError: [Errno 5] Input/output error"
+# when it is unable to write to stderr when no user is attached
 scan_cmd=`python notary_util/list_services.py | $scan_command --scans $rate --timeout $timeout >> $logdir/$scan_logfile 2>&1 &`
 echo $scan_cmd
 `$scan_cmd`

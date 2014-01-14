@@ -19,6 +19,9 @@ then
 	exit 1
 else
 	echo "starting notary..."
-	$server_command $server_options &
+	# Important: redirect stderr to stdout,
+	# or python throws the error "IOError: [Errno 5] Input/output error"
+	# when it is unable to write to stderr when no user is attached
+	`$server_command $server_options 2>&1 &`
 	echo "notary started from script at $date" >> $logdir/$server_logfile
 fi 
