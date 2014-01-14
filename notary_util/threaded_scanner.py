@@ -94,7 +94,10 @@ class ScanThread(threading.Thread):
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
 				res_list.append((self.sid,fp))
-			# else error already logged
+			else:
+				# error already logged, but tally error count
+				stats.failures += 1
+				stats.failure_socket += 1
 		except Exception, e:
 			self.record_failure(e) 
 
@@ -119,6 +122,7 @@ class GlobalStats():
 		self.failure_conn_reset = 0
 		self.failure_dns = 0 
 		self.failure_ssl_alert = 0
+		self.failure_socket = 0
 		self.failure_other = 0 
 	
 
@@ -196,13 +200,14 @@ for sid in all_sids:
 				print "  details: timeouts = %s, " \
 					"ssl-alerts = %s, no-route = %s, " \
 					"conn-refused = %s, conn-reset = %s,"\
-					"dns = %s, other = %s" % \
+					"dns = %s, socket = %s, other = %s" % \
 					(stats.failure_timeouts,
 					stats.failure_ssl_alert,
 					stats.failure_no_route,
 					stats.failure_conn_refused,
 					stats.failure_conn_reset,
 					stats.failure_dns,
+					stats.failure_socket,
 					stats.failure_other)
 				sys.stdout.flush()
 
