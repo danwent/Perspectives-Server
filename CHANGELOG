@@ -6,6 +6,31 @@ Format:
 * bug or behavior fix
 
 
+3.3
+-----
+* Disable logging of request headers in newer versions of CherryPy
+* Send all notary and scanner logs to the /logs directory (one central place)
+* Fix error counts of socket errors while scanning
+* Catch exceptions when reporting observations and committing database records
++ Add bash scripts to help administer notaries under unix environments
+	(Dan's original shell scripts from the psv-admin depo updated for the current version)
+	* Update admin scripts so they can be run from any location
+		(they calculate their own path before running)
+	* Update scripts to share common variables and functions
+	* Calculate paths for crontab jobs automatically
+		(then it doesn't matter where the notary software is located on the drive)
++ Add context manager for direct database connections
+* Convert listing and counting queries to use raw db connections rather than ORM sessions (this is much faster when we don't need to work with database objects)
+* Add thread locks for database connection counting
+* Fix db2file.py to print records in a loop rather than joining them all together (uses far less RAM)
+* Improve documentation:
+	* Improve docs on upgrading notaries (both from 2->3.2 and 3.1->3.2)
+	+ Add guide on running a notary hosted on Amazon Web Services (AWS)
+		(Dan's original v2 guide updated for the current version)
+	* Add sqlalchemy to the installation instructions
+	* Explain all of the directories in this depo inside the README
+
+
 3.2
 ---
 + Add support for caching data with local system memory only (--pycache).
