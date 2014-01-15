@@ -1,0 +1,8 @@
+Version 3.3 contains only code and documentation changes; all data stays the same.
+
+Therefore - upgrading is easy! Simply sync the code and restart your server!
+
+1. >git pull
+2. Restart the server
+
+Congrats, you're done! Enjoy the features and bug fixes :)
