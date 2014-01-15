@@ -48,9 +48,13 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	)
 
 
+2. Sync the new code
+
+	>cd Perspectives-Server
+	>git pull
 
 
-2. Upgrade your database schema
+3. Upgrade your database schema
 
 
 	=======
@@ -59,27 +63,27 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	This may be the only option if your database has a large number of records (e.g. 3 million observations)
 
 
-	2a.i) Open your database once with the updated python script to create the new schema
+	3a.i) Open your database once with the updated python script to create the new schema
 
 		> python notary_http.py
 
-	2a.ii) Migrate your data from the old schema to the new one:
+	3a.ii) Migrate your data from the old schema to the new one:
 
 		INSERT INTO t_services (name)
 		SELECT DISTINCT service_id FROM observations;
 
-	2a.iii)
+	3a.iii)
 
 		DELETE FROM observations WHERE key IS NULL AND start IS NULL AND end IS NULL;
 
-	2a.iv)
+	3a.iv)
 
 		UPDATE observations
 		SET service_id = (SELECT t_services.service_id
 							FROM t_services
 							WHERE t_services.name = observations.service_id );
 
-	2a.v) Fix any records that would violate check constraints
+	3a.v) Fix any records that would violate check constraints
 		SELECT service_id, key, start, "end"
 		FROM observations
 		WHERE start < 0
@@ -107,7 +111,7 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 			SET "end" = start
 			WHERE "end" < start
 
-	2a.vi) Fix any records that would violate uniqueness constraints
+	3a.vi) Fix any records that would violate uniqueness constraints
 
 		-- it's easy to delete records that are *exactly* the same across all fields
 		DELETE FROM observations WHERE ROWID NOT IN (
@@ -153,17 +157,17 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 			AND observations.end < MAX(temp.end));
 
 
-	2a.vii) transfer data to the new table
+	3a.vii) transfer data to the new table
 
 		INSERT INTO t_observations (service_id, key, start, end)
 			SELECT DISTINCT service_id, key, start, end FROM observations;
 
 
-	2a.viii) Clean up the old schema:
+	3a.viii) Clean up the old schema:
 
 		DROP TABLE observations
 
-	2a.ix) Vacuum!
+	3a.ix) Vacuum!
 
 		VACUUM
 
@@ -172,39 +176,39 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	Option b: export and re-import your data.
 	This option is useful if you prefer not to work with SQL.
 
-	2b.i) Export your data using the special db2file_2to3.py module.
+	3b.i) Export your data using the special db2file_2to3.py module.
 
 		This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
 
 		>python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
 
-	2b.ii) Rename your database.
+	3b.ii) Rename your database.
 
 		>mv notary.sqlite notary_2x.sqlite
 
 		You can also specify a different database name when importing your data - perspectives will create the database and schema if they don't exist.
 
-	2b.iii) Import your data
+	3b.iii) Import your data
 
 		>python notary_util\file2db.py upgraded_data.txt
 
 
 
 
-3. Check your settings
+4. Check your settings
 
 Many of the hardcoded settings from 2.0 have been converted to command-line arguments. Many of the required arguments have been given defaults. You can use the '-h' or '--help' switches to see the usage for each module - check how your old notary settings compare against the new settings and adjust anything you want to keep.
 
 One of the biggest improvements with the 3.x notary is data caching. You may want to consider setting up a dedicated caching server or at least using the --pycache argument.
 
 
-4. Run your server!
+5. Run your server!
 
 The command is now much shorter:
 
 >python notary_http.py
 
 
-5. You're done!
+6. You're done!
 
 Congratulations, and enjoy the new features :)
