@@ -38,7 +38,7 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "3.3a"
+	VERSION = "3.3"
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
