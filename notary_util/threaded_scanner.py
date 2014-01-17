@@ -19,19 +19,19 @@ Scan a list of services and update Observation records in the notary database.
 For running scans without connecting to the database see util/simple_scanner.py.
 """
 
-import sys
-import time 
-import traceback 
-import threading
 import argparse
 import errno
+import os
+import sys
+import threading
+import time 
+import traceback 
 
 import notary_common
 from notary_db import ndb
 
 # TODO: HACK
 # add ..\util to the import path so we can import ssl_scan_sock
-import os
 sys.path.insert(0,
 	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
@@ -94,7 +94,10 @@ class ScanThread(threading.Thread):
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
 				res_list.append((self.sid,fp))
-			# else error already logged
+			else:
+				# error already logged, but tally error count
+				stats.failures += 1
+				stats.failure_socket += 1
 		except Exception, e:
 			self.record_failure(e) 
 
@@ -119,6 +122,7 @@ class GlobalStats():
 		self.failure_conn_reset = 0
 		self.failure_dns = 0 
 		self.failure_ssl_alert = 0
+		self.failure_socket = 0
 		self.failure_other = 0 
 	
 
@@ -196,13 +200,14 @@ for sid in all_sids:
 				print "  details: timeouts = %s, " \
 					"ssl-alerts = %s, no-route = %s, " \
 					"conn-refused = %s, conn-reset = %s,"\
-					"dns = %s, other = %s" % \
+					"dns = %s, socket = %s, other = %s" % \
 					(stats.failure_timeouts,
 					stats.failure_ssl_alert,
 					stats.failure_no_route,
 					stats.failure_conn_refused,
 					stats.failure_conn_reset,
 					stats.failure_dns,
+					stats.failure_socket,
 					stats.failure_other)
 				sys.stdout.flush()
 

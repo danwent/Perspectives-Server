@@ -1,0 +1,214 @@
+So you're upgrading to Perspectives Server version 3! Congratulations :) Here's how.
+
+
+0. Install Prerequisites:
+
+	a) Upgrade to python 2.7.
+
+	http://www.python.org/getit/
+
+	This is required for the 'argparse' module.
+
+
+	b) Install sqlalchemy
+
+	See http://docs.sqlalchemy.org/ru/latest/intro.html#installation-guide
+
+	Depending on your system, you may be able to use something like
+
+	>pip install SQLAlchemy
+	or
+	>sudo apt-get install python-sqlalchemy
+
+	sqlalchemy is used to talk to the database so we don't have hardcoded SQL strings.
+
+
+1. Back up your database.
+
+	Note that simply copying the database file is *NOT* a good solution: if any process is still holding on to the database or something bad happens (such as a power failure) this can result in database corruption.
+
+	The proper way to back up an sqlite database is:
+
+	TODO: set up screen first
+
+	>sqlite3 notary.sqlite
+	>.output backup.sql
+	>.dump
+	>.output stdout
+	>.quit
+
+	You can also use the db2file command from the next step.
+
+	(to recreate your database from a backup do this:
+
+	>sqlite3 newdb.sqlite
+	>.read backup.sql
+	>.quit
+
+	)
+
+
+2. Sync the new code
+
+	>cd Perspectives-Server
+	>git pull
+
+
+3. Upgrade your database schema
+
+
+	=======
+	Option a: upgrade the database in-place.
+	This is the recommended option. It will usually be faster.
+	This may be the only option if your database has a large number of records (e.g. 3 million observations)
+
+
+	3a.i) Open your database once with the updated python script to create the new schema
+
+		> python notary_http.py
+
+	3a.ii) Migrate your data from the old schema to the new one:
+
+		INSERT INTO t_services (name)
+		SELECT DISTINCT service_id FROM observations;
+
+	3a.iii)
+
+		DELETE FROM observations WHERE key IS NULL AND start IS NULL AND end IS NULL;
+
+	3a.iv)
+
+		UPDATE observations
+		SET service_id = (SELECT t_services.service_id
+							FROM t_services
+							WHERE t_services.name = observations.service_id );
+
+	3a.v) Fix any records that would violate check constraints
+		SELECT service_id, key, start, "end"
+		FROM observations
+		WHERE start < 0
+
+			-- if any exist, fix them with
+			UPDATE observations
+			SET start = 0
+			WHERE start < 0
+
+		SELECT service_id, key, start, "end"
+		FROM observations
+		WHERE observations.end < 0
+
+			-- if any exist, fix them with
+			UPDATE observations
+			SET "end" = 0
+			WHERE observations.end < 0
+
+		SELECT service_id, key, start, "end", (start - "end")
+		FROM observations
+		WHERE "end" < start
+
+			-- if any exist, fix them with something like
+			UPDATE observations
+			SET "end" = start
+			WHERE "end" < start
+
+	3a.vi) Fix any records that would violate uniqueness constraints
+
+		-- it's easy to delete records that are *exactly* the same across all fields
+		DELETE FROM observations WHERE ROWID NOT IN (
+			SELECT MIN(ROWID) FROM observations GROUP BY service_id, key, start, end);
+
+		-- rows that have the same end time but different start times (or vice versa) are trickier
+		-- NOTE: the remaining queries is this section may take a long time to run (e.g. 30 minutes or more) depending on the speed on your hardware.
+
+		.output dupes_end.sql
+		select rowid, service_id, key, end, min(start), max(start), max(start) - min(start) as Diff from observations group by service_id, key, end having count(*) > 1 order by Diff DESC;
+		.output stdout
+
+		-- examine that file (you may need to .quit first) and see if the data ranges are acceptable.
+		-- if so (e.g. 1 second difference), you can delete the service_id-key-end duplicates.
+		-- TODO: this query can probably be improved.
+
+		DELETE FROM observations
+		WHERE EXISTS(
+			SELECT NULL
+			FROM observations AS temp
+			WHERE observations.service_id = temp.service_id
+			AND observations.key = temp.key
+			AND observations.end = temp.end
+			GROUP BY service_id, key, end
+			having count(*) > 1
+			AND observations.start > MIN(temp.start)));
+
+		-- same for duplicates of service_id/key/start
+		.output dupes_end.sql
+		select rowid, service_id, key, start, min(end), max(end), max(end) - min(end) as Diff from observations group by service_id, key, start having count(*) > 1 order by Diff DESC;
+		.output stdout
+
+
+		DELETE FROM observations
+		WHERE EXISTS(
+			SELECT NULL
+			FROM observations AS temp
+			WHERE observations.service_id = temp.service_id
+			AND observations.key = temp.key
+			AND observations.start = temp.start
+			GROUP BY service_id, key, start
+			having count(*) > 1
+			AND observations.end < MAX(temp.end));
+
+
+	3a.vii) transfer data to the new table
+
+		INSERT INTO t_observations (service_id, key, start, end)
+			SELECT DISTINCT service_id, key, start, end FROM observations;
+
+
+	3a.viii) Clean up the old schema:
+
+		DROP TABLE observations
+
+	3a.ix) Vacuum!
+
+		VACUUM
+
+
+	=======
+	Option b: export and re-import your data.
+	This option is useful if you prefer not to work with SQL.
+
+	3b.i) Export your data using the special db2file_2to3.py module.
+
+		This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
+
+		>python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
+
+	3b.ii) Rename your database.
+
+		>mv notary.sqlite notary_2x.sqlite
+
+		You can also specify a different database name when importing your data - perspectives will create the database and schema if they don't exist.
+
+	3b.iii) Import your data
+
+		>python notary_util\file2db.py upgraded_data.txt
+
+
+
+
+4. Check your settings
+
+Many of the hardcoded settings from 2.0 have been converted to command-line arguments. Many of the required arguments have been given defaults. You can use the '-h' or '--help' switches to see the usage for each module - check how your old notary settings compare against the new settings and adjust anything you want to keep.
+
+One of the biggest improvements with the 3.x notary is data caching. You may want to consider setting up a dedicated caching server or at least using the --pycache argument.
+
+
+5. Run your server!
+
+The command is now much shorter:
+
+>python notary_http.py
+
+
+6. You're done!
+
+Congratulations, and enjoy the new features :)

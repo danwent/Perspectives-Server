@@ -14,13 +14,14 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from xml.dom.minidom import parseString, getDOMImplementation
+import argparse
+import errno
+import os
 import struct
 import sys
 import threading 
 import traceback 
-import argparse
-import os
+from xml.dom.minidom import getDOMImplementation
 
 import cherrypy
 
@@ -37,11 +38,13 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "3.2"
+	VERSION = "3.3"
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
+	LOG_DIR = 'logs'
+	LOG_FILE = 'webserver.log'
 
 	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
 
@@ -109,6 +112,9 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
+		if not args.echo_screen:
+			self.create_folder(self.LOG_DIR)
+
 		self.use_sni = args.sni
 		self.create_static_index()
 		self.args = args
@@ -174,6 +180,18 @@ class NotaryHTTPServer:
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:
 			print >> i, lines
+
+	def create_folder(self, path):
+		"""Create a folder if it doesn't already exist."""
+		# use try/except here to avoid a race condition when checking for existance
+		try:
+			os.makedirs(path)
+		except OSError as e:
+			if (os.path.exists(path) and not os.path.isdir(path)):
+				print >> sys.stderr, "ERROR: Could not create log directory '{0}': a file with that name already exists.".format(path)
+				exit(1)
+			elif e.errno != errno.EEXIST:
+				raise
 
 	def get_xml(self, host, port, service_type):
 		"""Fetch the xml response for a given service."""
@@ -398,9 +416,12 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 # IMPORTANT PRIVACY SETTINGS!
 			 # we do *not* want to record any information about clients
 			 'log.access_file' : None,
+			 # disable all locations of logging request headers
 			 'server.log_request_headers': False,
+			 'cherrypy.lib.cptools.log_request_headers': False,
+			 'tools.log_headers.on': False,
 			 # end of privacy settings
-			 'log.error_file' : 'error.log', 
+			 'log.error_file' : '{0}/{1}'.format(notary.LOG_DIR, notary.LOG_FILE),
 			 'log.screen' : False } ) 
 
 if (notary.args.echo_screen):

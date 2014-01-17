@@ -6,12 +6,12 @@ You only need follow these steps in the unlikely event that you are upgrading a 
 
 ---
 
-How to upgrade the database:
+How to upgrade:
 
 
 1. Stop your notary
 
-2. Update/sinc the code
+2. Update/sync the code
 
 >git pull
 
@@ -73,10 +73,10 @@ How to upgrade the database:
 
 		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_start_end CHECK (start <= t_observations.end)
 
-		-- TODO! add unique constraints x2
-		-- need to clean up records that don't match :-/
-		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
-		-- ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, end)
+		-- add unique constraints
+		-- TODO: clean up records that don't fit the constraint
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u1 UNIQUE (service_id, key, start)
+		ALTER TABLE t_observations ADD CONSTRAINT chk_t_observations_u2 UNIQUE (service_id, key, "end")
 
 		-- 5) add NOT NULL
 
@@ -91,6 +91,16 @@ How to upgrade the database:
 		ALTER TABLE t_metrics ALTER COLUMN event_id SET NOT NULL;
 		ALTER TABLE t_metrics ALTER COLUMN event_type_id SET NOT NULL;
 		ALTER TABLE t_metrics ALTER COLUMN date SET NOT NULL;
+
+		-- 6) delete old, unneeded metric records
+		-- (these metric types are no longer used)
+		DELETE FROM t_metrics
+		WHERE t_metrics.event_type_id IN (
+			SELECT event_type_id FROM t_event_types WHERE
+			t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated'))
+
+		DELETE from t_event_types
+		WHERE t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated')
 
 
 	sqlite:
@@ -108,7 +118,18 @@ How to upgrade the database:
 		    FOREIGN KEY ( event_type_id ) REFERENCES t_event_types ( event_type_id )
 		);
 
-		INSERT INTO t_metrics SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
+		-- 1a) delete old, unneeded metric records
+		-- (these metric types are no longer used)
+		DELETE FROM t_metrics_old
+		WHERE t_metrics_old.event_type_id IN (
+			SELECT event_type_id FROM t_event_types WHERE
+			t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated'))
+
+		DELETE from t_event_types
+		WHERE t_event_types.name IN ('ServiceScanKeyUpdated', 'ServiceScanPrevKeyUpdated')
+
+		INSERT INTO t_metrics (event_id, event_type_id, date, comment)
+		SELECT event_id, event_type_id, date, comment FROM t_metrics_old;
 
 		DROP TABLE t_metrics_old;
 		DROP TABLE t_machines;

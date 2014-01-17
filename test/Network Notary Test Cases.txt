@@ -106,3 +106,29 @@ pycache arguments:
 - Is it case insensitive?
 - Does the cache have to be at least 1MB?
 
+
+Admin Shell Scripts
+-------------------
+- Does the setup script create the logs directory?
+- Does the setup script properly add the cron entries to crontab?
+	- Are existing crontab entries left untouched?
+	- Does running the setup script multiple times not damage the crontab list?
+
+- Can you start and stop the webserver when nothing else is running?
+	- From any directory?
+	- Are stderr and stdout properly sent to the logfile?
+- Can you start and stop the scanning process when nothing else is running?
+	- From any directory?
+	- Are stderr and stdout properly sent to the logfile?
+
+- Can you start and stop the webserver when the scanner is already running?
+	- Is the scan process left alone?
+- Can you start and stop the scan process when the webserver is already running?
+	- Is the webserver process left alone?
+
+- Does the webserver start when the machine reboots?
+- If the webserver stops (e.g. due to an error) does it start again at the next five minute clock interval (i.e. does the crontab job start it again)?
+
+- Does the restart script restart the webserver?
+	- Does it leave the scan process alone?
+

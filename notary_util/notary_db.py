@@ -26,6 +26,7 @@ from contextlib import contextmanager
 import os
 import re
 import sys
+import threading
 import time
 import ConfigParser
 
@@ -36,7 +37,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session, relationship, backref, 
 from sqlalchemy.pool import Pool
 from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError, ResourceClosedError
 from sqlalchemy.schema import CheckConstraint, UniqueConstraint
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, and_, func
 from sqlalchemy import Column, Integer, String, Index, ForeignKey
 
 
@@ -229,7 +230,7 @@ class ndb:
 	# (e.g. the scan may start every 24 hours but sites may be updated in a random order)
 	OBSERVATION_UPDATE_LIMIT = 60 * 60 * 48 # 2 days
 
-
+	_conn_count_lock = threading.Lock()
 	_open_connections = 0
 
 	def __init__(self, args):
@@ -597,39 +598,68 @@ class ndb:
 
 	def _on_connection_checkout(self, dbapi_connection, connection_record, connection_proxy):
 		"""Count when a connection is checked out of the connection pool."""
-		self._open_connections += 1
+		with self._conn_count_lock:
+			self._open_connections += 1
 
 	def _on_connection_checkin(self, dbapi_connection, connection_record):
 		"""Count when a connection is checked back in to the connection pool."""
-		self._open_connections -= 1
+		with self._conn_count_lock:
+			self._open_connections -= 1
 
 	def get_connection_count(self):
 		"""Return the count of open database connections."""
 		return self._open_connections
 
+	@contextmanager
+	def _get_connection(self):
+		"""
+		Open a raw connection with the database using the SQLAlchemy core, rather than the ORM.
+		Queries that are read-only or do not manipulate any records
+		may be much faster using this type of connection,
+		as raw connections avoid the overhead of ORM objects.
+		"""
+		conn = self.db.connect()
+		try:
+			yield conn
+		finally:
+			conn.close()
+
+
 	# actual data methods follow
 
 	def count_services(self):
 		"""Return a count of the service records."""
-		with self.get_session() as session:
-			count = session.query(Services.service_id).count()
-			return count
+		with self._get_connection() as conn:
+			return conn.execute(select([func.count(Services.service_id)])).first()[0]
 
-	def get_all_services(self, session):
+	def get_all_service_names(self):
 		"""Get all service names."""
-		return session.query(Services.name).all()
+		# use raw SQL mode so we don't incur the extra overhead of ORM objects.
+		# the results of this function are not being updated; only read
+		with self._get_connection() as conn:
+			# TODO: could do a windowed amount if too big
+			return conn.execute(select([Services.name])).fetchall()
 
-	def get_newest_services(self, session, end_limit):
+	def get_newest_service_names(self, end_limit):
 		"""Get service names with an observation newer than end_limit."""
-		return session.query(Services.name).join(Observations).\
-			filter(Observations.end > end_limit)
+		with self._get_connection() as conn:
+			return self._get_newest_service_names(conn, end_limit)
 
-	def get_oldest_services(self, session, end_limit):
+	def _get_newest_service_names(self, conn, end_limit):
+		"""Get service names with an observation newer than end_limit."""
+		# internal function so we don't have to open a separate database connection
+		return conn.execute(select([Services.name]).where(\
+				and_(Services.service_id == Observations.service_id,\
+				Observations.end > end_limit\
+				))).fetchall()
+
+	def get_oldest_service_names(self, end_limit):
 		"""Get service names with a MOST RECENT observation that is older than end_limit."""
-		return session.query(Services).join(Observations).filter(\
-			~Services.name.in_(\
-				self.get_newest_services(session, end_limit))).\
-			values(Services.name)
+		with self._get_connection() as conn:
+			return conn.execute(select([Services.name]).where(\
+				and_(Services.service_id == Observations.service_id,\
+				~Services.name.in_(self._get_newest_service_names(conn, end_limit))\
+				))).fetchall()
 
 	def insert_service(self, session, service_name):
 		"""Add a new Service to the database, and return the Service object."""
@@ -641,7 +671,7 @@ class ndb:
 			try:
 				session.add(srv)
 				session.commit()
-			except (ProgrammingError, IntegrityError) as e:
+			except (ProgrammingError, IntegrityError, OperationalError) as e:
 				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
 				srv = None
 
@@ -658,41 +688,36 @@ class ndb:
 			print >> sys.stderr, "Could not add services - no services in list."
 			return
 
-		try:
-			conn = self.db.connect()
+		with self._get_connection() as conn:
+			try:
+				# select duplicates that already exist in the database
+				dupes = conn.execute(select([Services.name], Services.name.in_(services))).fetchall()
 
-			# select duplicates that already exist in the database
-			dupes = conn.execute(select([Services.name], Services.name.in_(services))).fetchall()
+				# convert dupes to dictionary so we can easily test against them
+				dupes_dict = dict((dup[0], True) for dup in dupes)
 
-			# convert dupes to dictionary so we can easily test against them
-			dupes_dict = dict((dup[0], True) for dup in dupes)
+				# remove any entries that already exist in the database
+				# so that inserting bulk records doesn't throw an IntegrityError.
+				# At the same time, modify entries to be dictionaries
+				# with the correct key/value mapping to be used in a bulk insert.
+				# doing this at the same time saves us from looping through the list twice.
+				services = [{'name': service_name} for service_name in services
+					if service_name not in dupes_dict]
 
-			# remove any entries that already exist in the database
-			# so that inserting bulk records doesn't throw an IntegrityError.
-			# At the same time, modify entries to be dictionaries
-			# with the correct key/value mapping to be used in a bulk insert.
-			# doing this at the same time saves us from looping through the list twice.
-			services = [{'name': service_name} for service_name in services
-				if service_name not in dupes_dict]
+				# any services left in the list will be new entries
+				if (len(services)) > 0:
+					conn.execute(Services.__table__.insert(), services)
 
-			# any services left in the list will be new entries
-			if (len(services)) > 0:
-				conn.execute(Services.__table__.insert(), services)
-
-		except IntegrityError as e:
-			print >> sys.stderr, "Error adding bulk services: '{0}'".format(e)
-
-		finally:
-			conn.close()
+			except IntegrityError as e:
+				print >> sys.stderr, "Error adding bulk services: '{0}'".format(e)
 
 		return
 
 	#######
 	def count_observations(self):
 		"""Return a count of the observation records."""
-		with self.get_session() as session:
-			count = session.query(Observations.observation_id).count()
-			return count
+		with self._get_connection() as conn:
+			return conn.execute(select([func.count(Observations.observation_id)])).first()[0]
 
 	def get_all_observations(self, session):
 		"""Get all observations in the database."""
@@ -722,7 +747,7 @@ class ndb:
 					newob.validate()
 					session.add(newob)
 					session.commit()
-				except (ProgrammingError, IntegrityError, ValueError) as e:
+				except (ProgrammingError, IntegrityError, OperationalError, ValueError) as e:
 					print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
 			# else error already logged by previous function
 
@@ -754,7 +779,7 @@ class ndb:
 				else:
 					print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
 						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
-		except (ValueError) as e:
+		except (OperationalError, ValueError) as e:
 			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
 
 	def report_observation(self, service, fp):
@@ -769,19 +794,23 @@ class ndb:
 		most_recent_key = None
 		most_recent_time = 0
 
-		with self.get_session() as session:
-			obs = self.get_observations(session, service)
+		try:
+			with self.get_session() as session:
+				obs = self.get_observations(session, service)
 
-			# calculate the most recently seen key
-			# TODO: there has got to be a more efficient way to do this with a query
-			for (service, key, start, end) in obs:
-				if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
-					most_recent_time_by_key[key] = end
+				# calculate the most recently seen key
+				# TODO: there has got to be a more efficient way to do this with a query
+				for (service, key, start, end) in obs:
+					if key not in most_recent_time_by_key or end > most_recent_time_by_key[key]:
+						most_recent_time_by_key[key] = end
 
-				for k in most_recent_time_by_key:
-					if most_recent_time_by_key[k] > most_recent_time:
-						most_recent_key = k
-						most_recent_time = most_recent_time_by_key[k]
+					for k in most_recent_time_by_key:
+						if most_recent_time_by_key[k] > most_recent_time:
+							most_recent_key = k
+							most_recent_time = most_recent_time_by_key[k]
+		except Exception as e:
+			# error already reported by get_observations()
+			return
 
 		if most_recent_key == fp: # "fingerprint"
 			# this key matches the most recently seen key before this observation.

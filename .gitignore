@@ -2,9 +2,14 @@
 *.pyc
 *.priv
 *.pub
+*.pem
 *.sqlite
+*.sql
+*.log
+*.bz2
 
-error.log
+logs/
+backup/
 
 # files the notary may create:
 notary.db.config
