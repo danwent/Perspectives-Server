@@ -210,7 +210,7 @@ def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 	try:
 		dns, port = service.split(",")[0].split(":")
 	except (ValueError):
-		raise ValueError("Service must be of the form 'host:port'")
+		raise ValueError("Service '{0}' must be of the form 'host:port'".format(service))
 
 	# if we want to try SNI, do such a scan but if that
 	# scan fails with an SSL alert, retry with a non SNI request
@@ -221,7 +221,7 @@ def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 			except SSLAlertException:
 				pass
 		else:
-			raise ValueError("Service must be of the form 'host:port'")
+			raise ValueError("Service '{0}' must be of the form 'host:port'".format(service))
 
 	return _run_scan(dns,port,timeout_sec,False)
 
