@@ -293,8 +293,9 @@ def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 		if dns[-1:].isalpha():
 			try:
 				return _run_scan(dns,port,timeout_sec,True)
-			except SSLAlertException:
-				pass
+			except SSLAlertException as e:
+				print >> sys.stderr, "Received SSL Alert during SNI scan of {0}:{1} - '{2}'.".format(dns, port, e) +\
+					" Will re-run with non-SNI scan."
 		else:
 			raise ValueError("Service '{0}' must be of the form 'host:port'".format(service))
 
@@ -316,7 +317,9 @@ if __name__ == "__main__":
 		fp = attempt_observation_for_service(service, 10, args.sni)
 		if (fp != None):
 			print "Successful scan complete: '%s' has key '%s' " % (service,fp)
-			# else error already logged
+
+	except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
+		print >> sys.stderr, e
 	except:
 		print >> sys.stderr, "Error scanning for %s" % (service)
 		traceback.print_exc(file=sys.stderr)
