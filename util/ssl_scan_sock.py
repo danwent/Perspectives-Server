@@ -96,6 +96,10 @@ def _do_connect(s, host, port, timeout_sec):
 				raise
 
 def _read_record(sock,timeout_sec):
+	"""
+	Decipher a TLS record.
+	Return the record type and (still packed) record data.
+	"""
 	rec_start = _read_data(sock,5,timeout_sec)
 	if len(rec_start) != 5: 
 		raise Exception("Error: unable to read start of record")
@@ -107,6 +111,10 @@ def _read_record(sock,timeout_sec):
 	return (rec_type, rest_of_rec)
 
 def _get_all_handshake_protocols(rec_data):
+	"""
+	Decipher a TLS handshake protocol record.
+	Return a list of (message_type, data) tuples.
+	"""
 	protos = [] 
 	while len(rec_data) > 0: 
 		t, b1,b2,b3 = struct.unpack('!BBBB',rec_data[0:4])
@@ -118,6 +126,10 @@ def _get_all_handshake_protocols(rec_data):
 # rfc 2246 says the server cert is the first one
 # in the chain, so ignore everything else 
 def _get_server_cert_from_protocol(proto_data):
+	"""
+	Decipher a TLS Certificate message
+	(i.e. the bytes from one message inside a handshake protocol record).
+	"""
 	proto_data = proto_data[3:] # get rid of 3-bytes describing length of all certs
 	(b1,b2,b3) = struct.unpack("!BBB",proto_data[0:3])
 	cert_len = (b1 << 16) | (b2 << 8) | b3
@@ -131,6 +143,10 @@ def _get_server_cert_from_protocol(proto_data):
 	return fp[:-1] 
 		
 def _run_scan(dns, port, timeout_sec, sni_query):
+	"""
+	Perform an SSL handshake with the given server and port.
+	If possible, retrieve the server's x509 certificate.
+	"""
 	try: 	
 		if sni_query:
 			# only do SNI query for DNS names, per RFC
