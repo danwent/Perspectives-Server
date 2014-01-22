@@ -53,7 +53,7 @@ def _read_data(s,data_len, timeout_sec):
 			if not _is_nonblocking_exception(e):
 				raise
 		if time.time() - start_time > timeout_sec: 
-			raise SSLScanTimeoutException("timeout in _read_data")
+			raise SSLScanTimeoutException("timeout in _read_data after {0}s".format(timeout_sec))
 		time.sleep(SLEEP_LEN_SEC)
 	return buf_str
 
@@ -66,7 +66,7 @@ def _send_data(s, data, timeout_sec):
 		except socket.error, e: 
 			if _is_nonblocking_exception(e):
 				if time.time() - start_time > timeout_sec: 
-					raise SSLScanTimeoutException("timeout in _send_data")
+					raise SSLScanTimeoutException("timeout in _send_data after {0}s".format(timeout_sec))
 				time.sleep(SLEEP_LEN_SEC)
 			else: 
 				raise
@@ -90,7 +90,7 @@ def _do_connect(s, host, port, timeout_sec):
 				break
 			if _is_nonblocking_exception(e):
 				if time.time() - start_time > timeout_sec: 
-					raise SSLScanTimeoutException("timeout in _do_connect")
+					raise SSLScanTimeoutException("timeout in _do_connect after {0}s".format(timeout_sec))
 				time.sleep(SLEEP_LEN_SEC) 
 			else: 
 				raise
@@ -167,7 +167,7 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 		except: 
 			pass
 		if not fp: 
-			raise SSLScanTimeoutException("timeout waiting for data")
+			raise SSLScanTimeoutException("timeout waiting for data after {0}s".format(timeout_sec))
 		sock.close()
 		return fp 
 
