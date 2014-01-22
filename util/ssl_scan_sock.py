@@ -36,10 +36,69 @@ SLEEP_LEN_SEC = 0.2
 class SSLScanTimeoutException(Exception): 
 	pass
 
-class SSLAlertException(Exception): 
+class SSLAlertException(Exception):
+
+	ALERT_LEVELS = {
+		1: 'Warning',
+		2: 'Fatal'
+	}
+
+	# alert information transcribed from:
+	#
+	# RFC 5246 - TLS 1.2
+	# https://tools.ietf.org/html/rfc5246#section-7.2
+	#
+	# RFC 4366 - TLS Extensions
+	# http://tools.ietf.org/html/rfc4366#section-4
+	ALERT_DESC = {
+		0: 'Close Notify: the other party has closed the connection.',
+		10: 'Unexpected Message: An inappropriate message was received.',
+		20: 'Bad Record MAC',
+		21: 'Decryption Failed',
+		22: 'Record Overflow',
+		30: 'Decompression Failure',
+		40: 'Handshake Failure',
+		41: 'No Certificate',
+		42: 'Bad Certificate',
+		43: 'Unsupported Certificate',
+		44: 'Certificate Revoked',
+		45: 'Certificate Expired',
+		46: 'Certificate Unknown',
+		47: 'Illegal Parameter',
+		48: 'Unknown CA',
+		49: 'Access Denied',
+		50: 'Decode Error',
+		51: 'Decrypt Error',
+		60: 'Export Restriction',
+		70: 'Protocol Version: The protocol version sent is recognized but not supported.',
+		71: 'Insufficient Security: This server requires ciphers more secure than those supported.',
+		80: 'Internal Error',
+		90: 'User Canceled',
+		100: 'No Renegotiation',
+		110: 'Unsupported Extension',
+		111: 'Certificate Unobtainable',
+		112: 'Unrecognized Name: the supplied SNI name was not recognized.',
+		113: 'Bad Certificate Status Response',
+		114: 'Bad Certificate Hash Value'
+	}
 	
-	def __init__(self,value): 
+	def __init__(self, value):
 		self.value = value
+
+		# decipher the alert data from the TLS record
+		if (len(value) > 0):
+			level, desc = struct.unpack('!BB', value[0:2])
+			if (level in self.ALERT_LEVELS and desc in self.ALERT_DESC):
+				self.value = "{0} ({1}): Code {2} - {3}".format(\
+					self.ALERT_LEVELS[level], level, desc, self.ALERT_DESC[desc])
+			else:
+				self.value = "Level {0}: Code {1}".format(level, desc)
+		else:
+			self.value = "Could not decipher SSLAlert record: '{0}'".format(value)
+
+	def __str__(self):
+		return self.value
+
 
 def _read_data(s,data_len, timeout_sec):
 	buf_str = ""
