@@ -287,6 +287,9 @@ def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 	except (ValueError):
 		raise ValueError("Service '{0}' must be of the form 'host:port'".format(service))
 
+	if not port.isdigit():
+		raise ValueError("Port '{0}' must be a number.".format(port))
+
 	# if we want to try SNI, do such a scan but if that
 	# scan fails with an SSL alert, retry with a non SNI request
 	if use_sni:
