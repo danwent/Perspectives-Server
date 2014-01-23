@@ -32,8 +32,28 @@ import unittest
 # add ..\notary_util to the import path so we can import ndb
 sys.path.insert(0,
 	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
 from notary_util.notary_db import ndb
 from util import pycache
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
+
+class SSLScanSockTestCases(unittest.TestCase):
+	"""Test the standalone scanner."""
+
+	def test_site_with_no_port(self):
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com', 10, False)
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com', 10, True)
+
+	def test_site_with_non_numeric_port(self):
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com:', 10, False)
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com:', 10, True)
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com:a', 10, False)
+		self.assertRaises(ValueError, attempt_observation_for_service, 'testsite.com:a', 10, True)
+
+	# TODO: implement --dry-run mode so we can run tests without actually scanning
+	#def test_valid_site(self):
+	#	self.assertTrue(attempt_observation_for_service('testsite.com:443', 10, False))
+	#	self.True(attempt_observation_for_service('testsite.com:443', 10, True))
 
 
 class PyCacheTestCases(unittest.TestCase):
