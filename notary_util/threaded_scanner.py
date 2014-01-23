@@ -56,8 +56,6 @@ class ScanThread(threading.Thread):
 		self.timeout_sec = timeout_sec
 		self.sni = sni
 		self.global_stats.threads[sid] = time.time() 
-		self.timeout_exc = SSLScanTimeoutException() 
-		self.alert_exc = SSLAlertException("foo")
 
 	def get_errno(self, e): 
 		try: 
@@ -68,11 +66,14 @@ class ScanThread(threading.Thread):
 	def record_failure(self, e,): 
 		stats.failures += 1
 		ndb.report_metric('ServiceScanFailure', str(e))
-		if type(e) == type(self.timeout_exc): 
+		if (isinstance(e, SSLScanTimeoutException)):
 			stats.failure_timeouts += 1
 			return
-		if type(e) == type(self.alert_exc): 
+		if (isinstance(e, SSLAlertException)):
 			stats.failure_ssl_alert += 1
+			return
+		if (isinstance(e, ValueError)):
+			stats.failure_other += 1
 			return
 
 		err = self.get_errno(e) 
@@ -100,6 +101,7 @@ class ScanThread(threading.Thread):
 				stats.failure_socket += 1
 		except Exception, e:
 			self.record_failure(e) 
+			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
 
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
