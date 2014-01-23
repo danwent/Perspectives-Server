@@ -29,7 +29,7 @@ from util import crypto, cache
 from util.keymanager import keymanager
 from notary_util.notary_db import ndb
 from notary_util import notary_common
-from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
 class NotaryHTTPServer:
 	"""
@@ -378,6 +378,9 @@ class OnDemandScanThread(threading.Thread):
 				self.db.report_observation(self.sid, fp)
 			# else error already logged
 			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
+		except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
+			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
+			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
 		except Exception as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
