@@ -23,13 +23,13 @@ You may see error messages printed to stderr, but that should be evidence of cod
 
 import argparse
 import logging
+import os
+import sys
 import time
 import unittest
 
 # TODO: HACK
 # add ..\notary_util to the import path so we can import ndb
-import sys
-import os
 sys.path.insert(0,
 	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from notary_util.notary_db import ndb
