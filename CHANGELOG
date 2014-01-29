@@ -12,6 +12,22 @@ We attempt to use meaningful version numbers, following semver.org:
 	PATCH version when you make backwards-compatible bug fixes.
 
 
+3.3.1
+-----
+* Properly catch and log known exceptions during scans
+* Decipher and log SSL Alert records found during scans
+* Log service name during scan errors, so we can see what needs fixing
+* Log timeout values during scan timeout errors
+* Add check for non-numeric scan port
+* Fix exception type checing in threaded_scanner
+* Always create log directory when starting notary
+* Fix CSS parsing error
++ Document functions in built-in scanner module
++ Document intended version numbering scheme
++ Add document on how to prepare releases
++ Add document summarizing privacy and security steps (for easy review)
+* Rename AUTHORS file to CREDITS, to reflect that not every contribution comes from writing code
+
 
 3.3
 -----
