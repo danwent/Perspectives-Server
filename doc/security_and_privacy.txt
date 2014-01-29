@@ -1,0 +1,22 @@
+At the Perspectives Project your security and privacy are of the highest importance. Below is a list of steps the Perspectives Server takes to protect both.
+
+Suggestions are welcome. If you have an idea or find a bug please let us know!
+
+
+- Disable error tracebacks
+- Do not keep *ANY* logs about who accessed a notary or when
+- Do not log any access request headers
+- Do not store any identifying information on visitors, such as IP address
+- Raise "400 Bad Request" errors if any unexpected parameters are sent
+
+
+
+Planned improvements
+--------------------
+- Implementing https
+- Adding secure headers to responses:
+	- X-Frame-Options: Deny
+	- X-XSS-Protection': '1; mode=block'
+	- Content-Security-Policy: "default-src='self'"
+	- HSTS/Strict-Transport-Security (for HTTPS connections only)
+- Padding request data, so services are not identifyable by the size of encrypted data transferred
