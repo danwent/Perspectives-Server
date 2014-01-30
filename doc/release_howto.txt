@@ -1,0 +1,37 @@
+Developer note: here are the steps to release an update to the Perspectives Server software.
+
+
+1. Local changes
+
+- Commit, stash, or revert all of your in-progress changes
+- Run the automated unit tests: 'python tests/unit_tests.py'
+	- Can you add any tests for new features in this release?
+- Run the manual tests (see the tests/ directory)
+	- Can you add any tests for new features in this release?
+
+Once you're confident everything works:
+
+- Increment the VERSION number in notary_http.py, following the MAJOR.MINOR.PATCH format if possible
+- Create a new folder in doc/upgrades with the name '{old_verion_number}to{new_version_number}'
+- Inside that folder create a text file with the name 'upgrade_{old_verion_number}to{new_verion_number}.txt'
+- Document all steps required to upgrade a notary from the previous version to this version.
+	If your release contains only code changes, note that. You may be able to copy the release notes from another code-only release (e.g. '3.2to3.3').
+	If your release contains database schema changes, you *must* document steps on how to upgrade data from the previous version.
+- Add a tag in git for the new version, to make it easy to find
+- Upload your changes to github
+- Create a pull request to bring your changes to the main branch
+
+
+2. Github
+
+Once the pull requst has been approved:
+
+- Add a tag in the official ('danwent') depo (if you're not a Perspectives maintainer, a maintainer will have to do this for you)
+- Close any github tickets/issues fixed by the current release (bonus points: add them to the correct Milestone before closing!)
+
+
+3. Broadcast
+
+- Post to the Perspectives blog ( http://perspectives-project.org )
+- Send an email to the mailing list ( https://groups.google.com/group/perspectives-dev
+

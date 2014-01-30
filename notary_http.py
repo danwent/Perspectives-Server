@@ -29,7 +29,7 @@ from util import crypto, cache
 from util.keymanager import keymanager
 from notary_util.notary_db import ndb
 from notary_util import notary_common
-from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException
+from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
 class NotaryHTTPServer:
 	"""
@@ -38,7 +38,13 @@ class NotaryHTTPServer:
 	Collect and share information on website certificates from around the internet.
 	"""
 
-	VERSION = "3.3"
+	# Attempt to version meaningfully, following semver.org:
+	# Given a version number MAJOR.MINOR.PATCH, increment the:
+	# MAJOR version when you make large architectural changes,
+	# MINOR version when you add functionality in a backwards-compatible manner
+	# PATCH version when you make backwards-compatible bug fixes.
+	VERSION = "3.3.1"
+
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
@@ -112,8 +118,7 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		if not args.echo_screen:
-			self.create_folder(self.LOG_DIR)
+		self.create_folder(self.LOG_DIR)
 
 		self.use_sni = args.sni
 		self.create_static_index()
@@ -379,6 +384,9 @@ class OnDemandScanThread(threading.Thread):
 				self.db.report_observation(self.sid, fp)
 			# else error already logged
 			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
+		except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
+			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
+			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
 		except Exception as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
