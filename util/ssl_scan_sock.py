@@ -24,6 +24,7 @@ import argparse
 import binascii
 import errno
 import hashlib
+import logging
 import socket
 import struct
 import sys
@@ -247,7 +248,7 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 		return fp 
 
 	except (socket.error, socket.herror, socket.gaierror, socket.timeout) as e:
-		print >> sys.stderr, "ERROR: socket error for service {0}:{1}: {2}".format(dns, port, e)
+		logging.warning("socket error for service {0}:{1}: {2}".format(dns, port, e))
 	# propogate non-socket exceptions so we can better troubleshoot
 	finally:
 		try: 
@@ -297,8 +298,8 @@ def attempt_observation_for_service(service, timeout_sec, use_sni=False):
 			try:
 				return _run_scan(dns,port,timeout_sec,True)
 			except SSLAlertException as e:
-				print >> sys.stderr, "Received SSL Alert during SNI scan of {0}:{1} - '{2}'.".format(dns, port, e) +\
-					" Will re-run with non-SNI scan."
+				logging.error("Received SSL Alert during SNI scan of {0}:{1} - '{2}'.".format(dns, port, e) +\
+					" Will re-run with non-SNI scan.")
 		else:
 			raise ValueError("Service '{0}' must be of the form 'host:port'".format(service))
 
@@ -314,6 +315,7 @@ if __name__ == "__main__":
 			 Default: \'%(default)s\'")
 
 	args = parser.parse_args()
+	logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s')
 	service = args.service
 	try:
  
@@ -322,8 +324,8 @@ if __name__ == "__main__":
 			print "Successful scan complete: '%s' has key '%s' " % (service,fp)
 
 	except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
-		print >> sys.stderr, e
+		logging.error(e)
 	except:
-		print >> sys.stderr, "Error scanning for %s" % (service)
+		logging.error("Error scanning for %s" % (service))
 		traceback.print_exc(file=sys.stderr)
 		
