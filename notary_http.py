@@ -86,6 +86,17 @@ class NotaryHTTPServer:
 		parser.add_argument('--cache-only', action='store_true', default=False,
 			help="When retrieving data, *only* read from the cache - do not read any database records. \'%(default)s\'")
 
+		# socket_queue_size and thread_pool use the cherrypy defaults,
+		# but we hardcode them here rather than refer to the cherrypy variables directly
+		# just in case the cherrypy architecture changes.
+		parser.add_argument('--socket-queue-size', '--socket-queue',\
+			default=5, type=self.positive_integer,
+			help="The maximum number of queued connections. Must be a positive integer. Default: %(default)s.")
+
+		parser.add_argument('--thread-pool-size', '--thread-pool', '--threads',\
+			default=10, type=self.positive_integer,
+			help="The number of worker threads to start up in the pool. Must be a positive integer. Default: %(default)s.")
+
 		args = parser.parse_args()
 
 		# pass ndb the args so it can use any relevant ones from its own parser
@@ -129,6 +140,20 @@ class NotaryHTTPServer:
 		self.args = args
 
 		print "Using public key\n" + self.notary_public_key
+
+
+	# function to help with argument validation.
+	# we name this 'positive_integer' because argparse will print messages
+	# that include the function name on error, such as:
+	# "error: .. invalid positive_integer value: '1.3'".
+	# if the function name helps the user understand what type of argument they must supply
+	# this may be less confusing.
+	def positive_integer(self, value):
+		"""Convert value to a positive integer, or raise an exception if we cannot."""
+		ivalue = int(value)
+		if ivalue < 1:
+			raise argparse.ArgumentTypeError("'{0}' is not a positive integer.".format(value))
+		return ivalue
 
 	def _create_status_row(self, name, enabled, description):
 		"""Generate the HTML to display one particular server option."""
@@ -424,6 +449,8 @@ cherrypy.log.access = fake_access
 
 cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
+			 'server.socket_queue_size': notary.args.socket_queue_size,
+			 'server.thread_pool': notary.args.thread_pool_size,
 			 'request.show_tracebacks' : False,  
 			 # IMPORTANT PRIVACY SETTINGS!
 			 # we do *not* want to record any information about clients
