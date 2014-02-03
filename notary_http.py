@@ -43,7 +43,7 @@ class NotaryHTTPServer:
 	# MAJOR version when you make large architectural changes,
 	# MINOR version when you add functionality in a backwards-compatible manner
 	# PATCH version when you make backwards-compatible bug fixes.
-	VERSION = "3.3.1"
+	VERSION = "3.4a"
 
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
