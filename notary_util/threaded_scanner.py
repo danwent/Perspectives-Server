@@ -137,7 +137,7 @@ def record_observations_in_db(res_list):
 			ndb.report_observation(r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
-		logging.error("DB Error: Failed to write res_list of length %s" % \
+		logging.critical("DB Error: Failed to write res_list of length %s" % \
 					len(res_list))
 		traceback.print_exc(file=sys.stdout)
 
@@ -155,8 +155,11 @@ parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT
 parser.add_argument('--sni', action='store_true', default=False,
 			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
 			Default: \'%(default)s\'")
-parser.add_argument('--verbose', '-v', default=False, action='store_true',
+loggroup = parser.add_mutually_exclusive_group()
+loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
 			help="Verbose mode. Print more info about each scan.")
+loggroup.add_argument('--quiet', '-q', default=False, action='store_true',
+			help="Quiet mode. Only print system-critical problems.")
 
 args = parser.parse_args()
 
@@ -166,6 +169,8 @@ ndb = ndb(args)
 loglevel = logging.WARNING
 if (args.verbose):
 	loglevel = logging.INFO
+elif (args.quiet):
+	loglevel = logging.CRITICAL
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=loglevel)
 
 res_list = [] 
