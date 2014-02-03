@@ -83,6 +83,9 @@ class NotaryHTTPServer:
 			help="Use RAM to cache observation data on the local machine only.\
 			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
 
+		parser.add_argument('--cache-only', action='store_true', default=False,
+			help="When retrieving data, *only* read from the cache - do not read any database records. \'%(default)s\'")
+
 		args = parser.parse_args()
 
 		# pass ndb the args so it can use any relevant ones from its own parser
@@ -216,7 +219,7 @@ class NotaryHTTPServer:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
 		#TODO: don't reference session directly
-		if (self.ndb and (self.ndb._Session != None)):
+		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, host, port, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
