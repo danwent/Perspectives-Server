@@ -17,6 +17,7 @@
 import argparse
 import errno
 import os
+import re
 import struct
 import sys
 import threading 
@@ -86,6 +87,15 @@ class NotaryHTTPServer:
 		parser.add_argument('--cache-only', action='store_true', default=False,
 			help="When retrieving data, *only* read from the cache - do not read any database records. \'%(default)s\'")
 
+		parser.add_argument('--cache-expiry', '--cache-duration',\
+			default=self.CACHE_EXPIRY, type=self.cache_duration,
+			metavar="CACHE_EXPIRY[Ss|Mm|Hh]",
+			help="Expire cache entries after this many seconds / minutes / hours. " +\
+			"Hours is the default time unit if none is provided. " +\
+			"The default client settings ignore notary results that have not been updated in the past 48 hours, " +\
+			"so you may want your (scan frequency + scan duration + cache expiry) to be <= 48 hours. Default: " +\
+			str(self.CACHE_EXPIRY / 3600) + " hours.")
+
 		# socket_queue_size and thread_pool use the cherrypy defaults,
 		# but we hardcode them here rather than refer to the cherrypy variables directly
 		# just in case the cherrypy architecture changes.
@@ -154,6 +164,36 @@ class NotaryHTTPServer:
 		if ivalue < 1:
 			raise argparse.ArgumentTypeError("'{0}' is not a positive integer.".format(value))
 		return ivalue
+
+	def cache_duration(self, value):
+		"""Validate cache duration time, or raise an exception if we cannot."""
+		# let the user specify durations in seconds, minutes, or hours
+		if (re.search("[^0-9SsMmHh]+", value) != None):
+			raise argparse.ArgumentTypeError("Invalid cache duration '{0}'.".format(value))
+
+		# remove non-numeric characters
+		duration = value.translate(None, 'SsMmHh')
+		duration = int(duration)
+
+		time_units = 0
+		if (re.search("[Ss]", value)):
+			time_units += 1
+		if (re.search("[Mm]", value)):
+			time_units += 1
+			duration *= 60
+		if (re.search("[Hh]", value)):
+			time_units += 1
+			duration *= 3600
+
+		if (time_units > 1):
+			raise argparse.ArgumentTypeError("Only specify one of [S|M|H] for cache duration.")
+		elif (time_units == 0):
+			duration *= 3600 # assume hours by default
+
+		if (duration < 1):
+			raise argparse.ArgumentTypeError("Cache duration must be at least 1 second.")
+
+		return duration
 
 	def _create_status_row(self, name, enabled, description):
 		"""Generate the HTML to display one particular server option."""
@@ -349,7 +389,7 @@ class NotaryHTTPServer:
 		xml = top_element.toprettyxml()
 
 		if (self.cache != None):
-			self.cache.set(service, xml, expiry=self.CACHE_EXPIRY)
+			self.cache.set(service, xml, expiry=self.args.cache_expiry)
 
 		return xml
 
