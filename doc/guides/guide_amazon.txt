@@ -95,6 +95,51 @@ The last step is to assign your keyfile so you can connect via ssh. Select 'Use 
 
 Congratulations! You now have a running ec2 machine.
 
+Note the instance ID of your new machine, so you can use it in the next step.
+
+
+Get the Instance's SSH Fingerprint
+==================================
+
+Before connecting for the first time you should verify the ssh key used by your instance. This ensures that you are connecting to the correct machine, and that your session has not been man-in-the-middle attacked (probably the same reason you use Perspectives!).
+
+1. First, install the AWS Command Line Interface. If you have python installed, this is probably easiest using pip:
+
+>pip install awscli
+
+For full instructions see https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html#install-with-pip .
+
+You will need your AWS access key ID and secret acces key, as discussed here:
+
+https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html
+
+
+2. Secondly, configure the awscli:
+
+>aws configure
+
+Type or paste in your Access Key ID and Secret Access Key when asked. The full instructions are at https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html .
+
+
+3. Finally, execute the 'get-console-output' command:
+
+>aws ec2 get-console-output --instance-id i-12345
+
+You should see some output that includes the server's ssh key fingerprints:
+
+ec2: -----BEGIN SSH HOST KEY FINGERPRINTS-----
+ec2: 1024 aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99  root@ip-0-0-0-0 (DSA)
+ec2: 256  00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff  root@ip-0-0-0-0 (ECDSA)
+ec2: 2048 00:99:88:77:66:55:44:33:22:11:ff:ee:dd:cc:bb:aa  root@ip-0-0-0-0 (RSA)
+ec2: -----END SSH HOST KEY FINGERPRINTS-----
+
+
+Write down the RSA key for use in the next step.
+
+Note that you *must* retrieve the server's ssh fingerprint the *first* time you launch the instance. If you stop the instance and re-launch it later the fingerprint will not be listed in the console output (as the ssh keys have already been installed to that instance).
+
+The server's fingerprint will be the same after every launch, but you must read it the first time if you want to verify.
+
 
 Connect to the machine
 ======================
@@ -102,6 +147,8 @@ Connect to the machine
 You can now access your machine remotely.  Click on "Instances" in the left dashboard panel. Select your instance’s row in the main pane and view the details box at the bottom.  Note the "Public DNS" field, as this is how you will access the machine remotely. It will look like 'ec2-11-11-11-11.us-west-2.compute.amazonaws.com'. To connect to the machine, run:
 
 >ssh -i notary.pem ubuntu@<insert-public-dns>
+
+If the fingerprint displayed matches the one you retrieved from the previous step, you can type 'yes' and connect to the machine!
 
 
 Set up the Notary Server
@@ -117,6 +164,7 @@ This will create a folder called 'Perspectives-Server'.
 Now, initialize the setup and start the webserver:
 
 	>cd Perspectives-Server
+	>chmod 770 admin/*.sh
 	>admin/setup.sh
 	>admin/start_webserver.sh
 
