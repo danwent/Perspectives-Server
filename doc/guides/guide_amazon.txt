@@ -10,6 +10,32 @@ Amazon Web Services (AWS) let's you easily create a server in the "cloud".  In f
 
 This guide will show you how you can get your own notary running in just 15 minutes using AWS.
 
+
+Requirements
+============
+
+* A valid credit card, required to create an Amazon AWS account
+
+
+Cost
+====
+
+Free up to the limits specified in the Free Usage Tier - https://aws.amazon.com/free/
+
+As of this writing:
+* 750 hours of EC2 Micro Instance usage (enough to run one instance the entire month)
+* 750 hours of Single-AZ Micro DB Instances (enough to run one database the entire month)
+* 30 GB of Elastic Block Storage (EBS), plus 2 million I/Os and 1 GB of snapshot storage
+* 20 GB of database storage
+* 15 GB of bandwidth out
+
+
+Caution: While setting up a micro ec2 instance is free, if you use a larger instance type or run an intensive process that performs a large number of reads or writes on the EBS drive, Amazon will charge you money. You may wish to set up Amazon alerts to notify you of usage beyond the free tier limits, use the --quiet option when performing scans, and/or use a Relational Database Service rather than storing data in sqlite on disk.
+
+
+Setup
+=====
+
 First, read about the free usage tier and sign up for an AWS account: http://aws.amazon.com/free/
 
 Then, access the AWS management console to create an instance: https://aws.amazon.com/console/
