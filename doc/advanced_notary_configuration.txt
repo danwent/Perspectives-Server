@@ -22,3 +22,17 @@ The observations table has many updates during normal behaviour as the end times
 For Postgres:
 	ALTER TABLE t_observations SET (autovacuum_vacuum_scale_factor = 0.1);
 
+
+4. Socket Queue Size and Thread Pool Size
+
+As explained by '--help', the socket queue size is the maximum number of queued network connections allowed by CherryPy, the web server used by this notary software. The thread pool size controlls the number of CherrPy worker threads that handle incoming requests.
+
+If your notary runs in an environment with a fast network connection, fast routing, and adequate bandwidth you shouldn't need to adjust the defaults. However, if you are on a slower connection, increasing these values may help your server handle requests more quickly, up to a limit.
+
+The Winsock Programmer's FAQ suggests a socket queue size of at most 200 [1], and notes that your program should be able to quickly deal with queued sockets so they don't sit for too long. Values below 50 should be adequate in most situations.
+
+Increasing the Thread Pool Size will use more memory. In addition, due to the python Global Interpreter Lock, only one thread from a process can perform certain operations at a time. This means that a large thread pool won't necessarily increase notary responsiveness. If you need a large number of threads you may achieve better performance by running multiple notary servers behind a load-balancer (also known as a "reverse proxy") and having them use a shared cache and database.
+
+When adjusting these settings you should test notary behaviour in your environment.
+
+[1] http://tangentsoft.net/wskfaq/advanced.html#backlog
