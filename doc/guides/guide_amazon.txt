@@ -217,7 +217,77 @@ And there you have it! You now have a running Perspectives notary! You can add t
 For more information see the README file or the doc/ directory. Feel free to ask questions on the mailing list!
 
 
---
+-------
+
+
+Optional: Setting up a Relational Database Service
+==================================================
+
+You may wish to use a Relational Database Service (RDS) instead of writing to an sqlite database on disk. This can save lots of IOPs if you are using an EBS disk, which can be costly if you have a large number of services (e.g. hundreds of thousands). Data transfer between Amazon RDS and Amazon EC2 machines is free.
+
+To set up a RDS:
+
+- From the Amazon web console, click on "RDS" in the Database group
+- On the RDS Dashboard page, click 'Launch an Instance'
+- Select your desired database type, such as Postgres
+- When asked about Multi-AZ Deployment, select "No", to remain in the free-usage tier.
+- Under database details:
+	- Select a "db.t1.micro" instance class
+	- Select "No" to Multi-AZ Deployment
+	- Make sure the "Use Provisioned IOPS" box is *NOT* checked
+	- Choose a storage size of at least 200MB. The minimum storage for a Postgres database, for example, is 5GB, which will easily hold all of the data your notary will use.
+	- choose an instance name, username, and password. Write these down somewhere safe
+- On the Additional Configuration screen:
+	- Set "Publicly Accessible" to No, unless you really want to connect to your database from the outside world
+	- Be sure to select the same Availability Zone as your EC2 machine
+	- Select the same Security Group as your EC2 machine
+	- Choose any database name you like
+- Fill in other options as you see fit. You may want to enable more than 1 day of automatic backups in case something goes wrong.
+- You may want to specify times for your database backups and updates that do not overlap with notary scanning runs, so the database is not being used.
+
+
+- Once you have created your RDS, click on the 'Instances' link and check the box next to your RDS instance. Note down the 'Endpoint', which will look something like 'instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432'. This is the database hostname your EC2 machine will connect to, so write it down or remember it for later.
+
+
+- Next, return to the EC2 dashboard. We will need to open a port so your EC2 machine can connect to your database.
+
+- Click on the Instances link and check the box beside your EC2 instance
+- On the Description tab, note down the Private IPs, for example 172.28.11.130.
+
+- Next click on Security Groups
+- Select the security group that both your EC2 machine and your database use
+- Click on the Inbound tab
+- Create a new Custom TCP rule that allows your private IP to talk to the database:
+	- add port 5432 (or whatever port you specified for your database)
+	- You can add the EC2 machine's IP address directly (e.g. 172.28.11.130) or set up a partial mask that will allow other machines from the same part of the network; for example - 172.28.11.00/24 . This may be desirable if you plan to have multiple machines on the same private network all talking to the same database.
+
+	See https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing for more information.
+
+	- Click 'Apply Rule Changes' to save your filter
+
+
+Your EC2 machine can now connect to your database! To instruct your notary to do so you need to pass the database arguments when running the web service and notary scans.
+
+	Option 1) Edit the 'server_args' and 'database_args' variables in admin/start_webserver.sh and admin/start_scan.sh. Add the --dbtype, --dbname, --dbhost, and --dbuser values.
+
+	Note that the database password is not stored in the configuration files but read from the 'NOTARY_DB_PASSWORD' environment variable. Set up the environment variable using the next step.
+
+	Option 2) Edit the 'server_args' and 'database_args' variables in admin/start_webserver.sh and admin/start_scan.sh. Add the --dburl switch to have them both read the database connection info from the 'DATABASE_URL' environment variable. Set up the environment variable using the next step.
+
+	Note the 'DATABASE_URL' variable will take a special form depending on the type of database you connect to. It will usually be similar to 'database_type://username:password@instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432/db_name'.
+
+
+
+Set up the environment variable by adding a line to admin/_common_functions.sh that uses the 'export' command:
+
+	>export NOTARY_DB_PASSWORD=correcthorsebatterystaple
+	or
+	>export DATABASE_URL=postgres://username:password@instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432/db_name
+
+
+Your notary will now be able to read the correct connection settings even after rebooting.
+
+
 
 Advanced: Securing EC2 machines
 ===============================
