@@ -70,8 +70,8 @@ class Observations(ORMBase):
 		UniqueConstraint('service_id', 'key', 'start'),
 		UniqueConstraint('service_id', 'key', 'end'),
 		CheckConstraint('start >= 0'),
-		CheckConstraint('end >= 0'),
-		CheckConstraint('start <= end'),
+		CheckConstraint('"end" >= 0'),
+		CheckConstraint('start <= "end"'),
 		)
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
