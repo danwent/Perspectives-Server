@@ -5,7 +5,7 @@ There are several options that can make your notary run even better.
 
 Data caching will significantly increase your notary's performance.
 
-For best performance you may want to use a dedicated caching server such as memcached, memcachier, or redis. If you do not have access to or don't want to set up a dedicated caching server, use the built-in python caching with '--pycache'.
+For best performance you may want to use a dedicated caching server such as memcached, memcachier, or redis. If you do not have access to or don't want to set up a dedicated caching server, use the built-in python caching with '--pycache'. It works automatically and is as easy as adding the switch!
 
 
 2. Enable SNI scanning
