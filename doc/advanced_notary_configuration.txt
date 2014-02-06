@@ -7,6 +7,14 @@ Data caching will significantly increase your notary's performance.
 
 For best performance you may want to use a dedicated caching server such as memcached, memcachier, or redis. If you do not have access to or don't want to set up a dedicated caching server, use the built-in python caching with '--pycache'. It works automatically and is as easy as adding the switch!
 
+1a. Cache duration
+
+Longer cache durations mean less frequent fetching from the database, which improves performance. However, cache entries should be refreshed often enough that clients can see reasonably recent data (e.g. perhaps after every scan or every second scan).
+
+The default Perspectives client settings ignore notary results that have not been updated in the past 48 hours. Because of this, you may want to set your cache duration so that the (scan frequency + scan duration + cache expiry) is <= 48 hours.
+
+For example, if you run scans every 24 hours and scans take 10 hours to run, set your cache duration to (48 - 24 - 10) = 14 hours. If you run scans every 12 hours and they take 1 hour to run, you can get away with a cache duration of (48 - 12 - 1) = 35 hours. This will ensure that your cached data is always up to date and that clients are always getting current results.
+
 
 2. Enable SNI scanning
 
