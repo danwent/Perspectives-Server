@@ -16,6 +16,12 @@ scan_command="python notary_util/threaded_scanner.py"
 
 backupdir=backup
 
+# If you set a custom environment variable, do it below this line. e.g.:
+# export DATABASE_URL=postgres://username:password@instance.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432/dbname
+# - or -
+# export NOTARY_DB_PASSWORD=correcthorsebatterystaple
+
+
 do_setup()
 {
 	script_location="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
