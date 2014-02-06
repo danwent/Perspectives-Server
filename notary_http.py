@@ -53,7 +53,7 @@ class NotaryHTTPServer:
 	LOG_DIR = 'logs'
 	LOG_FILE = 'webserver.log'
 
-	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
+	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
