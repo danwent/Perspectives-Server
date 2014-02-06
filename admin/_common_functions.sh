@@ -5,6 +5,9 @@
 date=`date`
 logdir="logs"
 
+# do not edit or add arguments to these commands -
+# they are used to detect the running processes and retrieve PIDs.
+# instead, edit the start_webserver.sh and start_scan.sh scripts
 server_logfile=webserver.log
 server_command="python notary_http.py"
 
