@@ -85,7 +85,7 @@ class NotaryHTTPServer:
 			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
 
 		parser.add_argument('--cache-only', action='store_true', default=False,
-			help="When retrieving data, *only* read from the cache - do not read any database records. \'%(default)s\'")
+			help="When retrieving data, *only* read from the cache - do not read any database records. Default: %(default)s")
 
 		parser.add_argument('--cache-expiry', '--cache-duration',\
 			default=self.CACHE_EXPIRY, type=self.cache_duration,
