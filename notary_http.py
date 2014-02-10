@@ -17,6 +17,7 @@
 import argparse
 import errno
 import os
+import re
 import struct
 import sys
 import threading 
@@ -43,7 +44,7 @@ class NotaryHTTPServer:
 	# MAJOR version when you make large architectural changes,
 	# MINOR version when you add functionality in a backwards-compatible manner
 	# PATCH version when you make backwards-compatible bug fixes.
-	VERSION = "3.3.1"
+	VERSION = "3.4"
 
 	DEFAULT_WEB_PORT=8080
 	ENV_PORT_KEY_NAME='PORT'
@@ -52,7 +53,7 @@ class NotaryHTTPServer:
 	LOG_DIR = 'logs'
 	LOG_FILE = 'webserver.log'
 
-	CACHE_EXPIRY = 60 * 60 * 24 # seconds. set this to however frequently you scan services.
+	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
 
 	def __init__(self):
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
@@ -63,7 +64,8 @@ class NotaryHTTPServer:
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
-		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', action='store_true', default=False,
+		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
+			action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
 		parser.add_argument('--sni', action='store_true', default=False,
 			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
@@ -81,6 +83,29 @@ class NotaryHTTPServer:
 			nargs='?', metavar=cache.Pycache.get_metavar(),
 			help="Use RAM to cache observation data on the local machine only.\
 			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
+
+		parser.add_argument('--cache-only', action='store_true', default=False,
+			help="When retrieving data, *only* read from the cache - do not read any database records. Default: %(default)s")
+
+		parser.add_argument('--cache-expiry', '--cache-duration',\
+			default=self.CACHE_EXPIRY, type=self.cache_duration,
+			metavar="CACHE_EXPIRY[Ss|Mm|Hh]",
+			help="Expire cache entries after this many seconds / minutes / hours. " +\
+			"Hours is the default time unit if none is provided. " +\
+			"The default client settings ignore notary results that have not been updated in the past 48 hours, " +\
+			"so you may want your (scan frequency + scan duration + cache expiry) to be <= 48 hours. Default: " +\
+			str(self.CACHE_EXPIRY / 3600) + " hours.")
+
+		# socket_queue_size and thread_pool use the cherrypy defaults,
+		# but we hardcode them here rather than refer to the cherrypy variables directly
+		# just in case the cherrypy architecture changes.
+		parser.add_argument('--socket-queue-size', '--socket-queue',\
+			default=5, type=self.positive_integer,
+			help="The maximum number of queued connections. Must be a positive integer. Default: %(default)s.")
+
+		parser.add_argument('--thread-pool-size', '--thread-pool', '--threads',\
+			default=10, type=self.positive_integer,
+			help="The number of worker threads to start up in the pool. Must be a positive integer. Default: %(default)s.")
 
 		args = parser.parse_args()
 
@@ -125,6 +150,50 @@ class NotaryHTTPServer:
 		self.args = args
 
 		print "Using public key\n" + self.notary_public_key
+
+
+	# function to help with argument validation.
+	# we name this 'positive_integer' because argparse will print messages
+	# that include the function name on error, such as:
+	# "error: .. invalid positive_integer value: '1.3'".
+	# if the function name helps the user understand what type of argument they must supply
+	# this may be less confusing.
+	def positive_integer(self, value):
+		"""Convert value to a positive integer, or raise an exception if we cannot."""
+		ivalue = int(value)
+		if ivalue < 1:
+			raise argparse.ArgumentTypeError("'{0}' is not a positive integer.".format(value))
+		return ivalue
+
+	def cache_duration(self, value):
+		"""Validate cache duration time, or raise an exception if we cannot."""
+		# let the user specify durations in seconds, minutes, or hours
+		if (re.search("[^0-9SsMmHh]+", value) != None):
+			raise argparse.ArgumentTypeError("Invalid cache duration '{0}'.".format(value))
+
+		# remove non-numeric characters
+		duration = value.translate(None, 'SsMmHh')
+		duration = int(duration)
+
+		time_units = 0
+		if (re.search("[Ss]", value)):
+			time_units += 1
+		if (re.search("[Mm]", value)):
+			time_units += 1
+			duration *= 60
+		if (re.search("[Hh]", value)):
+			time_units += 1
+			duration *= 3600
+
+		if (time_units > 1):
+			raise argparse.ArgumentTypeError("Only specify one of [S|M|H] for cache duration.")
+		elif (time_units == 0):
+			duration *= 3600 # assume hours by default
+
+		if (duration < 1):
+			raise argparse.ArgumentTypeError("Cache duration must be at least 1 second.")
+
+		return duration
 
 	def _create_status_row(self, name, enabled, description):
 		"""Generate the HTML to display one particular server option."""
@@ -215,7 +284,7 @@ class NotaryHTTPServer:
 				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
 
 		#TODO: don't reference session directly
-		if (self.ndb and (self.ndb._Session != None)):
+		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, host, port, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
@@ -320,7 +389,7 @@ class NotaryHTTPServer:
 		xml = top_element.toprettyxml()
 
 		if (self.cache != None):
-			self.cache.set(service, xml, expiry=self.CACHE_EXPIRY)
+			self.cache.set(service, xml, expiry=self.args.cache_expiry)
 
 		return xml
 
@@ -420,6 +489,8 @@ cherrypy.log.access = fake_access
 
 cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'server.socket_host' : "0.0.0.0",
+			 'server.socket_queue_size': notary.args.socket_queue_size,
+			 'server.thread_pool': notary.args.thread_pool_size,
 			 'request.show_tracebacks' : False,  
 			 # IMPORTANT PRIVACY SETTINGS!
 			 # we do *not* want to record any information about clients

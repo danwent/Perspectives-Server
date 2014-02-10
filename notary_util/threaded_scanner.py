@@ -21,6 +21,7 @@ For running scans without connecting to the database see util/simple_scanner.py.
 
 import argparse
 import errno
+import logging
 import os
 import sys
 import threading
@@ -87,7 +88,7 @@ class ScanThread(threading.Thread):
 			stats.failure_dns += 1
 		else: 	
 			stats.failure_other += 1 
-			print "Unknown error scanning '%s'\n" % self.sid
+			logging.error("Unknown error scanning '%s'\n" % self.sid)
 			traceback.print_exc(file=sys.stdout)
 
 	def run(self): 
@@ -101,7 +102,7 @@ class ScanThread(threading.Thread):
 				stats.failure_socket += 1
 		except Exception, e:
 			self.record_failure(e) 
-			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
+			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
 
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
@@ -136,8 +137,8 @@ def record_observations_in_db(res_list):
 			ndb.report_observation(r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
-		print "DB Error: Failed to write res_list of length %s" % \
-					len(res_list)
+		logging.critical("DB Error: Failed to write res_list of length %s" % \
+					len(res_list))
 		traceback.print_exc(file=sys.stdout)
 
 
@@ -154,13 +155,23 @@ parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT
 parser.add_argument('--sni', action='store_true', default=False,
 			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
 			Default: \'%(default)s\'")
-parser.add_argument('--verbose', '-v', default=False, action='store_true',
+loggroup = parser.add_mutually_exclusive_group()
+loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
 			help="Verbose mode. Print more info about each scan.")
+loggroup.add_argument('--quiet', '-q', default=False, action='store_true',
+			help="Quiet mode. Only print system-critical problems.")
 
 args = parser.parse_args()
 
 # pass ndb the args so it can use any relevant ones from its own parser
 ndb = ndb(args)
+
+loglevel = logging.WARNING
+if (args.verbose):
+	loglevel = logging.INFO
+elif (args.quiet):
+	loglevel = logging.CRITICAL
+logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=loglevel)
 
 res_list = [] 
 stats = GlobalStats()
@@ -194,39 +205,36 @@ for sid in all_sids:
 			record_observations_in_db(res_list) 
 			res_list = [] 
 			so_far = int(time.time() - start_time)
-			if (args.verbose):
-				print "%s seconds passed.  %s complete, %s " \
-					"failures.  %s Active threads" % \
-					(so_far, stats.num_completed,
-						stats.failures, stats.active_threads)
-				print "  details: timeouts = %s, " \
-					"ssl-alerts = %s, no-route = %s, " \
-					"conn-refused = %s, conn-reset = %s,"\
-					"dns = %s, socket = %s, other = %s" % \
-					(stats.failure_timeouts,
-					stats.failure_ssl_alert,
-					stats.failure_no_route,
-					stats.failure_conn_refused,
-					stats.failure_conn_reset,
-					stats.failure_dns,
-					stats.failure_socket,
-					stats.failure_other)
-				sys.stdout.flush()
+			logging.info("%s seconds passed.  %s complete, %s " \
+				"failures.  %s Active threads" % \
+				(so_far, stats.num_completed,
+				stats.failures, stats.active_threads))
+			logging.info("  details: timeouts = %s, " \
+				"ssl-alerts = %s, no-route = %s, " \
+				"conn-refused = %s, conn-reset = %s,"\
+				"dns = %s, socket = %s, other = %s" % \
+				(stats.failure_timeouts,
+				stats.failure_ssl_alert,
+				stats.failure_no_route,
+				stats.failure_conn_refused,
+				stats.failure_conn_reset,
+				stats.failure_dns,
+				stats.failure_socket,
+				stats.failure_other))
 
 		if stats.num_started  % 1000 == 0: 
 			if (args.verbose):
-				print "long running threads"
+				logging.info("long running threads")
 				cur_time = time.time()
 				for sid in stats.threads.keys():
 					spawn_time = stats.threads.get(sid,cur_time)
 					duration = cur_time - spawn_time
 					if duration > 20:
-						print "'%s' has been running for %s" %\
-						 (sid,duration)
-				sys.stdout.flush()
+						logging.info("'%s' has been running for %s" %\
+						 (sid,duration))
 
 	except IndexError:
-		print >> sys.stderr, "Service '%s' has no index [1] after splitting on ','.\n" % (sid)
+		logging.error("Service '%s' has no index [1] after splitting on ','.\n" % (sid))
 	except KeyboardInterrupt: 
 		exit(1)	
 

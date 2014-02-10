@@ -27,6 +27,12 @@ Arguments
 	- If envport is specified and the env var exists and is a valid integer, do we use it?
 	- If both are specified, does argparse reject that usage?
 
+--cache-duration
+	- Are negative numbers and non-integers rejected?
+	- Are arguments with letters from more than one of the groups [Ss], [Mm], and [Hh] rejected?
+	- Are the seconds, minutes, and hours calculated correctly for each letter group?
+	- Are hours used by default if there are no letters specified?
+
 
 While Running:
 --------------

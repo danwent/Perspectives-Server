@@ -70,8 +70,8 @@ class Observations(ORMBase):
 		UniqueConstraint('service_id', 'key', 'start'),
 		UniqueConstraint('service_id', 'key', 'end'),
 		CheckConstraint('start >= 0'),
-		CheckConstraint('end >= 0'),
-		CheckConstraint('start <= end'),
+		CheckConstraint('"end" >= 0'),
+		CheckConstraint('start <= "end"'),
 		)
 
 	services = relationship("Services", backref=backref('t_observations', order_by=service_id))
@@ -327,6 +327,8 @@ class ndb:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
 			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
+			if (self.DB_PASSWORD_FIELD not in os.environ):
+				print >> sys.stderr, "The environment variable '{0}' does not exist. Did you mean to specify a database password?".format(self.DB_PASSWORD_FIELD)
 			raise
 
 		listen(Pool, 'checkout', self._on_connection_checkout)

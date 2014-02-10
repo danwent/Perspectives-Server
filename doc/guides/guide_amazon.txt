@@ -10,6 +10,32 @@ Amazon Web Services (AWS) let's you easily create a server in the "cloud".  In f
 
 This guide will show you how you can get your own notary running in just 15 minutes using AWS.
 
+
+Requirements
+============
+
+* A valid credit card, required to create an Amazon AWS account
+
+
+Cost
+====
+
+Free up to the limits specified in the Free Usage Tier - https://aws.amazon.com/free/
+
+As of this writing:
+* 750 hours of EC2 Micro Instance usage (enough to run one instance the entire month)
+* 750 hours of Single-AZ Micro DB Instances (enough to run one database the entire month)
+* 30 GB of Elastic Block Storage (EBS), plus 2 million I/Os and 1 GB of snapshot storage
+* 20 GB of database storage
+* 15 GB of bandwidth out
+
+
+Caution: While setting up a micro ec2 instance is free, if you use a larger instance type or run an intensive process that performs a large number of reads or writes on the EBS drive, Amazon will charge you money. You may wish to set up Amazon alerts to notify you of usage beyond the free tier limits, use the --quiet option when performing scans, and/or use a Relational Database Service rather than storing data in sqlite on disk.
+
+
+Setup
+=====
+
 First, read about the free usage tier and sign up for an AWS account: http://aws.amazon.com/free/
 
 Then, access the AWS management console to create an instance: https://aws.amazon.com/console/
@@ -95,6 +121,51 @@ The last step is to assign your keyfile so you can connect via ssh. Select 'Use 
 
 Congratulations! You now have a running ec2 machine.
 
+Note the instance ID of your new machine, so you can use it in the next step.
+
+
+Get the Instance's SSH Fingerprint
+==================================
+
+Before connecting for the first time you should verify the ssh key used by your instance. This ensures that you are connecting to the correct machine, and that your session has not been man-in-the-middle attacked (probably the same reason you use Perspectives!).
+
+1. First, install the AWS Command Line Interface. If you have python installed, this is probably easiest using pip:
+
+>pip install awscli
+
+For full instructions see https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html#install-with-pip .
+
+You will need your AWS access key ID and secret acces key, as discussed here:
+
+https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html
+
+
+2. Secondly, configure the awscli:
+
+>aws configure
+
+Type or paste in your Access Key ID and Secret Access Key when asked. The full instructions are at https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html .
+
+
+3. Finally, execute the 'get-console-output' command:
+
+>aws ec2 get-console-output --instance-id i-12345
+
+You should see some output that includes the server's ssh key fingerprints:
+
+ec2: -----BEGIN SSH HOST KEY FINGERPRINTS-----
+ec2: 1024 aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99  root@ip-0-0-0-0 (DSA)
+ec2: 256  00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff  root@ip-0-0-0-0 (ECDSA)
+ec2: 2048 00:99:88:77:66:55:44:33:22:11:ff:ee:dd:cc:bb:aa  root@ip-0-0-0-0 (RSA)
+ec2: -----END SSH HOST KEY FINGERPRINTS-----
+
+
+Write down the RSA key for use in the next step.
+
+Note that you *must* retrieve the server's ssh fingerprint the *first* time you launch the instance. If you stop the instance and re-launch it later the fingerprint will not be listed in the console output (as the ssh keys have already been installed to that instance).
+
+The server's fingerprint will be the same after every launch, but you must read it the first time if you want to verify.
+
 
 Connect to the machine
 ======================
@@ -102,6 +173,8 @@ Connect to the machine
 You can now access your machine remotely.  Click on "Instances" in the left dashboard panel. Select your instance’s row in the main pane and view the details box at the bottom.  Note the "Public DNS" field, as this is how you will access the machine remotely. It will look like 'ec2-11-11-11-11.us-west-2.compute.amazonaws.com'. To connect to the machine, run:
 
 >ssh -i notary.pem ubuntu@<insert-public-dns>
+
+If the fingerprint displayed matches the one you retrieved from the previous step, you can type 'yes' and connect to the machine!
 
 
 Set up the Notary Server
@@ -117,6 +190,7 @@ This will create a folder called 'Perspectives-Server'.
 Now, initialize the setup and start the webserver:
 
 	>cd Perspectives-Server
+	>chmod 770 admin/*.sh
 	>admin/setup.sh
 	>admin/start_webserver.sh
 
@@ -143,7 +217,77 @@ And there you have it! You now have a running Perspectives notary! You can add t
 For more information see the README file or the doc/ directory. Feel free to ask questions on the mailing list!
 
 
---
+-------
+
+
+Optional: Setting up a Relational Database Service
+==================================================
+
+You may wish to use a Relational Database Service (RDS) instead of writing to an sqlite database on disk. This can save lots of IOPs if you are using an EBS disk, which can be costly if you have a large number of services (e.g. hundreds of thousands). Data transfer between Amazon RDS and Amazon EC2 machines is free.
+
+To set up a RDS:
+
+- From the Amazon web console, click on "RDS" in the Database group
+- On the RDS Dashboard page, click 'Launch an Instance'
+- Select your desired database type, such as Postgres
+- When asked about Multi-AZ Deployment, select "No", to remain in the free-usage tier.
+- Under database details:
+	- Select a "db.t1.micro" instance class
+	- Select "No" to Multi-AZ Deployment
+	- Make sure the "Use Provisioned IOPS" box is *NOT* checked
+	- Choose a storage size of at least 200MB. The minimum storage for a Postgres database, for example, is 5GB, which will easily hold all of the data your notary will use.
+	- choose an instance name, username, and password. Write these down somewhere safe
+- On the Additional Configuration screen:
+	- Set "Publicly Accessible" to No, unless you really want to connect to your database from the outside world
+	- Be sure to select the same Availability Zone as your EC2 machine
+	- Select the same Security Group as your EC2 machine
+	- Choose any database name you like
+- Fill in other options as you see fit. You may want to enable more than 1 day of automatic backups in case something goes wrong.
+- You may want to specify times for your database backups and updates that do not overlap with notary scanning runs, so the database is not being used.
+
+
+- Once you have created your RDS, click on the 'Instances' link and check the box next to your RDS instance. Note down the 'Endpoint', which will look something like 'instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432'. This is the database hostname your EC2 machine will connect to, so write it down or remember it for later.
+
+
+- Next, return to the EC2 dashboard. We will need to open a port so your EC2 machine can connect to your database.
+
+- Click on the Instances link and check the box beside your EC2 instance
+- On the Description tab, note down the Private IPs, for example 172.28.11.130.
+
+- Next click on Security Groups
+- Select the security group that both your EC2 machine and your database use
+- Click on the Inbound tab
+- Create a new Custom TCP rule that allows your private IP to talk to the database:
+	- add port 5432 (or whatever port you specified for your database)
+	- You can add the EC2 machine's IP address directly (e.g. 172.28.11.130) or set up a partial mask that will allow other machines from the same part of the network; for example - 172.28.11.00/24 . This may be desirable if you plan to have multiple machines on the same private network all talking to the same database.
+
+	See https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing for more information.
+
+	- Click 'Apply Rule Changes' to save your filter
+
+
+Your EC2 machine can now connect to your database! To instruct your notary to do so you need to pass the database arguments when running the web service and notary scans.
+
+	Option 1) Edit the 'server_args' and 'database_args' variables in admin/start_webserver.sh and admin/start_scan.sh. Add the --dbtype, --dbname, --dbhost, and --dbuser values.
+
+	Note that the database password is not stored in the configuration files but read from the 'NOTARY_DB_PASSWORD' environment variable. Set up the environment variable using the next step.
+
+	Option 2) Edit the 'server_args' and 'database_args' variables in admin/start_webserver.sh and admin/start_scan.sh. Add the --dburl switch to have them both read the database connection info from the 'DATABASE_URL' environment variable. Set up the environment variable using the next step.
+
+	Note the 'DATABASE_URL' variable will take a special form depending on the type of database you connect to. It will usually be similar to 'database_type://username:password@instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432/db_name'.
+
+
+
+Set up the environment variable by adding a line to admin/_common_functions.sh that uses the 'export' command:
+
+	>export NOTARY_DB_PASSWORD=correcthorsebatterystaple
+	or
+	>export DATABASE_URL=postgres://username:password@instance-name.xxxxxxxxxxxx.us-west-2.rds.amazonaws.com:5432/db_name
+
+
+Your notary will now be able to read the correct connection settings even after rebooting.
+
+
 
 Advanced: Securing EC2 machines
 ===============================

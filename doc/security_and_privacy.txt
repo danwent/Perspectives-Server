@@ -10,6 +10,13 @@ Suggestions are welcome. If you have an idea or find a bug please let us know!
 - Raise "400 Bad Request" errors if any unexpected parameters are sent
 
 
+In addition the server has the following stability features:
+
+- Limit the total number of simultaneous on-demand scans (default 10)
+- Limit one on-demand scan of any particular site at a time
+- Serve HTTP 503 but continue running if both the cache and database are unavailable
+
+
 
 Planned improvements
 --------------------
