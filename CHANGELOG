@@ -12,6 +12,25 @@ We attempt to use meaningful version numbers, following semver.org:
 	PATCH version when you make backwards-compatible bug fixes.
 
 
+3.4
+---
++ Add --cache-duration switch to allow control of cache expiry
+* Lower default cache expiry to 12 hours to fit with notary defaults
++ Add switches to expose control of socket_queue_size and thread_pool, to allow performance tuning
+* Convert scanner modules to use standard python logging (for better control)
++ Add --quiet mode for scans
+* Add --screen-echo argument alias
++ Add --cache-only argument, to avoid reading from the database
+* Add error message when connecting to the database fails with a blank password
+* Fix formatting for creating database check constraints
+* Organize and explain argument customization in admin scripts
++ Document performance tuning and cache duration behaviour
++ Update amazon guide:
+	+ Add steps for verifying host ssh fingerprint
+	+ Add requirements and notes on avoiding surprise costs
+	+ Add section on using a Relational Database Service (RDS)
+
+
 3.3.1
 -----
 * Properly catch and log known exceptions during scans
