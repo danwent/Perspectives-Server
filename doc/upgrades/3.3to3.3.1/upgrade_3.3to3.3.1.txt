@@ -1,8 +1,0 @@
-Version 3.3.1 contains only code and documentation changes; all data stays the same.
-
-Therefore - upgrading is easy! Simply sync the code and restart your server!
-
-1. >git pull
-2. Restart the server
-
-Congrats, you're done! Enjoy!
