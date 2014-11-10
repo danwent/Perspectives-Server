@@ -35,6 +35,10 @@ When run this software does three things:
 Installing this software and launching the server will take care of tasks 1 and 2.
 To run a notary it is important to set a scheduled task (whether via crontab or some other method) to cover step 3, allowing the server to generate a history of keys for each service over time.
 
+### API
+
+See the [network notary API document](doc/api.md) for details.
+
 ### Technical Details
 
 The Perspectives server implements "on-demand probing": if you query for a service that is not in the database the notary will automatically kick-off a probe for that service.
