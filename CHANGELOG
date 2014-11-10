@@ -12,6 +12,12 @@ We attempt to use meaningful version numbers, following semver.org:
 	PATCH version when you make backwards-compatible bug fixes.
 
 
+NEXT
+----
+* Convert README to markdown format
+* Add document explaining the notary API
+
+
 3.4
 ---
 + Add --cache-duration switch to allow control of cache expiry
