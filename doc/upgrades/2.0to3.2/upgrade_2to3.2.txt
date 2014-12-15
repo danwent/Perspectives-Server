@@ -1,4 +1,4 @@
-So you're upgrading to Perspectives Server version 3! Congratulations :) Here's how.
+So you're upgrading from Perspectives Server version 2! Congratulations :) Here's how.
 
 
 0. Install Prerequisites:
@@ -176,11 +176,11 @@ So you're upgrading to Perspectives Server version 3! Congratulations :) Here's 
 	Option b: export and re-import your data.
 	This option is useful if you prefer not to work with SQL.
 
-	3b.i) Export your data using the special db2file_2to3.py module.
+	3b.i) Export your data using the special db2file_2to3.2.py module.
 
 		This module reads data from a 2.x database schema and exports it in the format expected by a 3.x database reader.
 
-		>python doc/upgrade2xto3x/db2file_2to3.py upgraded_data.txt
+		>python doc/upgrade2xto3x/db2file_2to3.2.py upgraded_data.txt
 
 	3b.ii) Rename your database.
 

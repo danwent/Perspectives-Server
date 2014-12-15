@@ -1,6 +1,6 @@
 In Perspectives server version 3.1 a table and column were added to track the machine name as part of metrics data. This was used to troubleshoot a potential issue running notaries on environments that use multiple machines (such as distributed cloud platforms). The issue was determined to not be a problem and the table and column were removed in version 3.2.
 
-You only need follow these steps in the unlikely event that you are upgrading a notary from version 3.1 to 3.2. If you are upgrading a 2.x notary to version 3.2 or later (or running any notary version 3.2 or later) these steps are not needed.
+You only need follow these steps in the unlikely event that you are upgrading a notary from version 3.1 to 3.2. If you are upgrading a 2.x notary to version 3.2 (or running any notary version 3.2 or later) these steps are not needed.
 
 
 

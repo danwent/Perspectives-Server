@@ -1,4 +1,4 @@
-Version 3.3 contains only code and documentation changes; all data stays the same.
+The current version contains only code and documentation changes; all data stays the same.
 
 Therefore - upgrading is easy! Simply sync the code and restart your server!
 

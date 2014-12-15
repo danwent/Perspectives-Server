@@ -285,12 +285,12 @@ class NotaryHTTPServer:
 
 		#TODO: don't reference session directly
 		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
-			return self.calculate_service_xml(service, host, port, service_type)
+			return self.calculate_service_xml(service, service_type)
 		else:
 			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
-	def calculate_service_xml(self, service, host, port, service_type):
+	def calculate_service_xml(self, service, service_type):
 		"""
 		Query the database and build a response containing any known keys for the given service.
 		"""
