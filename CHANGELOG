@@ -16,6 +16,8 @@ NEXT
 ----
 * Convert README to markdown format
 * Add document explaining the notary API
+* Fix 'upgrades' directory so steps are more clear
+* Clean up unused function parameters
 
 
 3.4
