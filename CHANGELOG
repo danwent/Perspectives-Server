@@ -14,7 +14,7 @@ We attempt to use meaningful version numbers, following semver.org:
 
 NEXT
 ----
-* Convert README to markdown format
+* Convert README and Amazon guide to markdown format
 * Add document explaining the notary API
 * Fix 'upgrades' directory so steps are more clear
 * Clean up unused function parameters
