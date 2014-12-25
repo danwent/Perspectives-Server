@@ -28,7 +28,7 @@ As of this writing:
 * 15 GB of bandwidth out
 
 
-**Caution:** While setting up a micro ec2 instance is free, if you use a larger instance type or run an intensive process, Amazon will charge you money. You may wish to set up Amazon alerts to notify you of usage beyond the free tier limits; use the ```--quiet``` option when performing scans; and/or use a Relational Database Service rather than storing data in sqlite on disk.
+**Caution:** While setting up a micro ec2 instance is free, if you use a larger instance type or run an intensive process, Amazon will charge you money. You may wish to set up Amazon alerts to notify you of usage beyond the free tier limits, and/or use the ```--quiet``` option when performing scans.
 
 
 ## Setup
@@ -210,7 +210,9 @@ For more information see the [README file](../../README.md) or the doc/ director
 
 ## Optional: Setting up a Relational Database Service
 
-You may wish to use a Relational Database Service (RDS) instead of writing to an sqlite database on disk. This can save lots of IOPs if you are using an EBS disk, which can be costly if you have a large number of services (e.g. hundreds of thousands). Data transfer between Amazon RDS and Amazon EC2 machines is free.
+**Note:** As of June 2014, Amazon [no longer charges for EBS based on the amount of reads or writes performed](https://aws.amazon.com/blogs/aws/new-ssd-backed-elastic-block-storage). Thus it is no longer as necessary to host notary data inside an RDS. However, this section is left intact for anyone who wishes to do so.
+
+You may wish to use a Relational Database Service (RDS) instead of writing to an sqlite database on disk. Data transfer between Amazon RDS and Amazon EC2 machines is free.
 
 To set up a RDS:
 
