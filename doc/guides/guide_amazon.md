@@ -93,6 +93,7 @@ Choose an Ubuntu server AMI by clicking on the "Community AMIs" tab and finding 
 
 * Make sure the image is free tier eligible (denoted by a yellow star or the text "Free tier eligible").
 * Use an image with a "Root Store" of "ebs", as this means that even if this particular instance dies, you can spin up a new instance and reattach the same disk. This ensures you do not lose your data.
+* We recommend [encrypting](https://aws.amazon.com/blogs/aws/protect-your-data-with-new-ebs-encryption/) your EBS volume
 * 64-bit image is suggested.
 * Choosing a Long Term Support (LTS) build is advised so you can easily update packages and security fixes. You can see the exact version for an image by reading the "Manifest" field.
 
@@ -281,6 +282,10 @@ Your notary will now be able to read the correct connection settings even after 
 ## Advanced: Securing EC2 machines
 
 There are many steps you can take to secure your EC2 machine, depending on what OS or AMI type you selected. Here are a few resources to get you started; contributions to this document are welcome (or start a thread on the mailing list).
+
+### General
+
+* [Enable EBS volume encryption when creating your volume](https://aws.amazon.com/blogs/aws/protect-your-data-with-new-ebs-encryption/)
 
 
 ### Ubuntu LTS 12.04
