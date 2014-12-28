@@ -16,6 +16,7 @@ NEXT
 ----
 * Convert README and Amazon guide to markdown format
 * Add document explaining the notary API
+* Add basic guide on using nginx as a cache and proxy
 * Fix 'upgrades' directory so steps are more clear
 * Clean up unused function parameters
 
