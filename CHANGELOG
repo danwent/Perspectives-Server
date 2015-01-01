@@ -12,9 +12,12 @@ We attempt to use meaningful version numbers, following semver.org:
 	PATCH version when you make backwards-compatible bug fixes.
 
 
-NEXT
-----
+3.4.1
+-----
+* Fix HTML in static index page
+* Move CSS to its own file, rather than inline, so Content Security Policies can be properly applied.
 * Convert README and Amazon guide to markdown format
+* Update Amazon guide
 * Add document explaining the notary API
 * Add basic guide on using nginx as a cache and proxy
 * Fix 'upgrades' directory so steps are more clear

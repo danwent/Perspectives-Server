@@ -45,6 +45,11 @@ While Running:
 - If the visitor simply goes to the index do they get the HTML explanation page?
 	- Are the public key and version number displayed?
 	- Is the metric on/off status displayed on the page?
+	- Is the SNI scan on/off status displayed on the page?
+	- Do the HTML and CSS validate properly? e.g. with:
+		http://validator.w3.org/
+		http://jigsaw.w3.org/css-validator/
+	- Do the HTML and CSS display properly when a Content Security Policy is applied?
 - If the service_type is unknown do they get a 400 error?
 - If any extra, unknown parameters are passed does the server raise a 400 error?
 - Does the favicon work?
