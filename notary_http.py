@@ -22,8 +22,7 @@ import os
 import re
 import struct
 import sys
-import threading 
-import traceback 
+import threading
 from xml.dom.minidom import getDOMImplementation
 
 import cherrypy
@@ -458,7 +457,7 @@ class OnDemandScanThread(threading.Thread):
 			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
 		except Exception as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
-			traceback.print_exc(file=sys.stdout)
+			logging.exception(e)
 		finally:
 			self.server_obj.scan_finished(self.sid)
 
