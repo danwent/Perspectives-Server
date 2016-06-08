@@ -54,6 +54,7 @@ class NotaryHTTPServer(object):
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
 	LOG_FILE = 'webserver.log'
+	CHERRYPY_FILE = 'cherrypy.log'
 
 	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
 
@@ -499,7 +500,7 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'cherrypy.lib.cptools.log_request_headers': False,
 			 'tools.log_headers.on': False,
 			 # end of privacy settings
-			 'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.LOG_FILE),
+			 'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE),
 			 'log.screen' : False } ) 
 
 if (notary.args.echo_screen):
