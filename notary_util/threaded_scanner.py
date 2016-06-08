@@ -65,13 +65,13 @@ class ScanThread(threading.Thread):
 		self.sni = sni
 		self.global_stats.threads[sid] = time.time() 
 
-	def get_errno(self, e):
+	def _get_errno(self, e):
 		try: 
 			return e.args[0]
 		except: 
 			return 0 # no error
 
-	def record_failure(self, e):
+	def _record_failure(self, e):
 		"""Record an exception that happened during a scan."""
 		stats.failures += 1
 		db.report_metric('ServiceScanFailure', str(e))
@@ -85,7 +85,7 @@ class ScanThread(threading.Thread):
 			stats.failure_other += 1
 			return
 
-		err = self.get_errno(e) 
+		err = self._get_errno(e)
 		if err == errno.ECONNREFUSED or err == errno.EINVAL:
 			stats.failure_conn_refused += 1
 		elif err == errno.EHOSTUNREACH or err == errno.ENETUNREACH: 
@@ -107,7 +107,7 @@ class ScanThread(threading.Thread):
 				stats.failures += 1
 				stats.failure_socket += 1
 		except Exception, e:
-			self.record_failure(e) 
+			self._record_failure(e)
 			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
 			logging.exception(e)
 
@@ -137,7 +137,7 @@ class GlobalStats(object):
 		self.failure_other = 0 
 	
 
-def record_observations_in_db(res_list):
+def _record_observations_in_db(res_list):
 	if len(res_list) == 0:
 		return
 	try:
@@ -222,7 +222,7 @@ def main():
 
 			if (stats.num_started % rate) == 0:
 				time.sleep(1)
-				record_observations_in_db(res_list)
+				_record_observations_in_db(res_list)
 				res_list = []
 				so_far = int(time.time() - start_time)
 				logging.info("%s seconds passed.  %s complete, %s " \
@@ -268,7 +268,7 @@ def main():
 
 	# record any observations made since we finished the
 	# main for-loop
-	record_observations_in_db(res_list)
+	_record_observations_in_db(res_list)
 
 	duration = int(time.time() - start_time)
 	localtime = time.asctime( time.localtime(start_time) )
