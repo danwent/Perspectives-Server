@@ -251,7 +251,7 @@ class ndb(object):
 		# so there are no errors.
 		good_args = ndb.__filter_args(vars(args))
 
-		if (good_args['read_config_file']):
+		if ('read_config_file' in good_args and good_args['read_config_file']):
 			good_args = self._set_config_args()
 
 		self.__actual_init(**good_args)
