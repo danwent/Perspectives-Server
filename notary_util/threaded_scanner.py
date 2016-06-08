@@ -27,7 +27,7 @@ import logging
 import os
 import sys
 import threading
-import time 
+import time
 
 import notary_common
 import notary_logs
@@ -65,13 +65,14 @@ class ScanThread(threading.Thread):
 		self.sni = sni
 		self.global_stats.threads[sid] = time.time() 
 
-	def get_errno(self, e): 
+	def get_errno(self, e):
 		try: 
 			return e.args[0]
 		except: 
 			return 0 # no error
 
-	def record_failure(self, e,): 
+	def record_failure(self, e):
+		"""Record an exception that happened during a scan."""
 		stats.failures += 1
 		db.report_metric('ServiceScanFailure', str(e))
 		if (isinstance(e, SSLScanTimeoutException)):
@@ -94,10 +95,10 @@ class ScanThread(threading.Thread):
 		elif err == -2 or err == -3 or err == -5 or err == 8: 
 			stats.failure_dns += 1
 		else: 	
-			stats.failure_other += 1 
+			stats.failure_other += 1
 
 	def run(self): 
-		try: 
+		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
 				res_list.append((self.sid,fp))
@@ -136,11 +137,11 @@ class GlobalStats(object):
 		self.failure_other = 0 
 	
 
-def record_observations_in_db(res_list): 
-	if len(res_list) == 0: 
+def record_observations_in_db(res_list):
+	if len(res_list) == 0:
 		return
-	try: 
-		for r in res_list: 
+	try:
+		for r in res_list:
 			db.report_observation(r[0], r[1])
 	except Exception as e:
 		# TODO: we should probably retry here 
