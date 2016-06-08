@@ -28,7 +28,6 @@ import os
 import sys
 import threading
 import time 
-import traceback 
 
 import notary_common
 import notary_logs
@@ -96,8 +95,6 @@ class ScanThread(threading.Thread):
 			stats.failure_dns += 1
 		else: 	
 			stats.failure_other += 1 
-			logging.error("Unknown error scanning '%s'\n" % self.sid)
-			traceback.print_exc(file=sys.stdout)
 
 	def run(self): 
 		try: 
@@ -111,6 +108,7 @@ class ScanThread(threading.Thread):
 		except Exception, e:
 			self.record_failure(e) 
 			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
+			logging.exception(e)
 
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
@@ -144,11 +142,11 @@ def record_observations_in_db(res_list):
 	try: 
 		for r in res_list: 
 			db.report_observation(r[0], r[1])
-	except:
+	except Exception as e:
 		# TODO: we should probably retry here 
-		logging.critical("DB Error: Failed to write res_list of length %s" % \
-					len(res_list))
-		traceback.print_exc(file=sys.stdout)
+		logging.critical("DB Error: Failed to write res_list of length {0}".format(
+					len(res_list)))
+		logging.exception(e)
 
 
 def _parse_args():
