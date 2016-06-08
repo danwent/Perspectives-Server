@@ -26,8 +26,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import traceback
-
 
 def attempt_observation_for_service(service, timeout):
 	# note: timeout is ignored for now
@@ -86,6 +84,6 @@ if __name__ == "__main__":
 	try: 
 		fp = attempt_observation_for_service(service, 10)
 		print("Successful scan complete: '%s' has key '%s' " % (service, fp))
-	except:
+	except Exception as e:
 		print("Error scanning for %s" % service)
-		traceback.print_exc(file=sys.stdout)
+		logging.exception(e)
