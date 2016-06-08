@@ -35,7 +35,7 @@ from util import crypto, cache
 from util.keymanager import keymanager
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
-class NotaryHTTPServer:
+class NotaryHTTPServer(object):
 	"""
 	Network Notary server for the Perspectives project
 	( http://perspectives-project.org/ )

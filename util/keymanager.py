@@ -26,7 +26,7 @@ import keygen
 import crypto
 
 
-class keymanager:
+class keymanager(object):
 	"""Read, set, create, and export public and private server keys."""
 
 	ENV_PUB_KEY_NAME='NOTARY_PUBLIC_KEY'

@@ -180,7 +180,7 @@ def ratelimited(max_per_second=1):
 	return decorate
 
 
-class ndb:
+class ndb(object):
 	"""
 	Notary database interface - create and interact with database tables.
 

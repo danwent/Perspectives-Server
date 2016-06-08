@@ -55,7 +55,7 @@ class Observations(ORMBase):
 	end = Column(Integer)
 
 
-class ndb2x:
+class ndb2x(object):
 	"""
 	This is a pared-down version of the notary database class
 	solely so we can export our data.
