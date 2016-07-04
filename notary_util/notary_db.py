@@ -21,6 +21,8 @@ This allows us to drop in any database without changing code,
 and keeps things modular for easier refactoring.
 """
 
+from __future__ import print_function
+
 import argparse
 from contextlib import contextmanager
 import logging
@@ -476,9 +478,9 @@ class ndb:
 
 		# print a header to make file purpose clear
 		with open(self.NOTARY_CONFIG_FILE, 'w') as f:
-			print >> f, "# Network notary database configuration settings -"
-			print >> f, "# for easy sharing of db configs between tools."
-			print >> f, "# Run `python notary_http.py --help` for more info.\n"
+			print("# Network notary database configuration settings -", file=f)
+			print("# for easy sharing of db configs between tools.", file=f)
+			print("# Run `python notary_http.py --help` for more info.\n", file=f)
 
 		config = ConfigParser.SafeConfigParser()
 		config.add_section(self.CONFIG_SECTION)
@@ -488,7 +490,7 @@ class ndb:
 		with open(self.NOTARY_CONFIG_FILE, 'a') as configfile:
 			config.write(configfile)
 
-		print "Notary database config saved in %s." % self.NOTARY_CONFIG_FILE
+		print("Notary database config saved in %s." % self.NOTARY_CONFIG_FILE)
 
 	def _read_db_config(self):
 		"""Read ndb args from the config file and return as a list."""
@@ -505,7 +507,7 @@ class ndb:
 	def _set_config_args(self):
 		"""Sanitize and set up ndb arguments read from a config file."""
 
-		print "Reading config data from %s." % self.NOTARY_CONFIG_FILE
+		print("Reading config data from %s." % self.NOTARY_CONFIG_FILE)
 		temp_args = self._read_db_config()
 		good_args = {}
 
@@ -866,7 +868,7 @@ class ndb:
 
 	def __print_metric(self, event_type, comment):
 		"""Print metric to stdout. External callers should use report_metric() instead."""
-		print "%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment))
+		print("%s|%s|%s|%s" % (self.METRIC_PREFIX, event_type, int(time.time()), str(comment)))
 
 if __name__ == "__main__":
 	args = ndb.get_parser().parse_args()
