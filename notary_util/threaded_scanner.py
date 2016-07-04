@@ -19,6 +19,8 @@ Scan a list of services and update Observation records in the notary database.
 For running scans without connecting to the database see util/simple_scanner.py.
 """
 
+from __future__ import print_function
+
 import argparse
 import errno
 import logging
@@ -186,9 +188,9 @@ localtime = time.asctime( time.localtime(start_time) )
 # if we're accepting data piped from another process
 all_sids = [ line.rstrip() for line in f ]
 
-print "Starting scan of %s service-ids at: %s" % (len(all_sids), localtime)
-print "INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
-    (timeout_sec, rate) 
+print("Starting scan of %s service-ids at: %s" % (len(all_sids), localtime))
+print("INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
+    (timeout_sec, rate) )
 ndb.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
 for sid in all_sids:  
@@ -252,8 +254,8 @@ record_observations_in_db(res_list)
 
 duration = int(time.time() - start_time)
 localtime = time.asctime( time.localtime(start_time) )
-print "Ending scan at: %s" % localtime
-print "Scan of %s services took %s seconds.  %s Failures" % \
-	(stats.num_started,duration, stats.failures)
+print("Ending scan at: %s" % localtime)
+print("Scan of %s services took %s seconds.  %s Failures" % \
+	(stats.num_started,duration, stats.failures))
 ndb.report_metric('ServiceScanStop')
 exit(0) 
