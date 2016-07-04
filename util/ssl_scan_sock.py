@@ -25,6 +25,7 @@ import binascii
 import errno
 import hashlib
 import logging
+import os
 import socket
 import struct
 import sys
@@ -215,7 +216,8 @@ def _run_scan(dns, port, timeout_sec, sni_query):
 			client_hello_hex = _get_standard_client_hello()
 
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		sock.setblocking(0) 
+		if os.name != "nt":
+			sock.setblocking(0)
 		_do_connect(sock, dns, int(port),timeout_sec)
 		client_hello = binascii.a2b_hex(client_hello_hex)
 		_send_data(sock, client_hello,timeout_sec)
