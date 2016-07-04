@@ -145,29 +145,31 @@ def record_observations_in_db(res_list):
 		traceback.print_exc(file=sys.stdout)
 
 
+def _parse_args():
+	"""Parse arguments and return the populated namespace."""
+	parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
+	description=__doc__)
 
-parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
-description=__doc__)
+	parser.add_argument('service_id_file', type=argparse.FileType('r'), nargs='?', default=DEFAULT_INFILE,
+				help="File that contains a list of service names - one per line. Will read from stdin by default.")
+	parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAULT_SCANS, const=DEFAULT_SCANS, type=int,
+				help="How many scans to run per second. Default: %(default)s.")
+	parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
+				help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
+	parser.add_argument('--sni', action='store_true', default=False,
+				help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+				Default: \'%(default)s\'")
+	loggroup = parser.add_mutually_exclusive_group()
+	loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
+				help="Verbose mode. Print more info about each scan.")
+	loggroup.add_argument('--quiet', '-q', default=False, action='store_true',
+				help="Quiet mode. Only print system-critical problems.")
 
-parser.add_argument('service_id_file', type=argparse.FileType('r'), nargs='?', default=DEFAULT_INFILE,
-			help="File that contains a list of service names - one per line. Will read from stdin by default.")
-parser.add_argument('--scans', '--scans-per-sec', '-s', nargs='?', default=DEFAULT_SCANS, const=DEFAULT_SCANS, type=int,
-			help="How many scans to run per second. Default: %(default)s.")
-parser.add_argument('--timeout', '--wait', '-w', nargs='?', default=DEFAULT_WAIT, const=DEFAULT_WAIT, type=int,
-			help="Maximum number of seconds each scan will wait (asychronously) for results before giving up. Default: %(default)s.")
-parser.add_argument('--sni', action='store_true', default=False,
-			help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
-			Default: \'%(default)s\'")
-loggroup = parser.add_mutually_exclusive_group()
-loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
-			help="Verbose mode. Print more info about each scan.")
-loggroup.add_argument('--quiet', '-q', default=False, action='store_true',
-			help="Quiet mode. Only print system-critical problems.")
+	args = parser.parse_args()
+	return args
 
-args = parser.parse_args()
 
-# pass ndb the args so it can use any relevant ones from its own parser
-ndb = ndb(args)
+args = _parse_args()
 
 loglevel = logging.WARNING
 if (args.verbose):
@@ -175,6 +177,9 @@ if (args.verbose):
 elif (args.quiet):
 	loglevel = logging.CRITICAL
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=loglevel)
+
+# pass ndb the args so it can use any relevant ones from its own parser
+ndb = ndb(args)
 
 res_list = [] 
 stats = GlobalStats()
