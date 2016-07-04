@@ -15,7 +15,6 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import errno
 import os
 import re
 import struct
@@ -26,10 +25,11 @@ from xml.dom.minidom import getDOMImplementation
 
 import cherrypy
 
+from notary_util import notary_common
+from notary_util import notary_logs
+from notary_util.notary_db import ndb
 from util import crypto, cache
 from util.keymanager import keymanager
-from notary_util.notary_db import ndb
-from notary_util import notary_common
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
 class NotaryHTTPServer:
@@ -50,7 +50,6 @@ class NotaryHTTPServer:
 	ENV_PORT_KEY_NAME='PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
-	LOG_DIR = 'logs'
 	LOG_FILE = 'webserver.log'
 
 	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
@@ -143,7 +142,7 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		self._create_dir(self.LOG_DIR)
+		notary_logs.create_log_dir()
 
 		self.use_sni = args.sni
 		self.create_static_index()
@@ -254,18 +253,6 @@ class NotaryHTTPServer:
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:
 			print >> i, lines
-
-	def _create_dir(self, path):
-		"""Create a directory if it doesn't already exist."""
-		# use try/except here to avoid a race condition when checking for existance
-		try:
-			os.makedirs(path)
-		except OSError as e:
-			if (os.path.exists(path) and not os.path.isdir(path)):
-				print >> sys.stderr, "ERROR: Could not create log directory '{0}': a file with that name already exists.".format(path)
-				exit(1)
-			elif e.errno != errno.EEXIST:
-				raise
 
 	def get_xml(self, host, port, service_type):
 		"""Fetch the xml response for a given service."""
@@ -500,7 +487,7 @@ cherrypy.config.update({ 'server.socket_port' : notary.web_port,
 			 'cherrypy.lib.cptools.log_request_headers': False,
 			 'tools.log_headers.on': False,
 			 # end of privacy settings
-			 'log.error_file' : '{0}/{1}'.format(notary.LOG_DIR, notary.LOG_FILE),
+			 'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.LOG_FILE),
 			 'log.screen' : False } ) 
 
 if (notary.args.echo_screen):
