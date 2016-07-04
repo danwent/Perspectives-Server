@@ -143,7 +143,7 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		self.create_folder(self.LOG_DIR)
+		self._create_dir(self.LOG_DIR)
 
 		self.use_sni = args.sni
 		self.create_static_index()
@@ -255,8 +255,8 @@ class NotaryHTTPServer:
 		with open (index, 'w') as i:
 			print >> i, lines
 
-	def create_folder(self, path):
-		"""Create a folder if it doesn't already exist."""
+	def _create_dir(self, path):
+		"""Create a directory if it doesn't already exist."""
 		# use try/except here to avoid a race condition when checking for existance
 		try:
 			os.makedirs(path)
