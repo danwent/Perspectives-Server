@@ -111,7 +111,7 @@ class ScanThread(threading.Thread):
 		
 		del self.global_stats.threads[self.sid]
 
-class GlobalStats(): 
+class GlobalStats(object):
 
 	def __init__(self): 
 		self.failures = 0
