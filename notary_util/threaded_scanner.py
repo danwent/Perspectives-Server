@@ -43,6 +43,10 @@ from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutEx
 DEFAULT_SCANS = 10
 DEFAULT_WAIT = 20
 DEFAULT_INFILE = "-"
+LOGFILE = "scanner.log"
+LOGGING_FORMAT = '%(asctime)s %(levelname)s: %(message)s'
+LOGGING_MAXBYTES = 1024 * 1024 * 10
+LOGGING_BACKUP_COUNT = 10
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
@@ -161,7 +165,8 @@ def _parse_args():
 				Default: \'%(default)s\'")
 	parser.add_argument('--logfile', action='store_true', default=False,
 				help="Log to a file on disk rather than standard out.\
-				Default: \'%(default)s\'")
+				A rotating set of {0} logs will be used, each captuning up to {1} bytes.\
+				Default: \'%(default)s\'".format(LOGGING_BACKUP_COUNT ,LOGGING_MAXBYTES))
 	loggroup = parser.add_mutually_exclusive_group()
 	loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
 				help="Verbose mode. Print more info about each scan.")
