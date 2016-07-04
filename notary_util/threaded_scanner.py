@@ -24,6 +24,7 @@ from __future__ import print_function
 import argparse
 import errno
 import logging
+import logging.handlers
 import os
 import sys
 import threading
@@ -31,6 +32,7 @@ import time
 import traceback 
 
 import notary_common
+import notary_logs
 from notary_db import ndb
 
 # TODO: HACK
@@ -184,7 +186,17 @@ if (args.verbose):
 	loglevel = logging.INFO
 elif (args.quiet):
 	loglevel = logging.CRITICAL
-logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=loglevel)
+
+if args.logfile:
+	log_file = notary_logs.get_log_file(LOGFILE)
+	logger = logging.getLogger()
+	log_handler = logging.handlers.RotatingFileHandler(log_file,
+		maxBytes=LOGGING_MAXBYTES, backupCount=LOGGING_BACKUP_COUNT)
+	log_handler.setLevel(loglevel)
+	log_handler.setFormatter(logging.Formatter(fmt=LOGGING_FORMAT))
+	logger.addHandler(log_handler)
+else:
+	logging.basicConfig(format=LOGGING_FORMAT, level=loglevel)
 
 # pass ndb the args so it can use any relevant ones from its own parser
 ndb = ndb(args)
