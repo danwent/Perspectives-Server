@@ -159,6 +159,9 @@ def _parse_args():
 	parser.add_argument('--sni', action='store_true', default=False,
 				help="use Server Name Indication. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
 				Default: \'%(default)s\'")
+	parser.add_argument('--logfile', action='store_true', default=False,
+				help="Log to a file on disk rather than standard out.\
+				Default: \'%(default)s\'")
 	loggroup = parser.add_mutually_exclusive_group()
 	loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
 				help="Verbose mode. Print more info about each scan.")
