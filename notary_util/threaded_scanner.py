@@ -109,7 +109,8 @@ class ScanThread(threading.Thread):
 		self.global_stats.num_completed += 1
 		self.global_stats.active_threads -= 1
 		
-		del self.global_stats.threads[self.sid]
+		if self.sid in self.global_stats.threads:
+			del self.global_stats.threads[self.sid]
 
 class GlobalStats(object):
 
