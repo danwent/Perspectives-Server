@@ -23,6 +23,7 @@ and keeps things modular for easier refactoring.
 
 import argparse
 from contextlib import contextmanager
+import logging
 import os
 import re
 import sys
@@ -165,7 +166,7 @@ def ratelimited(max_per_second=1):
 				# while not printing the log too often -
 				# that would slow down the system and defeat the purpose of rate limiting.
 				if ((curtime - last_warned[0] >= warn_every) and (num_skips[0] > 0)):
-					print >> sys.stderr, "WARNING: Skipped %s calls to '%s()' in %s seconds." % (num_skips[0], func.__name__, warn_every)
+					logging.warn("WARNING: Skipped %s calls to '%s()' in %s seconds." % (num_skips[0], func.__name__, warn_every))
 					last_warned[0] = curtime
 					num_skips[0] = 0
 			else:
@@ -310,7 +311,7 @@ class ndb:
 
 		else:
 			errmsg = "'%s' is not a supported database type" % dbtype
-			print >> sys.stderr, errmsg
+			logging.error(errmsg)
 			raise Exception(errmsg)
 
 		# set up sqlalchemy objects
@@ -326,9 +327,9 @@ class ndb:
 		try:
 			ORMBase.metadata.create_all(self.db)
 		except Exception as e:
-			print >> sys.stderr, "Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e))
+			logging.error("Database error: '%s'. Could not connect to database! Please check your database status. " % (str(e)))
 			if (self.DB_PASSWORD_FIELD not in os.environ):
-				print >> sys.stderr, "The environment variable '{0}' does not exist. Did you mean to specify a database password?".format(self.DB_PASSWORD_FIELD)
+				logging.error("The environment variable '{0}' does not exist. Did you mean to specify a database password?".format(self.DB_PASSWORD_FIELD))
 			raise
 
 		listen(Pool, 'checkout', self._on_connection_checkout)
@@ -361,19 +362,19 @@ class ndb:
 						self.EVENT_TYPES[name] = evt.event_type_id
 
 					except ProgrammingError as e:
-						print >> sys.stderr, "Error creating Event type '%s': '%s'." % (name, e)
+						logging.error("Error creating Event type '%s': '%s'." % (name, e))
 						session.rollback()
 						if (self.metricsdb):
 							self.metricsdb = False
-							print >> sys.stderr, "Cannot log performance metrics to a database without event types - metrics will be disabled."
+							logging.error("Cannot log performance metrics to a database without event types - metrics will be disabled.")
 							break
 
 	def __del__(self):
 		"""Clean up any remaining database connections."""
 
 		if (self.get_connection_count() != 0):
-			print >> sys.stderr, "ERROR: {0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
-				self.get_connection_count())
+			logging.error("ERROR: {0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
+				self.get_connection_count()))
 
 		if ((hasattr(self, '_Session')) and (self._Session != None)):
 			try:
@@ -381,7 +382,7 @@ class ndb:
 				self._Session.remove()
 				del self._Session
 			except Exception as e:
-				print >> sys.stderr, "Error closing database sessions in destructor: '%s'" % (e)
+				logging.error("Error closing database sessions in destructor: '%s'" % (e))
 
 		if (hasattr(self, 'db')):
 			self.db.dispose()
@@ -498,7 +499,7 @@ class ndb:
 			items = config.items(self.CONFIG_SECTION)
 			return items
 		except ConfigParser.NoSectionError:
-			print >> sys.stderr, "Could not read config file. Please write one with --write-config-file before reading"
+			logging.error("Could not read config file. Please write one with --write-config-file before reading")
 			return ()
 
 	def _set_config_args(self):
@@ -674,7 +675,7 @@ class ndb:
 				session.add(srv)
 				session.commit()
 			except (ProgrammingError, IntegrityError, OperationalError) as e:
-				print >> sys.stderr, "Error inserting service '%s': '%s'" % (service_name, e)
+				logging.error("Error inserting service '%s': '%s'" % (service_name, e))
 				srv = None
 
 		return srv
@@ -687,7 +688,7 @@ class ndb:
 		'services': a list of service names.
 		"""
 		if len(services) < 1:
-			print >> sys.stderr, "Could not add services - no services in list."
+			logging.error("Could not add services - no services in list.")
 			return
 
 		with self._get_connection() as conn:
@@ -711,7 +712,7 @@ class ndb:
 					conn.execute(Services.__table__.insert(), services)
 
 			except IntegrityError as e:
-				print >> sys.stderr, "Error adding bulk services: '{0}'".format(e)
+				logging.error("Error adding bulk services: '{0}'".format(e))
 
 		return
 
@@ -734,7 +735,7 @@ class ndb:
 				filter(Services.name == service).\
 				values(Services.name, Observations.key, Observations.start, Observations.end)
 		except Exception as e:
-			print >> sys.stderr, "Error getting observations: '%s'" % (e)
+			logging.error("Error getting observations: '%s'" % (e))
 			# re-raise the error so the caller definitely knows something bad happened,
 			# as opposed to there being no observation records
 			raise
@@ -750,7 +751,7 @@ class ndb:
 					session.add(newob)
 					session.commit()
 				except (ProgrammingError, IntegrityError, OperationalError, ValueError) as e:
-					print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e)
+					logging.error("Error committing observation on key '%s' for service '%s': '%s'" % (key, service, e))
 			# else error already logged by previous function
 
 	def _update_observation_end_time(self, service, fp, old_end_time, new_end_time):
@@ -779,10 +780,10 @@ class ndb:
 					ob.end = new_end_time
 					session.commit()
 				else:
-					print >> sys.stderr, "Attempted to update the end time for service '%s' key '%s',\
-						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp)
+					logging.error("Attempted to update the end time for service '%s' key '%s',\
+						but no records for it were found! This is really bad; code shouldn't be here." % (service, fp))
 		except (OperationalError, ValueError) as e:
-			print >> sys.stderr, "Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e)
+			logging.error("Error committing observation on key '%s' for service '%s': '%s'" % (fp, service, e))
 
 	def report_observation(self, service, fp):
 		"""
@@ -845,7 +846,7 @@ class ndb:
 		"""Record a metric event in the database or the log."""
 		if self.is_metrics_enabled():
 			if (event_type not in self.EVENT_TYPES):
-				print >> sys.stderr, "Unknown event type '%s'. Please check your call to report_metric()." % event_type
+				logging.error("Unknown event type '%s'. Please check your call to report_metric()." % event_type)
 				self.report_metric('EventTypeUnknown', str(event_type) + "|" + str(comment))
 			else:
 				if (self.metricsdb):
@@ -858,9 +859,8 @@ class ndb:
 							session.commit()
 					except (ProgrammingError, OperationalError, ResourceClosedError, AttributeError) as e:
 						# ResourceClosedError can happen when the database is under heavy load
-						print >> sys.stderr, "Error committing metric: '%s'" % e
-						print >> sys.stderr, "Was trying to log the following metric:"
-						self.__print_metric(event_type, comment)
+						logging.error("Error committing metric: '%s'. Was trying to log the following metric: %s %s " % 
+							e, event_type, comment)
 				else:
 					self.__print_metric(event_type, comment)
 
