@@ -46,6 +46,10 @@ DEFAULT_WAIT = 20
 DEFAULT_INFILE = "-"
 LOGFILE = "scanner.log"
 
+stats = None
+db = None
+res_list = []
+
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
 # those that fail or hang after making some progress, as they could indicate
@@ -70,7 +74,7 @@ class ScanThread(threading.Thread):
 
 	def record_failure(self, e,): 
 		stats.failures += 1
-		ndb.report_metric('ServiceScanFailure', str(e))
+		db.report_metric('ServiceScanFailure', str(e))
 		if (isinstance(e, SSLScanTimeoutException)):
 			stats.failure_timeouts += 1
 			return
@@ -139,7 +143,7 @@ def record_observations_in_db(res_list):
 		return
 	try: 
 		for r in res_list: 
-			ndb.report_observation(r[0], r[1])
+			db.report_observation(r[0], r[1])
 	except:
 		# TODO: we should probably retry here 
 		logging.critical("DB Error: Failed to write res_list of length %s" % \
@@ -174,95 +178,102 @@ def _parse_args():
 	args = parser.parse_args()
 	return args
 
+def main():
+	"""Run the main program."""
 
-args = _parse_args()
+	global stats
+	global db
+	global res_list
 
-notary_logs.setup_logs(args.logfile, LOGFILE, verbose=args.verbose, quiet=args.quiet)
+	args = _parse_args()
 
-# pass ndb the args so it can use any relevant ones from its own parser
-ndb = ndb(args)
+	notary_logs.setup_logs(args.logfile, LOGFILE, verbose=args.verbose, quiet=args.quiet)
 
-res_list = [] 
-stats = GlobalStats()
-rate = args.scans
-timeout_sec = args.timeout
-f = args.service_id_file
-start_time = time.time()
-localtime = time.asctime( time.localtime(start_time) )
+	# pass ndb the args so it can use any relevant ones from its own parser
+	db = ndb(args)
+	stats = GlobalStats()
+	rate = args.scans
+	timeout_sec = args.timeout
+	f = args.service_id_file
+	start_time = time.time()
+	localtime = time.asctime( time.localtime(start_time) )
 
-# read all service names to start;
-# otherwise the database can lock up
-# if we're accepting data piped from another process
-all_sids = [ line.rstrip() for line in f ]
+	# read all service names to start;
+	# otherwise the database can lock up
+	# if we're accepting data piped from another process
+	all_sids = [ line.rstrip() for line in f ]
 
-print("Starting scan of %s service-ids at: %s" % (len(all_sids), localtime))
-print("INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
-    (timeout_sec, rate) )
-ndb.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
+	print("Starting scan of %s service-ids at: %s" % (len(all_sids), localtime))
+	print("INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
+	    (timeout_sec, rate) )
+	db.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
-for sid in all_sids:  
-	try: 
-		# ignore non SSL services
-		# TODO: use a regex instead
-		if sid.split(",")[1] == notary_common.SSL_TYPE:
-			stats.num_started += 1
-			t = ScanThread(sid,stats,timeout_sec,args.sni)
-			t.start()
- 
-		if (stats.num_started % rate) == 0: 
-			time.sleep(1)
-			record_observations_in_db(res_list) 
-			res_list = [] 
-			so_far = int(time.time() - start_time)
-			logging.info("%s seconds passed.  %s complete, %s " \
-				"failures.  %s Active threads" % \
-				(so_far, stats.num_completed,
-				stats.failures, stats.active_threads))
-			logging.info("  details: timeouts = %s, " \
-				"ssl-alerts = %s, no-route = %s, " \
-				"conn-refused = %s, conn-reset = %s,"\
-				"dns = %s, socket = %s, other = %s" % \
-				(stats.failure_timeouts,
-				stats.failure_ssl_alert,
-				stats.failure_no_route,
-				stats.failure_conn_refused,
-				stats.failure_conn_reset,
-				stats.failure_dns,
-				stats.failure_socket,
-				stats.failure_other))
+	for sid in all_sids:
+		try:
+			# ignore non SSL services
+			# TODO: use a regex instead
+			if sid.split(",")[1] == notary_common.SSL_TYPE:
+				stats.num_started += 1
+				t = ScanThread(sid,stats,timeout_sec,args.sni)
+				t.start()
 
-		if stats.num_started  % 1000 == 0: 
-			if (args.verbose):
-				logging.info("long running threads")
-				cur_time = time.time()
-				for sid in stats.threads.keys():
-					spawn_time = stats.threads.get(sid,cur_time)
-					duration = cur_time - spawn_time
-					if duration > 20:
-						logging.info("'%s' has been running for %s" %\
-						 (sid,duration))
+			if (stats.num_started % rate) == 0:
+				time.sleep(1)
+				record_observations_in_db(res_list)
+				res_list = []
+				so_far = int(time.time() - start_time)
+				logging.info("%s seconds passed.  %s complete, %s " \
+					"failures.  %s Active threads" % \
+					(so_far, stats.num_completed,
+					stats.failures, stats.active_threads))
+				logging.info("  details: timeouts = %s, " \
+					"ssl-alerts = %s, no-route = %s, " \
+					"conn-refused = %s, conn-reset = %s,"\
+					"dns = %s, socket = %s, other = %s" % \
+					(stats.failure_timeouts,
+					stats.failure_ssl_alert,
+					stats.failure_no_route,
+					stats.failure_conn_refused,
+					stats.failure_conn_reset,
+					stats.failure_dns,
+					stats.failure_socket,
+					stats.failure_other))
 
-	except IndexError:
-		logging.error("Service '%s' has no index [1] after splitting on ','.\n" % (sid))
-	except KeyboardInterrupt: 
-		exit(1)	
+			if stats.num_started  % 1000 == 0:
+				if (args.verbose):
+					logging.info("long running threads")
+					cur_time = time.time()
+					for sid in stats.threads.keys():
+						spawn_time = stats.threads.get(sid,cur_time)
+						duration = cur_time - spawn_time
+						if duration > 20:
+							logging.info("'%s' has been running for %s" %\
+							 (sid,duration))
 
-# finishing the for-loop means we kicked-off all threads, 
-# but they may not be done yet.  Wait for a bit, if needed.
-giveup_time = time.time() + (2 * timeout_sec) 
-while stats.active_threads > 0: 
-	time.sleep(1)
-	if time.time() > giveup_time: 
-		break
+		except IndexError:
+			logging.error("Service '%s' has no index [1] after splitting on ','.\n" % (sid))
+		except KeyboardInterrupt:
+			exit(1)
 
-# record any observations made since we finished the
-# main for-loop			
-record_observations_in_db(res_list)
+	# finishing the for-loop means we kicked-off all threads,
+	# but they may not be done yet.  Wait for a bit, if needed.
+	giveup_time = time.time() + (2 * timeout_sec)
+	while stats.active_threads > 0:
+		time.sleep(1)
+		if time.time() > giveup_time:
+			break
 
-duration = int(time.time() - start_time)
-localtime = time.asctime( time.localtime(start_time) )
-print("Ending scan at: %s" % localtime)
-print("Scan of %s services took %s seconds.  %s Failures" % \
-	(stats.num_started,duration, stats.failures))
-ndb.report_metric('ServiceScanStop')
-exit(0) 
+	# record any observations made since we finished the
+	# main for-loop
+	record_observations_in_db(res_list)
+
+	duration = int(time.time() - start_time)
+	localtime = time.asctime( time.localtime(start_time) )
+	print("Ending scan at: %s" % localtime)
+	print("Scan of %s services took %s seconds.  %s Failures" % \
+		(stats.num_started,duration, stats.failures))
+	db.report_metric('ServiceScanStop')
+	exit(0)
+
+if __name__ == "__main__":
+	main()
