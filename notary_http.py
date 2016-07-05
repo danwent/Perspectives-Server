@@ -15,6 +15,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+import logging
 import os
 import re
 import struct
@@ -69,6 +70,11 @@ class NotaryHTTPServer:
 		parser.add_argument('--sni', action='store_true', default=False,
 			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
 			 Default: \'%(default)s\'")
+		parser.add_argument('--logfile', action='store_true', default=False,
+				help="Log to a file on disk rather than standard out.\
+				A rotating set of {0} logs will be used, each captuning up to {1} bytes.\
+				Default: \'%(default)s\'".format(notary_logs.LOGGING_BACKUP_COUNT, notary_logs.LOGGING_MAXBYTES))
+
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
@@ -107,19 +113,20 @@ class NotaryHTTPServer:
 			help="The number of worker threads to start up in the pool. Must be a positive integer. Default: %(default)s.")
 
 		args = parser.parse_args()
+		notary_logs.setup_logs(args.logfile, self.LOG_FILE)
 
 		# pass ndb the args so it can use any relevant ones from its own parser
 		try:
 			self.ndb = ndb(args)
 		except Exception as e:
 			self.ndb = None
-			print >> sys.stderr, "Database error: '%s'" % (str(e))
+			logging.error("Database error: '%s'" % (str(e)))
 
 		# same for keymanager
 		km = keymanager(args)
 		(self.notary_public_key, self.notary_priv_key) = km.get_keys()
 		if (self.notary_public_key == None or self.notary_priv_key == None):
-			print >> sys.stderr, "Could not get public and private keys."
+			logging.error("Could not get public and private keys.")
 			exit(1)
 
 		self.web_port = self.DEFAULT_WEB_PORT
@@ -268,13 +275,13 @@ class NotaryHTTPServer:
 				else:
 					self.ndb.report_metric('CacheMiss', service)
 			except Exception as e:
-				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
+				logging.error("ERROR getting service from cache: %s\n" % (e))
 
 		#TODO: don't reference session directly
 		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, service_type)
 		else:
-			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
+			logging.error("ERROR: Database is not available to retrieve data, and data not in the cache.\n")
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
 	def calculate_service_xml(self, service, service_type):
@@ -442,7 +449,7 @@ class OnDemandScanThread(threading.Thread):
 			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
 		except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
-			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
+			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
 		except Exception as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
 			traceback.print_exc(file=sys.stdout)
