@@ -277,13 +277,13 @@ class NotaryHTTPServer:
 				else:
 					self.ndb.report_metric('CacheMiss', service)
 			except Exception as e:
-				logging.error("ERROR getting service from cache: %s\n" % (e))
+				logging.error("Error getting service from cache: %s\n" % (e))
 
 		#TODO: don't reference session directly
 		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, service_type)
 		else:
-			logging.error("ERROR: Database is not available to retrieve data, and data not in the cache.\n")
+			logging.error("Database is not available to retrieve data, and data not in the cache.\n")
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
 	def calculate_service_xml(self, service, service_type):

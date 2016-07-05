@@ -375,7 +375,7 @@ class ndb:
 		"""Clean up any remaining database connections."""
 
 		if (self.get_connection_count() != 0):
-			logging.error("ERROR: {0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
+			logging.error("{0} database connections remain open! This may indicate a programming error - please use 'with ndb.get_session:' to manage your session scope.".format(
 				self.get_connection_count()))
 
 		if ((hasattr(self, '_Session')) and (self._Session != None)):
