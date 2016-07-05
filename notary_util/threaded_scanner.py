@@ -47,8 +47,9 @@ DEFAULT_WAIT = 20
 DEFAULT_INFILE = "-"
 LOGFILE = "scanner.log"
 LOGGING_FORMAT = '%(asctime)s %(levelname)s: %(message)s'
+# put a limit on the amount of disk space used when logging to files
 LOGGING_MAXBYTES = 1024 * 1024 * 10
-LOGGING_BACKUP_COUNT = 10
+LOGGING_BACKUP_COUNT = 1
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
