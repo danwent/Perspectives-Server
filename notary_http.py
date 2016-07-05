@@ -14,6 +14,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function
+
 import argparse
 import logging
 import os
@@ -155,7 +157,7 @@ class NotaryHTTPServer:
 		self.create_static_index()
 		self.args = args
 
-		print "Using public key\n" + self.notary_public_key
+		print("Using public key\n" + self.notary_public_key)
 
 
 	# function to help with argument validation.
@@ -259,7 +261,7 @@ class NotaryHTTPServer:
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
 		with open (index, 'w') as i:
-			print >> i, lines
+			print(lines, file=i)
 
 	def get_xml(self, host, port, service_type):
 		"""Fetch the xml response for a given service."""
