@@ -30,6 +30,8 @@ you may want to run this *without* echoing database statements,
 both to improve speed and to avoid memory issues.
 """
 
+from __future__ import print_function
+
 import sys
 import os
 import re
@@ -43,7 +45,7 @@ DEFAULT_INFILE = "-"
 def import_records(infile):
 	"""Read a file of tuples and extract service and observation data."""
 
-	print "Reading records from '{0}'.".format(infile.name)
+	print("Reading records from '{0}'.".format(infile.name))
 
 	lines = infile.readlines()
 	infile.close()
@@ -88,23 +90,23 @@ def import_records(infile):
 
 		num_lines += 1
 		if (num_lines) % 100000 == 0:
-			print "Finished reading {0} lines...".format(num_lines)
+			print("Finished reading {0} lines...".format(num_lines))
 
-	print "Found {0} invalid lines. Exporting to {1}.".format(
-		len(invalid_lines), invalid_file)
+	print("Found {0} invalid lines. Exporting to {1}.".format(
+		len(invalid_lines), invalid_file))
 	with open(invalid_file,'w') as outfile:
 		for line in invalid_lines:
-			print >> outfile, line
+			print(line, file=outfile)
 
 	service_count = len(services)
 	if (service_count > 0):
-		print "Found {0} services. Adding to database.".format(service_count)
+		print("Found {0} services. Adding to database.".format(service_count))
 		ndb.insert_bulk_services(services.keys())
 	else:
-		print "No services found."
+		print("No services found.")
 
 	if not args.services_only:
-		print "Found %s observations. Adding to database." % len(observations)
+		print("Found %s observations. Adding to database." % len(observations))
 		#TODO: need to get the service_ids after services are inserted
 		for (service, key, start, end) in observations:
 			# NOTE! this is a special case use of _insert_observation() -

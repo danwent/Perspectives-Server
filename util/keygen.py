@@ -16,6 +16,8 @@
 
 """Generate a private and public RSA keypair using openssl."""
 
+from __future__ import print_function
+
 import os
 import re
 import stat
@@ -36,15 +38,15 @@ def generate_keypair(public_key_name=DEFAULT_PUB_NAME, private_key_name=DEFAULT_
 	"""Generate a private and public RSA keypair using ssl and write those keys to files."""
 
 	if not (os.path.isfile(private_key_name)):
-		print "Generating notary private key '%s'" % (private_key_name)
+		print("Generating notary private key '%s'" % (private_key_name))
 		ret = call(["openssl", "genrsa", "-out", private_key_name, str(NEW_KEY_LENGTH)])
 		if (ret == 0):
-			print "Success"
+			print("Success")
 			os.chmod(private_key_name, stat.S_IRUSR | stat.S_IXUSR) #600 . 'Read-only' on Windows.
-		print "Generating notary public key '%s'" % (public_key_name)
+		print("Generating notary public key '%s'" % (public_key_name))
 		ret = call(["openssl", "rsa", "-in", private_key_name, "-out", public_key_name, "-outform", "PEM", "-pubout"])
 		if (ret == 0):
-			print "Success"
+			print("Success")
 
 	return (public_key_name, private_key_name)
 

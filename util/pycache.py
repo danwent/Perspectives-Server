@@ -30,6 +30,7 @@ Make sure you have enough memory to use the cache you request!
 
 import heapq
 import itertools
+import logging
 import sys
 import threading
 import time
@@ -226,8 +227,8 @@ def set(key, data, expiry):
 		entry = CacheEntry(key, data, expiry)
 
 		if (entry.memory_used > max_mem):
-			print >> sys.stderr, "ERROR: cannot store data for '%s' - it's larger than the max cache size (%s bytes)\n" \
-				% (key, max_mem)
+			logging.error("Cannot store data for '%s' - it's larger than the max cache size (%s bytes)\n" \
+				% (key, max_mem))
 			return
 
 		with mem_lock:

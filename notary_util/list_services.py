@@ -20,6 +20,8 @@ Data can be filtered based on the last time the notary successfully observed
 a key from each service.
 """
 
+from __future__ import print_function
+
 import time
 import argparse
 
@@ -70,6 +72,7 @@ else:
 		ids = ndb.get_newest_service_names(int(cur_time - (3600 * 24 * args.newer)))
 
 if (ids != None):
-	for (name) in ids:
-		# print as string instead of tuple, to make it easier to use elsewhere
-		print >> output_file, name[0]
+	with open(output_file, 'w') as f:
+		for (name) in ids:
+			# print as string instead of tuple, to make it easier to use elsewhere
+			print(name[0], file=f)

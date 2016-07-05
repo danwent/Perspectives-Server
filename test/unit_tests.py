@@ -21,6 +21,8 @@ Feel free to add tests!
 You may see error messages printed to stderr, but that should be evidence of code properly handling errors.
 """
 
+from __future__ import print_function
+
 import argparse
 import logging
 import os
@@ -443,10 +445,11 @@ if __name__ == '__main__':
 
 	if (os.path.exists(NotaryDBTestCases.TEST_DATABASE) and (os.path.isfile(NotaryDBTestCases.TEST_DATABASE))):
 			try:
-				print "Deleting test database file {0}".format(NotaryDBTestCases.TEST_DATABASE)
+				print("Deleting test database file {0}".format(NotaryDBTestCases.TEST_DATABASE))
 				os.remove(NotaryDBTestCases.TEST_DATABASE)
 			except (Exception) as e:
-				print >> sys.stderr, "Error deleting test database: '{0}'. WARNING - tests may not run properly.".format(e)
+				print("Error deleting test database: '{0}'. WARNING - tests may not run properly.".format(e),
+					file=sys.stderr)
 
 	test_suite = unittest.TestLoader().loadTestsFromTestCase(NotaryDBTestCases)
 	unittest.main(verbosity=2)

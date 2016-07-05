@@ -19,6 +19,7 @@ Cache and retrieve data in key-value pairs.
 """
 
 import abc
+import logging
 import os
 import sys
 
@@ -90,16 +91,16 @@ class Memcache(CacheBase):
 			)
 			self.pool = pylibmc.ThreadMappedPool(mc)
 		except ImportError:
-			print >> sys.stderr, "ERROR: Could not import module 'pylibmc' - memcache is disabled. Please install the module and try again."
+			logging.error("Could not import module 'pylibmc' - memcache is disabled. Please install the module and try again.")
 			self.pool = None
 		except AttributeError:
-			print >> sys.stderr, "ERROR: Could not connect to the memcache server '%s' as user '%s'. memcache is disabled.\
+			logging.error("Could not connect to the memcache server '%s' as user '%s'. memcache is disabled.\
 				Please check that the server is running, check your memcache environment variables, and try again."\
-				% (os.environ.get(self.CACHE_SERVER_VAR), os.environ.get(self.CACHE_PASS_VAR))
+				% (os.environ.get(self.CACHE_SERVER_VAR), os.environ.get(self.CACHE_PASS_VAR)))
 			self.pool = None
 		except TypeError, e:
 			# thrown by pylibmc e.g. if the wrong password was supplied
-			print >> sys.stderr, "ERROR: Could not connect to memcache server: '%s'. memcache is disabled." % (str(e))
+			logging.error("Could not connect to memcache server: '%s'. memcache is disabled." % (str(e)))
 			self.pool = None
 
 	def __del__(self):
@@ -114,9 +115,9 @@ class Memcache(CacheBase):
 				try:
 					return mc.get(str(key))
 				except Exception as e:
-					print >> sys.stderr, "cache get() error: '{0}'.".format(e)
+					logging.error("cache get() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "Cache does not exist! Create it first"
+			logging.error("Cache does not exist! Create it first")
 			return None
 
 	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
@@ -126,9 +127,9 @@ class Memcache(CacheBase):
 				try:
 					mc.set(str(key), data, time=expiry)
 				except Exception as e:
-					print >> sys.stderr, "cache set() error: '{0}'.".format(e)
+					logging.error("cache set() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "Cache does not exist! Create it first"
+			logging.error("Cache does not exist! Create it first")
 
 
 class Memcachier(Memcache):
@@ -191,11 +192,11 @@ class Redis(CacheBase):
 			redis_url = os.getenv(self.REDIS_URL, 'redis://localhost')
 			self.redis = redis.from_url(redis_url)
 		except ImportError:
-			print >> sys.stderr, "ERROR: Could not import module 'redis' - redis caching is disabled. Please install the module and try again."
+			logging.error("Could not import module 'redis' - redis caching is disabled. Please install the module and try again.")
 			self.redis = None
 		except Exception, e:
 			# unfortunately, the redis library doesn't give us any details if the connection didn't work.
-			print >> sys.stderr, "ERROR starting redis: '%s'. Is your redis URL '%s' correct? Redis caching is disabled." % (e, self.REDIS_URL)
+			logging.error("ERROR starting redis: '%s'. Is your redis URL '%s' correct? Redis caching is disabled." % (e, self.REDIS_URL))
 			self.redis = None
 
 	def get(self, key):
@@ -204,9 +205,9 @@ class Redis(CacheBase):
 			try:
 				return self.redis.get(key)
 			except Exception, e:
-				print >> sys.stderr, "redis get() error: '{0}'.".format(e)
+				logging.error("redis get() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
+			logging.error("Redis cache does not exist! Create it first")
 			return None
 
 	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
@@ -216,9 +217,9 @@ class Redis(CacheBase):
 				self.redis.set(key, data)
 				self.redis.expire(key, expiry)
 			except Exception, e:
-				print >> sys.stderr, "redis set() error: '{0}'.".format(e)
+				logging.error("redis set() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "ERROR: Redis cache does not exist! Create it first"
+			logging.error("Redis cache does not exist! Create it first")
 
 
 class Pycache(CacheBase):
@@ -279,10 +280,10 @@ class Pycache(CacheBase):
 			self.cache = pycache
 			pycache.set_cache_size(cache_size)
 		except ImportError, e:
-			print >> sys.stderr, "ERROR: Could not import module 'pycache': '%s'." % (e)
+			logging.error("Could not import module 'pycache': '%s'." % (e))
 			self.cache = None
 		except Exception, e:
-			print >> sys.stderr, "ERROR creating cache in memory: '%s'." % (e)
+			logging.error("ERROR creating cache in memory: '%s'." % (e))
 			self.cache = None
 
 	def get(self, key):
@@ -291,9 +292,9 @@ class Pycache(CacheBase):
 			try:
 				return self.cache.get(key)
 			except Exception, e:
-				print >> sys.stderr, "pycache get() error: '{0}'.".format(e)
+				logging.error("pycache get() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "pycache get() error: cache does not exist! create it before retrieving values."
+			logging.error("pycache get() error: cache does not exist! create it before retrieving values.")
 			return None
 
 	def set(self, key, data, expiry=CacheBase.CACHE_EXPIRY):
@@ -302,6 +303,6 @@ class Pycache(CacheBase):
 			try:
 				self.cache.set(key, data, expiry)
 			except Exception, e:
-				print >> sys.stderr, "pycache set() error: '{0}'.".format(e)
+				logging.error("pycache set() error: '{0}'.".format(e))
 		else:
-			print >> sys.stderr, "pycache set() error: cache does not exist! create it before setting values."
+			logging.error("pycache set() error: cache does not exist! create it before setting values.")

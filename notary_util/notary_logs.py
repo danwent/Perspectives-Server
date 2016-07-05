@@ -16,6 +16,8 @@
 
 """Common notary log functions."""
 
+from __future__ import print_function
+
 import errno
 import logging
 import logging.handlers
@@ -68,7 +70,8 @@ def create_dir(path):
 		os.makedirs(path)
 	except OSError as e:
 		if (os.path.exists(path) and not os.path.isdir(path)):
-			print >> sys.stderr, "ERROR: Could not create log directory '{0}': a file with that name already exists.".format(path)
+			print("ERROR: Could not create log directory '{0}': a file with that name already exists.".format(path),
+				file=sys.stderr)
 			exit(1)
 		elif e.errno != errno.EEXIST:
 			raise

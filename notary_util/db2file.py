@@ -18,6 +18,8 @@
 Export Observation data from a network notary database.
 """
 
+from __future__ import print_function
+
 import time
 import argparse
 
@@ -40,7 +42,7 @@ def print_long_output(obs):
 		if old_sid != sid:
 			num_sids += 1
 			if num_sids % 1000 == 0:
-				print "processed %s service-ids" % num_sids
+				print("processed %s service-ids" % num_sids)
 			if old_sid is not None:
 				print_sid_info(old_sid, key_to_obs)
 			key_to_obs = {}
@@ -59,18 +61,19 @@ def print_sid_info(sid, key_to_obs):
 	if (s_type not in notary_common.SERVICE_TYPES):
 		return	
 	
-	print >> output_file, ""
-	print >> output_file, "Start Host: '%s'" % sid
-	key_type_text = notary_common.SERVICE_TYPES[s_type]
-	for key in key_to_obs:
-		if key is None: 
-			continue 
-		print >> output_file, "%s key: %s" % (key_type_text,key)
-		for ts in key_to_obs[key]: 
-			print >> output_file, "start:\t%s - %s" % (ts[0],time.ctime(ts[0]))
-			print >> output_file, "end:\t%s - %s" % (ts[1],time.ctime(ts[1]))
-		print >> output_file, ""
-	print >> output_file, "End Host"
+	with open(output_file, 'a') as f:
+		print("", file=f)
+		print("Start Host: '%s'" % sid, file=f)
+		key_type_text = notary_common.SERVICE_TYPES[s_type]
+		for key in key_to_obs:
+			if key is None:
+				continue
+			print("%s key: %s" % (key_type_text, key), file=f)
+			for ts in key_to_obs[key]:
+				print("start:\t%s - %s" % (ts[0],time.ctime(ts[0])), file=f)
+				print("end:\t%s - %s" % (ts[1],time.ctime(ts[1])), file=f)
+			print("", file=f)
+		print("End Host", file=f)
 
 def print_tuples(obs):
 	"""Print output in a simple tuple format, one record per line. This makes it easy to import the data somewhere else."""
