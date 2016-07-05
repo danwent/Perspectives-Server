@@ -57,7 +57,7 @@ def get_log_dir():
 def get_log_file(filename):
 	"""Return the absolute path to a log file inside the logs directory."""
 	create_log_dir()
-	return os.path.join(get_log_dir(), filename)
+	return os.path.abspath(os.path.join(get_log_dir(), filename))
 
 def create_log_dir():
 	"""Create the log directory if it doesn't exist."""
