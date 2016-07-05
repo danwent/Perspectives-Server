@@ -22,8 +22,7 @@ else
 	# Important: redirect stderr to stdout,
 	# or python throws the error "IOError: [Errno 5] Input/output error"
 	# when it is unable to write to stderr when no user is attached
-	# TODO: send stderr and stdout to the correct log inside server's python code
-	cmd=`$server_command $server_args --echo-screen >> $logdir/$server_logfile 2>&1 &`
+	cmd=`$server_command $server_args --logfile &`
 	`$cmd`
 	echo "notary started from script at $date" >> $logdir/$server_logfile
 fi 
