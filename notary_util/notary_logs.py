@@ -17,9 +17,34 @@
 """Common notary log functions."""
 
 import errno
+import logging
+import logging.handlers
 import os
 
 LOG_DIR = 'logs'
+LOGGING_FORMAT = '%(asctime)s %(levelname)s: %(message)s'
+# put a limit on the amount of disk space used when logging to files
+LOGGING_MAXBYTES = 1024 * 1024 * 10
+LOGGING_BACKUP_COUNT = 1
+
+def setup_logs(use_logfile, filename, verbose=False, quiet=False):
+	"""Set up the correct log level and logging type for this run."""
+	loglevel = logging.WARNING
+	if (verbose):
+		loglevel = logging.INFO
+	elif (quiet):
+		loglevel = logging.CRITICAL
+
+	if use_logfile:
+		log_file = get_log_file(filename)
+		logger = logging.getLogger()
+		log_handler = logging.handlers.RotatingFileHandler(log_file,
+			maxBytes=LOGGING_MAXBYTES, backupCount=LOGGING_BACKUP_COUNT)
+		log_handler.setLevel(loglevel)
+		log_handler.setFormatter(logging.Formatter(fmt=LOGGING_FORMAT))
+		logger.addHandler(log_handler)
+	else:
+		logging.basicConfig(format=LOGGING_FORMAT, level=loglevel)
 
 def get_log_dir():
 	"""Return the absolute path to the logs directory."""

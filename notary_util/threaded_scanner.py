@@ -24,7 +24,6 @@ from __future__ import print_function
 import argparse
 import errno
 import logging
-import logging.handlers
 import os
 import sys
 import threading
@@ -46,10 +45,6 @@ DEFAULT_SCANS = 10
 DEFAULT_WAIT = 20
 DEFAULT_INFILE = "-"
 LOGFILE = "scanner.log"
-LOGGING_FORMAT = '%(asctime)s %(levelname)s: %(message)s'
-# put a limit on the amount of disk space used when logging to files
-LOGGING_MAXBYTES = 1024 * 1024 * 10
-LOGGING_BACKUP_COUNT = 1
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
@@ -169,7 +164,7 @@ def _parse_args():
 	parser.add_argument('--logfile', action='store_true', default=False,
 				help="Log to a file on disk rather than standard out.\
 				A rotating set of {0} logs will be used, each captuning up to {1} bytes.\
-				Default: \'%(default)s\'".format(LOGGING_BACKUP_COUNT ,LOGGING_MAXBYTES))
+				Default: \'%(default)s\'".format(notary_logs.LOGGING_BACKUP_COUNT, notary_logs.LOGGING_MAXBYTES))
 	loggroup = parser.add_mutually_exclusive_group()
 	loggroup.add_argument('--verbose', '-v', default=False, action='store_true',
 				help="Verbose mode. Print more info about each scan.")
@@ -182,22 +177,7 @@ def _parse_args():
 
 args = _parse_args()
 
-loglevel = logging.WARNING
-if (args.verbose):
-	loglevel = logging.INFO
-elif (args.quiet):
-	loglevel = logging.CRITICAL
-
-if args.logfile:
-	log_file = notary_logs.get_log_file(LOGFILE)
-	logger = logging.getLogger()
-	log_handler = logging.handlers.RotatingFileHandler(log_file,
-		maxBytes=LOGGING_MAXBYTES, backupCount=LOGGING_BACKUP_COUNT)
-	log_handler.setLevel(loglevel)
-	log_handler.setFormatter(logging.Formatter(fmt=LOGGING_FORMAT))
-	logger.addHandler(log_handler)
-else:
-	logging.basicConfig(format=LOGGING_FORMAT, level=loglevel)
+notary_logs.setup_logs(args.logfile, LOGFILE, verbose=args.verbose, quiet=args.quiet)
 
 # pass ndb the args so it can use any relevant ones from its own parser
 ndb = ndb(args)
