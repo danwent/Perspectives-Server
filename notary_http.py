@@ -73,10 +73,13 @@ class NotaryHTTPServer:
 			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
 			 Default: \'%(default)s\'")
 		parser.add_argument('--logfile', action='store_true', default=False,
-				help="Log to a file on disk rather than standard out.\
-				A rotating set of {0} logs will be used, each capturing up to {1} bytes.\
-				Default: \'%(default)s\'".format(notary_logs.LOGGING_BACKUP_COUNT, notary_logs.LOGGING_MAXBYTES))
-
+			help="Log to a file on disk rather than standard out.\
+			A rotating set of {0} logs will be used, each capturing up to {1} bytes.\
+			File will written to {2}\
+			Default: \'%(default)s\'".format(
+				notary_logs.LOGGING_BACKUP_COUNT,
+				notary_logs.LOGGING_MAXBYTES,
+				notary_logs.get_log_file(self.LOG_FILE)))
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
