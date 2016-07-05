@@ -1,4 +1,6 @@
 
+from __future__ import print_function
+
 import base64
 import hashlib
 import sys
@@ -7,7 +9,7 @@ from M2Crypto import BIO, RSA
 
 #TODO: use argparse
 if len(sys.argv) != 3: 
-	print "usage: <notary-list-file> <private-key>" 
+	print("usage: <notary-list-file> <private-key>" )
 	exit(1) 
 
 
@@ -20,4 +22,4 @@ bio = BIO.MemoryBuffer(notary_priv_key)
 rsa_priv = RSA.load_key_bio(bio)
 sig_before_raw = rsa_priv.sign(m.digest(),'md5') 
 sig = base64.standard_b64encode(sig_before_raw) 
-print sig
+print(sig)
