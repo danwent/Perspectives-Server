@@ -55,8 +55,10 @@ res_list = []
 # logic bugs
 
 class ScanThread(threading.Thread): 
-
-	def __init__(self, sid, global_stats,timeout_sec, sni):
+	"""
+	Scan a remote service and retrieve the fingerprint for its TLS certificate.
+	"""
+	def __init__(self, sid, global_stats, timeout_sec, sni):
 		self.sid = sid
 		self.global_stats = global_stats
 		self.global_stats.active_threads += 1
@@ -66,6 +68,10 @@ class ScanThread(threading.Thread):
 		self.global_stats.threads[sid] = time.time() 
 
 	def _get_errno(self, e):
+		"""
+		Return the error number attached to an Exception,
+		or 0 if none exists.
+		"""
 		try: 
 			return e.args[0]
 		except: 
@@ -97,11 +103,15 @@ class ScanThread(threading.Thread):
 		else: 	
 			stats.failure_other += 1
 
-	def run(self): 
+	def run(self):
+		"""
+		Scan a remote service and retrieve the fingerprint for its TLS certificate.
+		The fingerprint is appended to the global results list.
+		"""
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
-				res_list.append((self.sid,fp))
+				res_list.append((self.sid, fp))
 			else:
 				# error already logged, but tally error count
 				stats.failures += 1
@@ -118,7 +128,10 @@ class ScanThread(threading.Thread):
 			del self.global_stats.threads[self.sid]
 
 class GlobalStats(object):
-
+	"""
+	Count various statistics and causes of scan failures
+	for later analysis.
+	"""
 	def __init__(self): 
 		self.failures = 0
 		self.num_completed = 0
@@ -138,6 +151,9 @@ class GlobalStats(object):
 	
 
 def _record_observations_in_db(res_list):
+	"""
+	Record a set of service observations in the database.
+	"""
 	if len(res_list) == 0:
 		return
 	try:
@@ -182,7 +198,10 @@ def _parse_args():
 	return args
 
 def main():
-	"""Run the main program."""
+	"""
+	Run the main program.
+	Scan a list of services and update Observation records in the notary database.
+	"""
 
 	global stats
 	global db
@@ -211,13 +230,15 @@ def main():
 	    (timeout_sec, rate) )
 	db.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
+	# create a thread to scan each service
+	# and record results as they come in
 	for sid in all_sids:
 		try:
 			# ignore non SSL services
 			# TODO: use a regex instead
 			if sid.split(",")[1] == notary_common.SSL_TYPE:
 				stats.num_started += 1
-				t = ScanThread(sid,stats,timeout_sec,args.sni)
+				t = ScanThread(sid, stats, timeout_sec, args.sni)
 				t.start()
 
 			if (stats.num_started % rate) == 0:
