@@ -47,13 +47,41 @@ LOGFILE = "scanner.log"
 
 stats = None
 db = None
-res_list = []
-result_lock = threading.Lock()
+results = None
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
 # those that fail or hang after making some progress, as they could indicate
 # logic bugs
+
+class ResultStore(object):
+	"""
+	Store and retrieve observation results in a thread-safe way.
+	"""
+	def __init__(self):
+		self.results = []
+		self.lock = threading.Lock()
+
+	def add(self, result):
+		"""
+		Add a result to the set.
+		"""
+		with self.lock:
+			self.results.append(result)
+
+	def get(self):
+		"""
+		Return the list of existing results
+		and empty the set.
+		"""
+		# use a lock so we don't lose any results
+		# between retrieving the current set
+		# and adding new ones
+		with self.lock:
+			# copy existing results so we can clear the list
+			results_so_far = list(self.results)
+			self.results = []
+			return results_so_far
 
 class ScanThread(threading.Thread): 
 	"""
@@ -112,8 +140,7 @@ class ScanThread(threading.Thread):
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
-				with result_lock:
-					res_list.append((self.sid, fp))
+				results.add((self.sid, fp))
 			else:
 				# error already logged, but tally error count
 				stats.failures += 1
@@ -207,15 +234,16 @@ def main():
 
 	global stats
 	global db
-	global res_list
+	global results
 
 	args = _parse_args()
-
 	notary_logs.setup_logs(args.logfile, LOGFILE, verbose=args.verbose, quiet=args.quiet)
 
 	# pass ndb the args so it can use any relevant ones from its own parser
 	db = ndb(args)
 	stats = GlobalStats()
+	results = ResultStore()
+
 	rate = args.scans
 	timeout_sec = args.timeout
 	f = args.service_id_file
@@ -245,15 +273,7 @@ def main():
 
 			if (stats.num_started % rate) == 0:
 				time.sleep(1)
-				# use a lock so we don't lose any results
-				# between sending existing results to be recorded
-				# and continuing to gather new results
-				results_so_far = []
-				with result_lock:
-					# copy existing results so we can clear the list
-					results_so_far = list(res_list)
-					res_list = []
-				_record_observations_in_db(results_so_far)
+				_record_observations_in_db(results.get())
 
 				so_far = int(time.time() - start_time)
 				logging.info("%s seconds passed.  %s complete, %s " \
@@ -302,7 +322,7 @@ def main():
 
 	# record any observations made since we finished the
 	# main for-loop
-	_record_observations_in_db(res_list)
+	_record_observations_in_db(results.get())
 
 	duration = int(time.time() - start_time)
 	localtime = time.asctime( time.localtime(start_time) )
