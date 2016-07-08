@@ -48,6 +48,7 @@ LOGFILE = "scanner.log"
 stats = None
 db = None
 res_list = []
+result_lock = threading.Lock()
 
 # TODO: more fine-grained error accounting to distinguish different failures
 # (dns lookups, conn refused, timeouts).  Particularly interesting would be
@@ -111,7 +112,8 @@ class ScanThread(threading.Thread):
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.sni)
 			if (fp != None):
-				res_list.append((self.sid, fp))
+				with result_lock:
+					res_list.append((self.sid, fp))
 			else:
 				# error already logged, but tally error count
 				stats.failures += 1
@@ -150,19 +152,19 @@ class GlobalStats(object):
 		self.failure_other = 0 
 	
 
-def _record_observations_in_db(res_list):
+def _record_observations_in_db(results):
 	"""
 	Record a set of service observations in the database.
 	"""
-	if len(res_list) == 0:
+	if len(results) == 0:
 		return
 	try:
-		for r in res_list:
+		for r in results:
 			db.report_observation(r[0], r[1])
 	except Exception as e:
 		# TODO: we should probably retry here 
-		logging.critical("DB Error: Failed to write res_list of length {0}".format(
-					len(res_list)))
+		logging.critical("DB Error: Failed to write results of length {0}".format(
+					len(results)))
 		logging.exception(e)
 
 
@@ -243,8 +245,16 @@ def main():
 
 			if (stats.num_started % rate) == 0:
 				time.sleep(1)
-				_record_observations_in_db(res_list)
-				res_list = []
+				# use a lock so we don't lose any results
+				# between sending existing results to be recorded
+				# and continuing to gather new results
+				results_so_far = []
+				with result_lock:
+					# copy existing results so we can clear the list
+					results_so_far = list(res_list)
+					res_list = []
+				_record_observations_in_db(results_so_far)
+
 				so_far = int(time.time() - start_time)
 				logging.info("%s seconds passed.  %s complete, %s " \
 					"failures.  %s Active threads" % \
