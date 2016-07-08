@@ -285,6 +285,9 @@ def main():
 	while stats.active_threads > 0:
 		time.sleep(1)
 		if time.time() > giveup_time:
+			if stats.active_threads > 0:
+				logging.error("Giving up scans after {0}. {1} threads still active!".format(
+					giveup_time, stats.active_threads))
 			break
 
 	# record any observations made since we finished the
