@@ -39,7 +39,6 @@ sys.path.insert(0,
 	os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
-
 DEFAULT_SCANS = 10
 DEFAULT_WAIT = 20
 DEFAULT_INFILE = "-"
@@ -48,11 +47,6 @@ LOGFILE = "scanner.log"
 stats = None
 db = None
 results = None
-
-# TODO: more fine-grained error accounting to distinguish different failures
-# (dns lookups, conn refused, timeouts).  Particularly interesting would be
-# those that fail or hang after making some progress, as they could indicate
-# logic bugs
 
 class ResultStore(object):
 	"""
