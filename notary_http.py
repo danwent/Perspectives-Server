@@ -65,13 +65,11 @@ class NotaryHTTPServer(object):
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
-		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
+		loggroup = parser.add_mutually_exclusive_group()
+		loggroup.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
 			action='store_true', default=False,
 			help='Send web server output to stdout rather than a log file.')
-		parser.add_argument('--sni', action='store_true', default=False,
-			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
-			 Default: \'%(default)s\'")
-		parser.add_argument('--logfile', action='store_true', default=False,
+		loggroup.add_argument('--logfile', action='store_true', default=False,
 			help="Log to a file on disk rather than standard out.\
 			A rotating set of {0} logs will be used, each capturing up to {1} bytes.\
 			File will written to {2}\
@@ -93,6 +91,9 @@ class NotaryHTTPServer(object):
 			help="Use RAM to cache observation data on the local machine only.\
 			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
 
+		parser.add_argument('--sni', action='store_true', default=False,
+			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			 Default: \'%(default)s\'")
 		parser.add_argument('--cache-only', action='store_true', default=False,
 			help="When retrieving data, *only* read from the cache - do not read any database records. Default: %(default)s")
 
