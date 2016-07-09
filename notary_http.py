@@ -311,7 +311,7 @@ class NotaryHTTPServer(object):
 							timestamps_by_key[key] = []
 							keys.append(key)
 						timestamps_by_key[key].append((start, end))
-		except Exception as e:
+		except Exception:
 			# error already logged inside get_observations.
 			# we can also see InterfaceError or AttributeError when looping through observation records
 			# if the database is under heavy load.
