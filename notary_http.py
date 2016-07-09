@@ -498,13 +498,22 @@ cherrypy.config.update({'server.socket_port' : notary.web_port,
 	'cherrypy.lib.cptools.log_request_headers': False,
 	'tools.log_headers.on': False,
 	# end of privacy settings
-	'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE),
+	# log file is set up below
+	'log.error_file' : None,
 	'log.screen' : False})
 
 if (notary.args.echo_screen):
 	cherrypy.config.update({
-			'log.error_file' : None,
 			'log.screen' : True})
+else:
+	# set up a rotating log handler
+	# to put a limit on the amount of disk space that will be used by logs
+	log_file = '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE)
+	log_handler = logging.handlers.RotatingFileHandler(log_file,
+		maxBytes=notary_logs.LOGGING_MAXBYTES,
+		backupCount=notary_logs.LOGGING_BACKUP_COUNT)
+	log_handler.setFormatter(logging.Formatter(fmt=notary_logs.LOGGING_FORMAT))
+	cherrypy.log.error_log.addHandler(log_handler)
 
 static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
 notary_config = {'/': {'tools.staticfile.root' : static_root,
