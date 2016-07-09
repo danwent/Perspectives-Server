@@ -48,8 +48,8 @@ class NotaryHTTPServer(object):
 	# PATCH version when you make backwards-compatible bug fixes.
 	VERSION = "3.4.1"
 
-	DEFAULT_WEB_PORT=8080
-	ENV_PORT_KEY_NAME='PORT'
+	DEFAULT_WEB_PORT = 8080
+	ENV_PORT_KEY_NAME = 'PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
 	LOG_FILE = 'webserver.log'
@@ -225,7 +225,7 @@ class NotaryHTTPServer(object):
 		STATIC_TEMPLATE = "static_template.html"
 
 		template = os.path.join(self.STATIC_DIR, STATIC_TEMPLATE)
-		with open(template,'r') as t:
+		with open(template, 'r') as t:
 			lines = str(t.read())
 
 		options = ""
@@ -263,7 +263,7 @@ class NotaryHTTPServer(object):
 		lines = lines.replace('<!-- ::OPTIONS:: -->', options)
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
-		with open (index, 'w') as i:
+		with open(index, 'w') as i:
 			print(lines, file=i)
 
 	def get_xml(self, host, port, service_type):
@@ -332,7 +332,7 @@ class NotaryHTTPServer(object):
 						do_scan = True
 
 				if (do_scan):
-					t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
+					t = OnDemandScanThread(service, 10, self.use_sni, self, self.ndb)
 					t.start()
 					# report the metrics *after* launching so the scanning thread can get started
 					self.ndb.report_metric('ScanForNewService', service)
@@ -346,7 +346,7 @@ class NotaryHTTPServer(object):
 		dom_impl = getDOMImplementation() 
 		new_doc = dom_impl.createDocument(None, "notary_reply", None) 
 		top_element = new_doc.documentElement
-		top_element.setAttribute("version","1") 
+		top_element.setAttribute("version", "1")
 		top_element.setAttribute("sig_type", "rsa-md5") 
 	
 		packed_data = ""
@@ -358,33 +358,33 @@ class NotaryHTTPServer(object):
 			key_elem.setAttribute("fp", k)
 			top_element.appendChild(key_elem)
 			num_timespans = len(timestamps_by_key[k])
-			head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16,3)
+			head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16, 3)
 
 			fp_bytes = ""
 			for hex_byte in k.split(":"):
-				fp_bytes += struct.pack("B", int(hex_byte,16))
+				fp_bytes += struct.pack("B", int(hex_byte, 16))
 
 			ts_bytes = ""
 			for ts in sorted(timestamps_by_key[k], key=lambda t_pair: t_pair[0]):
 				ts_start = ts[0]
-				ts_end  = ts[1]
+				ts_end = ts[1]
 				ts_elem = new_doc.createElement("timestamp")
-				ts_elem.setAttribute("end",str(ts_end))
+				ts_elem.setAttribute("end", str(ts_end))
 				ts_elem.setAttribute("start", str(ts_start))
 				key_elem.appendChild(ts_elem) 
 				ts_bytes += struct.pack("BBBB", ts_start >> 24 & 255,
-											   ts_start >> 16 & 255,
-											   ts_start >> 8 & 255,
-											   ts_start & 255)
+					ts_start >> 16 & 255,
+					ts_start >> 8 & 255,
+					ts_start & 255)
 				ts_bytes += struct.pack("BBBB", ts_end >> 24 & 255,
-											   ts_end >> 16 & 255,
-											   ts_end >> 8 & 255,
-											   ts_end & 255)
-			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
+					ts_end >> 16 & 255,
+					ts_end >> 8 & 255,
+					ts_end & 255)
+			packed_data = (head + fp_bytes + ts_bytes) + packed_data
 	
 		packed_data = service.encode() + struct.pack("B", 0) + packed_data
 		sig = crypto.sign_content(packed_data, self.notary_priv_key)
-		top_element.setAttribute("sig",sig)
+		top_element.setAttribute("sig", sig)
 		xml = top_element.toprettyxml()
 
 		if (self.cache != None):
@@ -425,12 +425,12 @@ class NotaryHTTPServer(object):
 		if (host == None or host == '' or port == None or \
 			service_type not in notary_common.SERVICE_TYPES):
 			raise cherrypy.HTTPError(400) # 400 Bad Request
-			
+
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
 		return self.get_xml(host, port, service_type)
 
 
-class OnDemandScanThread(threading.Thread): 
+class OnDemandScanThread(threading.Thread):
 
 	def __init__(self, sid, timeout_sec, use_sni, server_obj, db):
 		self.sid = sid
@@ -444,7 +444,7 @@ class OnDemandScanThread(threading.Thread):
 		"""Clean up after scanning."""
 		del self.db
 
-	def run(self): 
+	def run(self):
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
@@ -486,30 +486,30 @@ servers.wait_for_occupied_port = fake_wait_for_occupied_port
 def fake_access(): return
 cherrypy.log.access = fake_access
 
-cherrypy.config.update({ 'server.socket_port' : notary.web_port,
-			 'server.socket_host' : "0.0.0.0",
-			 'server.socket_queue_size': notary.args.socket_queue_size,
-			 'server.thread_pool': notary.args.thread_pool_size,
-			 'request.show_tracebacks' : False,  
-			 # IMPORTANT PRIVACY SETTINGS!
-			 # we do *not* want to record any information about clients
-			 'log.access_file' : None,
-			 # disable all locations of logging request headers
-			 'server.log_request_headers': False,
-			 'cherrypy.lib.cptools.log_request_headers': False,
-			 'tools.log_headers.on': False,
-			 # end of privacy settings
-			 'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE),
-			 'log.screen' : False } ) 
+cherrypy.config.update({'server.socket_port' : notary.web_port,
+	'server.socket_host' : "0.0.0.0",
+	'server.socket_queue_size': notary.args.socket_queue_size,
+	'server.thread_pool': notary.args.thread_pool_size,
+	'request.show_tracebacks' : False,
+	# IMPORTANT PRIVACY SETTINGS!
+	# we do *not* want to record any information about clients
+	'log.access_file' : None,
+	# disable all locations of logging request headers
+	'server.log_request_headers': False,
+	'cherrypy.lib.cptools.log_request_headers': False,
+	'tools.log_headers.on': False,
+	# end of privacy settings
+	'log.error_file' : '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE),
+	'log.screen' : False})
 
 if (notary.args.echo_screen):
 	cherrypy.config.update({
-			 'log.error_file' : None,
-			 'log.screen' : True } )
+			'log.error_file' : None,
+			'log.screen' : True})
 
 static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
-notary_config = { '/': {'tools.staticfile.root' : static_root,
-						'tools.staticdir.root' : static_root }}
+notary_config = {'/': {'tools.staticfile.root' : static_root,
+						'tools.staticdir.root' : static_root}}
 
 app = cherrypy.tree.mount(notary, '/', config=notary_config)
 app.merge("notary.cherrypy.config")
