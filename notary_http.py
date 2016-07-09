@@ -316,7 +316,7 @@ class NotaryHTTPServer(object):
 			# if the database is under heavy load.
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
-		if num_rows == 0: 
+		if num_rows == 0:
 			# rate-limit on-demand probes
 			global scan_semaphore
 			global scan_sites
@@ -337,17 +337,17 @@ class NotaryHTTPServer(object):
 					self.ndb.report_metric('ScanForNewService', service)
 				else:
 					scan_semaphore.release()
-			else: 
+			else:
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404) # 404 Not Found
 	
-		dom_impl = getDOMImplementation() 
-		new_doc = dom_impl.createDocument(None, "notary_reply", None) 
+		dom_impl = getDOMImplementation()
+		new_doc = dom_impl.createDocument(None, "notary_reply", None)
 		top_element = new_doc.documentElement
 		top_element.setAttribute("version", "1")
-		top_element.setAttribute("sig_type", "rsa-md5") 
-	
+		top_element.setAttribute("sig_type", "rsa-md5")
+
 		packed_data = ""
 
 		# create an XML response that we'll send back to the client
@@ -370,7 +370,7 @@ class NotaryHTTPServer(object):
 				ts_elem = new_doc.createElement("timestamp")
 				ts_elem.setAttribute("end", str(ts_end))
 				ts_elem.setAttribute("start", str(ts_start))
-				key_elem.appendChild(ts_elem) 
+				key_elem.appendChild(ts_elem)
 				ts_bytes += struct.pack("BBBB", ts_start >> 24 & 255,
 					ts_start >> 16 & 255,
 					ts_start >> 8 & 255,
@@ -380,7 +380,7 @@ class NotaryHTTPServer(object):
 					ts_end >> 8 & 255,
 					ts_end & 255)
 			packed_data = (head + fp_bytes + ts_bytes) + packed_data
-	
+
 		packed_data = service.encode() + struct.pack("B", 0) + packed_data
 		sig = crypto.sign_content(packed_data, self.notary_priv_key)
 		top_element.setAttribute("sig", sig)
