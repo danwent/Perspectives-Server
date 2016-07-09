@@ -21,7 +21,6 @@ import logging
 import os
 import re
 import struct
-import sys
 import threading
 from xml.dom.minidom import getDOMImplementation
 
