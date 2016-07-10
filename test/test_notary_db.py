@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 
+import argparse
 import os
 import sys
 import time
@@ -71,6 +72,12 @@ class NotaryDBTestCases(unittest.TestCase):
 		self.assertTrue(self.ndb.get_connection_count() == 0)
 
 	#######
+
+	def test_call_ndb_after_extending_argparser(self):
+		parser = argparse.ArgumentParser(parents=[ndb.get_parser()])
+		args = parser.parse_args()
+		db = ndb(args)
+		db.get_all_service_names()
 
 	# important SQL: used frequently by the main app
 	def test_get_all_service_names(self):
