@@ -24,9 +24,6 @@ You may see error messages printed to stderr, but that should be evidence of cod
 from __future__ import print_function
 
 import argparse
-import os
-import sys
-import time
 import unittest
 
 import test_notary_db
