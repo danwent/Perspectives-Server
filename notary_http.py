@@ -57,7 +57,7 @@ class NotaryHTTPServer(object):
 	LOG_FILE = 'webserver.log'
 	CHERRYPY_FILE = 'cherrypy.log'
 
-	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
+	CACHE_EXPIRY = 12 # hours. see doc/advanced_notary_configuration.txt
 
 	@classmethod
 	def get_parser(cls):
@@ -109,7 +109,7 @@ class NotaryHTTPServer(object):
 			"Hours is the default time unit if none is provided. " +\
 			"The default client settings ignore notary results that have not been updated in the past 48 hours, " +\
 			"so you may want your (scan frequency + scan duration + cache expiry) to be <= 48 hours. Default: " +\
-			str(cls.CACHE_EXPIRY / 3600) + " hours.")
+			str(cls.CACHE_EXPIRY) + " hours.")
 
 		# socket_queue_size and thread_pool use the cherrypy defaults,
 		# but we hardcode them here rather than refer to the cherrypy variables directly
