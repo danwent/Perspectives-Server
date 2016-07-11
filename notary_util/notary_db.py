@@ -154,7 +154,7 @@ def ratelimited(max_per_second=1):
 		last_warned = [0.0]
 		num_skips = [0]
 
-		def rate_limited_function(*args,**kargs):
+		def rate_limited_function(*args, **kargs):
 			curtime = time.clock()
 			elapsed = curtime - last_called[0]
 			left_to_wait = min_interval - elapsed
@@ -215,10 +215,10 @@ class ndb(object):
 		os.path.join(os.path.dirname(os.path.realpath(__file__)), 'notary.db.config')
 	CONFIG_SECTION = 'NotaryDB'
 
-	EVENT_TYPE_NAMES=['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
+	EVENT_TYPE_NAMES = ['GetObservationsForService', 'ScanForNewService', 'ProbeLimitExceeded',
 		'ServiceScanStart', 'ServiceScanStop', 'ServiceScanFailure', 'CacheHit', 'CacheMiss',
 		'OnDemandServiceScanFailure', 'EventTypeUnknown']
-	EVENT_TYPES={}
+	EVENT_TYPES = {}
 	METRIC_PREFIX = "NOTARY_METRIC"
 
 	# if the scanner does not run regularly and consistently,
@@ -357,7 +357,7 @@ class ndb(object):
 						evt = session.query(EventTypes).filter(EventTypes.name == name).first()
 
 						if (evt == None):
-							evt = EventTypes(name = name)
+							evt = EventTypes(name=name)
 							session.add(evt)
 							session.commit()
 
@@ -672,7 +672,7 @@ class ndb(object):
 		srv = session.query(Services).filter(Services.name == service_name).first()
 
 		if (srv == None):
-			srv = Services(name = service_name)
+			srv = Services(name=service_name)
 			try:
 				session.add(srv)
 				session.commit()
