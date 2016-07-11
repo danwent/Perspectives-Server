@@ -56,15 +56,17 @@ class NotaryHTTPServer(object):
 
 	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
 
-	def __init__(self):
+	@classmethod
+	def get_parser(cls):
+		"""Return an argparser for NotaryHTTPServer."""
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
-			description=self.__doc__, version=self.VERSION,
+			description=cls.__doc__, version=cls.VERSION,
 			epilog="If the database schema does not exist it will be automatically created on launch.")
 		portgroup = parser.add_mutually_exclusive_group()
-		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT, type=int,
+		portgroup.add_argument('--webport', '-p', default=cls.DEFAULT_WEB_PORT, type=int,
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
-			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
+			help="Read which port to use from the environment variable '" + cls.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		loggroup = parser.add_mutually_exclusive_group()
 		loggroup.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
 			action='store_true', default=True,
@@ -76,12 +78,12 @@ class NotaryHTTPServer(object):
 			Default: \'%(default)s\'".format(
 				notary_logs.LOGGING_BACKUP_COUNT,
 				notary_logs.LOGGING_MAXBYTES,
-				notary_logs.get_log_file(self.LOG_FILE)))
+				notary_logs.get_log_file(cls.LOG_FILE)))
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
 			help="Use memcache to cache observation data, to increase performance and reduce load on the notary database.\
-				Cached info expires after " + str(self.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
+				Cached info expires after " + str(cls.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
 		cachegroup.add_argument('--memcachier', action='store_true', default=False,
 			help="Use memcachier to cache observation data. " + cache.Memcachier.get_help())
 		cachegroup.add_argument('--redis', action='store_true', default=False,
@@ -98,26 +100,29 @@ class NotaryHTTPServer(object):
 			help="When retrieving data, *only* read from the cache - do not read any database records. Default: %(default)s")
 
 		parser.add_argument('--cache-expiry', '--cache-duration',\
-			default=self.CACHE_EXPIRY, type=self.cache_duration,
+			default=cls.CACHE_EXPIRY, type=cls.cache_duration,
 			metavar="CACHE_EXPIRY[Ss|Mm|Hh]",
 			help="Expire cache entries after this many seconds / minutes / hours. " +\
 			"Hours is the default time unit if none is provided. " +\
 			"The default client settings ignore notary results that have not been updated in the past 48 hours, " +\
 			"so you may want your (scan frequency + scan duration + cache expiry) to be <= 48 hours. Default: " +\
-			str(self.CACHE_EXPIRY / 3600) + " hours.")
+			str(cls.CACHE_EXPIRY / 3600) + " hours.")
 
 		# socket_queue_size and thread_pool use the cherrypy defaults,
 		# but we hardcode them here rather than refer to the cherrypy variables directly
 		# just in case the cherrypy architecture changes.
 		parser.add_argument('--socket-queue-size', '--socket-queue',\
-			default=5, type=self.positive_integer,
+			default=5, type=cls.positive_integer,
 			help="The maximum number of queued connections. Must be a positive integer. Default: %(default)s.")
 
 		parser.add_argument('--thread-pool-size', '--thread-pool', '--threads',\
-			default=10, type=self.positive_integer,
+			default=10, type=cls.positive_integer,
 			help="The number of worker threads to start up in the pool. Must be a positive integer. Default: %(default)s.")
 
-		args = parser.parse_args()
+		return parser
+
+	def __init__(self):
+		args = self.get_parser().parse_args()
 		notary_logs.setup_logs(args.logfile, self.LOG_FILE)
 
 		# pass ndb the args so it can use any relevant ones from its own parser
@@ -169,6 +174,7 @@ class NotaryHTTPServer(object):
 	# "error: .. invalid positive_integer value: '1.3'".
 	# if the function name helps the user understand what type of argument they must supply
 	# this may be less confusing.
+	@classmethod
 	def positive_integer(self, value):
 		"""Convert value to a positive integer, or raise an exception if we cannot."""
 		ivalue = int(value)
@@ -176,10 +182,11 @@ class NotaryHTTPServer(object):
 			raise argparse.ArgumentTypeError("'{0}' is not a positive integer.".format(value))
 		return ivalue
 
+	@classmethod
 	def cache_duration(self, value):
 		"""Validate cache duration time, or raise an exception if we cannot."""
 		# let the user specify durations in seconds, minutes, or hours
-		if (re.search("[^0-9SsMmHh]+", value) != None):
+		if (re.search(r'[^0-9SsMmHh]', value) != None):
 			raise argparse.ArgumentTypeError("Invalid cache duration '{0}'.".format(value))
 
 		# remove non-numeric characters
@@ -187,12 +194,12 @@ class NotaryHTTPServer(object):
 		duration = int(duration)
 
 		time_units = 0
-		if (re.search("[Ss]", value)):
+		if (re.search(r"[Ss]", value)):
 			time_units += 1
-		if (re.search("[Mm]", value)):
+		if (re.search(r"[Mm]", value)):
 			time_units += 1
 			duration *= 60
-		if (re.search("[Hh]", value)):
+		if (re.search(r"[Hh]", value)):
 			time_units += 1
 			duration *= 3600
 
