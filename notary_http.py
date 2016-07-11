@@ -67,7 +67,7 @@ class NotaryHTTPServer(object):
 			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
 		loggroup = parser.add_mutually_exclusive_group()
 		loggroup.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
-			action='store_true', default=False,
+			action='store_true', default=True,
 			help='Send web server output to stdout rather than a log file.')
 		loggroup.add_argument('--logfile', action='store_true', default=False,
 			help="Log to a file on disk rather than standard out.\
