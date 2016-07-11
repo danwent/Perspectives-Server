@@ -167,7 +167,7 @@ def ratelimited(max_per_second=1):
 				# while not printing the log too often -
 				# that would slow down the system and defeat the purpose of rate limiting.
 				if ((curtime - last_warned[0] >= warn_every) and (num_skips[0] > 0)):
-					logging.warn("WARNING: Skipped %s calls to '%s()' in %s seconds." % (num_skips[0], func.__name__, warn_every))
+					logging.warning("Skipped %s calls to '%s()' in %s seconds." % (num_skips[0], func.__name__, warn_every))
 					last_warned[0] = curtime
 					num_skips[0] = 0
 			else:
