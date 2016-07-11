@@ -33,6 +33,9 @@ from util import crypto, cache
 from util.keymanager import keymanager
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
+# track locks at the module level so we only use them once across all cherrypy threads
+PROBE_LIMIT = 10 # simultaneous scans for new services
+
 class NotaryHTTPServer(object):
 	"""
 	Network Notary server for the Perspectives project
@@ -468,72 +471,71 @@ class OnDemandScanThread(threading.Thread):
 		finally:
 			self.server_obj.scan_finished(self.sid)
 
+def main():
+	"""Run the main program: start the NotaryHTTPServer."""
+	# create an instance here so command-line args will be automatically passed and parsed
+	# before we start the web server
+	notary = NotaryHTTPServer()
 
-# track locks at the module level so we only use them once across all cherrypy threads
-PROBE_LIMIT = 10 # simultaneous scans for new services
-scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
-scan_sites = {}
-scan_sites_lock = threading.Lock()
+	# PATCH: cherrypy has problems binding to the port on hosted server spaces
+	# https://bitbucket.org/cherrypy/cherrypy/issue/1100/cherrypy-322-gives-engine-error-when
+	# TODO use this workaround until 1100 is available for release and we can upgrade
+	from cherrypy.process import servers
+	def fake_wait_for_occupied_port(host, port): return
+	servers.wait_for_occupied_port = fake_wait_for_occupied_port
 
+	# do not log any information about clients.
+	# if we don't override this function,
+	# access information is still logged when screen echoing is turned on.
+	def fake_access(): return
+	cherrypy.log.access = fake_access
 
-# create an instance here so command-line args will be automatically passed and parsed
-# before we start the web server
-notary = NotaryHTTPServer()
+	cherrypy.config.update({'server.socket_port' : notary.web_port,
+		'server.socket_host' : "0.0.0.0",
+		'server.socket_queue_size': notary.args.socket_queue_size,
+		'server.thread_pool': notary.args.thread_pool_size,
+		'request.show_tracebacks' : False,
+		# IMPORTANT PRIVACY SETTINGS!
+		# we do *not* want to record any information about clients
+		'log.access_file' : None,
+		# disable all locations of logging request headers
+		'server.log_request_headers': False,
+		'cherrypy.lib.cptools.log_request_headers': False,
+		'tools.log_headers.on': False,
+		# end of privacy settings
+		# log file is set up below
+		'log.error_file' : None,
+		'log.screen' : False})
 
-# PATCH: cherrypy has problems binding to the port on hosted server spaces
-# https://bitbucket.org/cherrypy/cherrypy/issue/1100/cherrypy-322-gives-engine-error-when
-# TODO use this workaround until 1100 is available for release and we can upgrade
-from cherrypy.process import servers
-def fake_wait_for_occupied_port(host, port): return
-servers.wait_for_occupied_port = fake_wait_for_occupied_port
+	if (notary.args.echo_screen):
+		cherrypy.config.update({
+				'log.screen' : True})
+	else:
+		# set up a rotating log handler
+		# to put a limit on the amount of disk space that will be used by logs
+		log_file = '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE)
+		log_handler = logging.handlers.RotatingFileHandler(log_file,
+			maxBytes=notary_logs.LOGGING_MAXBYTES,
+			backupCount=notary_logs.LOGGING_BACKUP_COUNT)
+		log_handler.setFormatter(logging.Formatter(fmt=notary_logs.LOGGING_FORMAT))
+		cherrypy.log.error_log.addHandler(log_handler)
 
-# do not log any information about clients.
-# if we don't override this function,
-# access information is still logged when screen echoing is turned on.
-def fake_access(): return
-cherrypy.log.access = fake_access
+	static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
+	notary_config = {'/': {'tools.staticfile.root' : static_root,
+							'tools.staticdir.root' : static_root}}
 
-cherrypy.config.update({'server.socket_port' : notary.web_port,
-	'server.socket_host' : "0.0.0.0",
-	'server.socket_queue_size': notary.args.socket_queue_size,
-	'server.thread_pool': notary.args.thread_pool_size,
-	'request.show_tracebacks' : False,
-	# IMPORTANT PRIVACY SETTINGS!
-	# we do *not* want to record any information about clients
-	'log.access_file' : None,
-	# disable all locations of logging request headers
-	'server.log_request_headers': False,
-	'cherrypy.lib.cptools.log_request_headers': False,
-	'tools.log_headers.on': False,
-	# end of privacy settings
-	# log file is set up below
-	'log.error_file' : None,
-	'log.screen' : False})
+	app = cherrypy.tree.mount(notary, '/', config=notary_config)
+	app.merge("notary.cherrypy.config")
 
-if (notary.args.echo_screen):
-	cherrypy.config.update({
-			'log.screen' : True})
-else:
-	# set up a rotating log handler
-	# to put a limit on the amount of disk space that will be used by logs
-	log_file = '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE)
-	log_handler = logging.handlers.RotatingFileHandler(log_file,
-		maxBytes=notary_logs.LOGGING_MAXBYTES,
-		backupCount=notary_logs.LOGGING_BACKUP_COUNT)
-	log_handler.setFormatter(logging.Formatter(fmt=notary_logs.LOGGING_FORMAT))
-	cherrypy.log.error_log.addHandler(log_handler)
+	if hasattr(cherrypy.engine, "signal_handler"):
+		cherrypy.engine.signal_handler.subscribe()
+	if hasattr(cherrypy.engine, "console_control_handler"):
+		cherrypy.engine.console_control_handler.subscribe()
+	cherrypy.engine.start()
+	cherrypy.engine.block()
 
-static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
-notary_config = {'/': {'tools.staticfile.root' : static_root,
-						'tools.staticdir.root' : static_root}}
-
-app = cherrypy.tree.mount(notary, '/', config=notary_config)
-app.merge("notary.cherrypy.config")
-
-if hasattr(cherrypy.engine, "signal_handler"):
-	cherrypy.engine.signal_handler.subscribe()
-if hasattr(cherrypy.engine, "console_control_handler"):
-	cherrypy.engine.console_control_handler.subscribe()
-cherrypy.engine.start()
-cherrypy.engine.block()
-
+if __name__ == "__main__":
+	scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
+	scan_sites = {}
+	scan_sites_lock = threading.Lock()
+	main()
