@@ -162,8 +162,6 @@ class NotaryHTTPServer(object):
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		notary_logs.create_log_dir()
-
 		self.use_sni = args.sni
 		self.create_static_index()
 		self.args = args
