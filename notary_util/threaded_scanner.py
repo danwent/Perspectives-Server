@@ -208,7 +208,7 @@ def _parse_args():
 				A rotating set of {0} logs will be used, each capturing up to {1} bytes.\
 				File will written to {2}\
 				Default: \'%(default)s\'".format(
-					notary_logs.LOGGING_BACKUP_COUNT,
+					notary_logs.LOGGING_BACKUP_COUNT + 1,
 					notary_logs.LOGGING_MAXBYTES,
 					notary_logs.get_log_file(LOGFILE)))
 	loggroup = parser.add_mutually_exclusive_group()
