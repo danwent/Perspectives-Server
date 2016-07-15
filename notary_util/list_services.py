@@ -22,6 +22,7 @@ a key from each service.
 
 from __future__ import print_function
 
+import sys
 import time
 import argparse
 
@@ -32,47 +33,56 @@ DAYS_META_NAME = 'Days'
 DEFAULT_DAYS = 10
 DEFAULT_OUTFILE = "-"
 
-parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
-description=__doc__,
-epilog="This module can be used to generate a list of all services considered 'live' or 'dead'.")
+def print_ids(outfile, ids):
+	"""Print all of the ids to the given file."""
+	for (name) in ids:
+		# print as string instead of tuple, to make it easier to use elsewhere
+		print(name[0], file=outfile)
 
-parser.add_argument('output_file', type=argparse.FileType('w'), nargs='?', default=DEFAULT_OUTFILE,
-			help="File to write data to. Use '-' to write to stdout. Writing to stdout is the default if no file is given.")
-listgroup = parser.add_mutually_exclusive_group()
-listgroup.add_argument('--all', '-a', action='store_true', default=False,
-			help="List all services. This is the default if no action is specified.")
-listgroup.add_argument('--newer', '--newest', '--new', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
-			help="Only list services with an observation newer than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
-listgroup.add_argument('--older', '--oldest', '--old', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
-			help="Only list services with a MOST RECENT observation that is older than than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
+def get_parser():
+	"""Return an argument parser for this module."""
+	parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
+	description=__doc__,
+	epilog="This module can be used to generate a list of all services considered 'live' or 'dead'.")
 
-args = parser.parse_args()
+	parser.add_argument('output_file', type=argparse.FileType('w'), nargs='?', default=DEFAULT_OUTFILE,
+				help="File to write data to. Use '-' to write to stdout. Writing to stdout is the default if no file is given.")
+	listgroup = parser.add_mutually_exclusive_group()
+	listgroup.add_argument('--all', '-a', action='store_true', default=False,
+				help="List all services. This is the default if no action is specified.")
+	listgroup.add_argument('--newer', '--newest', '--new', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
+				help="Only list services with an observation newer than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
+	listgroup.add_argument('--older', '--oldest', '--old', metavar=DAYS_META_NAME, type=int, nargs='?', default=None, const=DEFAULT_DAYS,
+				help="Only list services with a MOST RECENT observation that is older than than '%s' days. Default: %s." % (DAYS_META_NAME, DEFAULT_DAYS))
+	return parser
 
-# pass ndb the args so it can use any relevant ones from its own parser
-ndb = ndb(args)
+def main(db, output_file=DEFAULT_OUTFILE, list_all=True, list_newer=False, list_older=False):
+	"""Run the main program."""
+	# set a default action
+	if (list_all == False and list_newer == None and list_older == None):
+		list_all = True
 
-output_file = args.output_file
+	ids = None
 
-
-# set a default action
-if (args.all == False and args.newer == None and args.older == None):
-	args.all = True
-
-
-ids = None
-
-if args.all:
-	ids = ndb.get_all_service_names()
-else:
-	cur_time = int(time.time())
-
-	if args.older:
-		ids = ndb.get_oldest_service_names(int(cur_time - (3600 * 24 * args.older)))
+	if list_all:
+		ids = db.get_all_service_names()
 	else:
-		ids = ndb.get_newest_service_names(int(cur_time - (3600 * 24 * args.newer)))
+		cur_time = int(time.time())
 
-if (ids != None):
-	with open(output_file, 'w') as f:
-		for (name) in ids:
-			# print as string instead of tuple, to make it easier to use elsewhere
-			print(name[0], file=f)
+		if list_older:
+			ids = db.get_oldest_service_names(int(cur_time - (3600 * 24 * list_older)))
+		else:
+			ids = db.get_newest_service_names(int(cur_time - (3600 * 24 * list_newer)))
+
+	if (ids != None):
+		if output_file == sys.stdout:
+			print_ids(output_file, ids)
+		else:
+			with output_file as f:
+				print_ids(output_file, ids)
+
+if __name__ == "__main__":
+	args = get_parser().parse_args()
+	# pass ndb the args so it can use any relevant ones from its own parser
+	db = ndb(args)
+	main(db, args.output_file, args.all, args.newer, args.older)
