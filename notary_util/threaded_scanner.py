@@ -235,16 +235,16 @@ def main(db, service_id_file, logfile=False, verbose=False, quiet=False, rate=DE
 	notary_logs.setup_logs(logfile, LOGFILE, verbose=verbose, quiet=quiet)
 
 	start_time = time.time()
-	localtime = time.asctime( time.localtime(start_time) )
+	localtime = time.asctime(time.localtime(start_time))
 
 	# read all service names to start;
 	# otherwise the database can lock up
 	# if we're accepting data piped from another process
-	all_sids = [ line.rstrip() for line in service_id_file ]
+	all_sids = [line.rstrip() for line in service_id_file]
 
 	print("Starting scan of %s service-ids at: %s" % (len(all_sids), localtime))
 	print("INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
-	    (timeout_sec, rate) )
+	    (timeout_sec, rate))
 	db.report_metric('ServiceScanStart', "ServiceCount: " + str(len(all_sids)))
 
 	# create a thread to scan each service
@@ -285,11 +285,11 @@ def main(db, service_id_file, logfile=False, verbose=False, quiet=False, rate=DE
 					logging.info("long running threads")
 					cur_time = time.time()
 					for sid in stats.threads.keys():
-						spawn_time = stats.threads.get(sid,cur_time)
+						spawn_time = stats.threads.get(sid, cur_time)
 						duration = cur_time - spawn_time
 						if duration > 20:
 							logging.info("'%s' has been running for %s" %\
-							 (sid,duration))
+							 (sid, duration))
 
 		except IndexError:
 			logging.error("Service '%s' has no index [1] after splitting on ','.\n" % (sid))
@@ -312,10 +312,10 @@ def main(db, service_id_file, logfile=False, verbose=False, quiet=False, rate=DE
 	_record_observations_in_db(db, results.get())
 
 	duration = int(time.time() - start_time)
-	localtime = time.asctime( time.localtime(start_time) )
+	localtime = time.asctime(time.localtime(start_time))
 	print("Ending scan at: %s" % localtime)
 	print("Scan of %s services took %s seconds.  %s Failures" % \
-		(stats.num_started,duration, stats.failures))
+		(stats.num_started, duration, stats.failures))
 	db.report_metric('ServiceScanStop')
 	exit(0)
 
