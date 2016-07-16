@@ -26,6 +26,7 @@ from __future__ import print_function
 import argparse
 import unittest
 
+import test_list_services
 import test_notary_db
 import test_pycache
 import test_ssl_scan_sock
@@ -37,6 +38,7 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	all_tests = unittest.TestSuite([
+		unittest.TestLoader().loadTestsFromModule(test_list_services),
 		unittest.TestLoader().loadTestsFromModule(test_notary_db),
 		unittest.TestLoader().loadTestsFromModule(test_pycache),
 		unittest.TestLoader().loadTestsFromModule(test_ssl_scan_sock),
