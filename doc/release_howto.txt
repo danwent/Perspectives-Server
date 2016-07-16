@@ -12,12 +12,10 @@ Developer note: here are the steps to release an update to the Perspectives Serv
 Once you're confident everything works:
 
 - Increment the VERSION number in notary_http.py, following the MAJOR.MINOR.PATCH format if possible
-- Create a new folder in doc/upgrades with the name '{old_verion_number}to{new_version_number}'
-- Inside that folder create a text file with the name 'upgrade_{old_verion_number}to{new_verion_number}.txt'
-- Document all steps required to upgrade a notary from the previous version to this version.
-	If your release contains only code changes, note that. You may be able to copy the release notes from another code-only release (e.g. '3.2to3.3').
-	If your release contains database schema changes, you *must* document steps on how to upgrade data from the previous version.
-- Add a tag in git for the new version, to make it easy to find
+- If there are database schema changes that require data upgrades:
+	- Create a new folder in doc/upgrades with the name '{old_verion_number}to{new_version_number}'
+	- Inside that folder create a text file with the name 'upgrade_{old_verion_number}to{new_verion_number}.txt'
+	- Document all steps required to upgrade a notary from the previous version to this version.
 - Upload your changes to github
 - Create a pull request to bring your changes to the main branch
 
