@@ -97,7 +97,7 @@ class ScanThread(threading.Thread):
 		"""
 		try: 
 			return e.args[0]
-		except: 
+		except Exception:
 			return 0 # no error
 
 	def _record_failure(self, e):
