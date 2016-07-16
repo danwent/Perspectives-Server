@@ -45,7 +45,6 @@ DEFAULT_INFILE = "-"
 LOGFILE = "scanner.log"
 
 stats = None
-db = None
 results = None
 
 class ResultStore(object):
@@ -81,7 +80,8 @@ class ScanThread(threading.Thread):
 	"""
 	Scan a remote service and retrieve the fingerprint for its TLS certificate.
 	"""
-	def __init__(self, sid, global_stats, timeout_sec, sni):
+	def __init__(self, db, sid, global_stats, timeout_sec, sni):
+		self.db = db
 		self.sid = sid
 		self.global_stats = global_stats
 		self.global_stats.active_threads += 1
@@ -103,7 +103,7 @@ class ScanThread(threading.Thread):
 	def _record_failure(self, e):
 		"""Record an exception that happened during a scan."""
 		stats.failures += 1
-		db.report_metric('ServiceScanFailure', str(e))
+		self.db.report_metric('ServiceScanFailure', str(e))
 		if (isinstance(e, SSLScanTimeoutException)):
 			stats.failure_timeouts += 1
 			return
@@ -173,7 +173,7 @@ class GlobalStats(object):
 		self.failure_other = 0 
 	
 
-def _record_observations_in_db(results):
+def _record_observations_in_db(db, results):
 	"""
 	Record a set of service observations in the database.
 	"""
@@ -189,8 +189,8 @@ def _record_observations_in_db(results):
 		logging.exception(e)
 
 
-def _parse_args():
-	"""Parse arguments and return the populated namespace."""
+def get_parser():
+	"""Return an argument parser for this module."""
 	parser = argparse.ArgumentParser(parents=[ndb.get_parser()],
 	description=__doc__)
 
@@ -216,38 +216,31 @@ def _parse_args():
 				help="Verbose mode. Print more info about each scan.")
 	loggroup.add_argument('--quiet', '-q', default=False, action='store_true',
 				help="Quiet mode. Only print system-critical problems.")
+	return parser
 
-	args = parser.parse_args()
-	return args
 
-def main():
+def main(db, service_id_file, logfile=False, verbose=False, quiet=False, rate=DEFAULT_SCANS,
+		timeout_sec=DEFAULT_WAIT, sni=False):
 	"""
 	Run the main program.
 	Scan a list of services and update Observation records in the notary database.
 	"""
 
 	global stats
-	global db
 	global results
 
-	args = _parse_args()
-	notary_logs.setup_logs(args.logfile, LOGFILE, verbose=args.verbose, quiet=args.quiet)
-
-	# pass ndb the args so it can use any relevant ones from its own parser
-	db = ndb(args)
 	stats = GlobalStats()
 	results = ResultStore()
 
-	rate = args.scans
-	timeout_sec = args.timeout
-	f = args.service_id_file
+	notary_logs.setup_logs(logfile, LOGFILE, verbose=verbose, quiet=quiet)
+
 	start_time = time.time()
 	localtime = time.asctime( time.localtime(start_time) )
 
 	# read all service names to start;
 	# otherwise the database can lock up
 	# if we're accepting data piped from another process
-	all_sids = [ line.rstrip() for line in f ]
+	all_sids = [ line.rstrip() for line in service_id_file ]
 
 	print("Starting scan of %s service-ids at: %s" % (len(all_sids), localtime))
 	print("INFO: *** Timeout = %s sec  Scans-per-second = %s" % \
@@ -262,12 +255,12 @@ def main():
 			# TODO: use a regex instead
 			if sid.split(",")[1] == notary_common.SSL_TYPE:
 				stats.num_started += 1
-				t = ScanThread(sid, stats, timeout_sec, args.sni)
+				t = ScanThread(db, sid, stats, timeout_sec, sni)
 				t.start()
 
 			if (stats.num_started % rate) == 0:
 				time.sleep(1)
-				_record_observations_in_db(results.get())
+				_record_observations_in_db(db, results.get())
 
 				so_far = int(time.time() - start_time)
 				logging.info("%s seconds passed.  %s complete, %s " \
@@ -288,7 +281,7 @@ def main():
 					stats.failure_other))
 
 			if stats.num_started  % 1000 == 0:
-				if (args.verbose):
+				if (verbose):
 					logging.info("long running threads")
 					cur_time = time.time()
 					for sid in stats.threads.keys():
@@ -316,7 +309,7 @@ def main():
 
 	# record any observations made since we finished the
 	# main for-loop
-	_record_observations_in_db(results.get())
+	_record_observations_in_db(db, results.get())
 
 	duration = int(time.time() - start_time)
 	localtime = time.asctime( time.localtime(start_time) )
@@ -327,4 +320,8 @@ def main():
 	exit(0)
 
 if __name__ == "__main__":
-	main()
+	args = get_parser().parse_args()
+	# pass ndb the args so it can use any relevant ones from its own parser
+	db = ndb(args)
+	main(db, args.service_id_file, args.logfile, args.verbose, args.quiet, args.scans,
+		args.timeout, args.sni)
