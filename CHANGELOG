@@ -12,6 +12,26 @@ We attempt to use meaningful version numbers, following semver.org:
 	PATCH version when you make backwards-compatible bug fixes.
 
 
+3.5
+-----
++ Add --logfile switch for scanner and server to handle logging to a file on disk.
+	This lets us limit how much disk space is used for logging, so it doesn't run out of control.
+* Change default admin scripts to use new --logfile switch
+* Clean up admin scripts
+* Fix multiple sources of logging, printing, and traceback to use logging module
+* Fix print statements to use print function
+* Fix threading bug with scanner: properly lock objects when recording scan results
+* Organize unit tests: use one test module for each code module being tested
+	This makes it much easier to see what is being tested.
+* Convert old-style classes to new-style classes
+* Add missing license header
+* Determine whether sockets block based on OS (nonblocking sockets don't work on Windows)
+* Remove some global variables and state from threaded_scanner
+* Fix list_services code to be testable, and add minimal tests
+* Minor code formatting and whitespace cleanup
+* Add some docstrings and documentation
+
+
 3.4.1
 -----
 * Fix HTML in static index page

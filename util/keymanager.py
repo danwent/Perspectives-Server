@@ -17,6 +17,7 @@
 """Read, set, create, and export public and private server keys."""
 
 import argparse
+import logging
 import os
 import re
 import sys
@@ -25,7 +26,7 @@ import keygen
 import crypto
 
 
-class keymanager:
+class keymanager(object):
 	"""Read, set, create, and export public and private server keys."""
 
 	ENV_PUB_KEY_NAME='NOTARY_PUBLIC_KEY'
@@ -126,10 +127,10 @@ class keymanager:
 		valid_keys = True
 
 		if not (crypto.validate_public_rsa(pub_key)):
-			print >> sys.stderr, "Error: public key '%s' is not a valid RSA key." % pub_key
+			logging.error("Error: public key '%s' is not a valid RSA key." % pub_key)
 			valid_keys = False
 		if not (crypto.validate_private_rsa(priv_key)):
-			print >> sys.stderr, "Error: private key is not a valid RSA key."
+			logging.error("Error: private key is not a valid RSA key.")
 			valid_keys = False
 
 		if (valid_keys):
@@ -179,7 +180,7 @@ class keymanager:
 				pub_key = pub.read()
 
 		except IOError as e:
-			print >> sys.stderr, e
+			logging.error(e)
 			pub_key = None
 			priv_key = None
 
@@ -227,7 +228,7 @@ class keymanager:
 			(self.ENV_PUB_KEY_NAME, pub_key, self.ENV_PRIV_KEY_NAME, priv_key, app_name)
 		ret = os.system(export)
 		if (ret != 0):
-			print >> sys.stderr, "Error: setting heroku config vars\n"
+			logging.error("Error: setting heroku config vars\n")
 
 
 	def wrap_key(self, key, width = 65):

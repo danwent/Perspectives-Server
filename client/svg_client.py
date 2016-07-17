@@ -14,6 +14,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function
+
 import time
 import sys
 import traceback  
@@ -21,7 +23,7 @@ from client_common import verify_notary_signature, fetch_notary_xml, parse_http_
 from generate_svg import get_svg_graph 
 
 if len(sys.argv) != 4: 
-	print "usage: %s <service-id> <notary-list-file> <len-days>" % sys.argv[0]
+	print("usage: %s <service-id> <notary-list-file> <len-days>" % sys.argv[0])
 	exit(1)  
 
 
@@ -40,5 +42,4 @@ for s in server_list:
 	except Exception, e:
 		pass
 
-print get_svg_graph(sid, server_list, int(sys.argv[3]), time.time())
-
+print(get_svg_graph(sid, server_list, int(sys.argv[3]), time.time()))

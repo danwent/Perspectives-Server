@@ -28,6 +28,8 @@ You can use the output of this script to evaluate SQL efficiency.
 If you add a function to the ndb class please add a test case for it here.
 """
 
+from __future__ import print_function
+
 import logging
 import unittest
 
@@ -156,12 +158,13 @@ if __name__ == '__main__':
 
 	if (os.path.exists(NotarySQLEnumeration.TEST_DATABASE) and (os.path.isfile(NotarySQLEnumeration.TEST_DATABASE))):
 		try:
-			print "Deleting test database file {0}".format(NotarySQLEnumeration.TEST_DATABASE)
+			print("Deleting test database file {0}".format(NotarySQLEnumeration.TEST_DATABASE))
 			os.remove(NotarySQLEnumeration.TEST_DATABASE)
 		except (Exception) as e:
-			print >> sys.stderr, "Error deleting test database: '{0}'. WARNING - tests may not run properly.".format(e)
+			print("Error deleting test database: '{0}'. WARNING - tests may not run properly.".format(e),
+				file=sys.stderr)
 
 	test_suite = unittest.TestLoader().loadTestsFromTestCase(NotarySQLEnumeration)
 	unittest.main(verbosity=2)
 
-	print "SQL statements output to '{0}'.".format(NotarySQLEnumeration.LOG_FILE)
+	print("SQL statements output to '{0}'.".format(NotarySQLEnumeration.LOG_FILE))

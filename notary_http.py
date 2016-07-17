@@ -14,25 +14,29 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function
+
 import argparse
-import errno
+import logging
 import os
 import re
 import struct
-import sys
-import threading 
-import traceback 
+import threading
 from xml.dom.minidom import getDOMImplementation
 
 import cherrypy
 
+from notary_util import notary_common
+from notary_util import notary_logs
+from notary_util.notary_db import ndb
 from util import crypto, cache
 from util.keymanager import keymanager
-from notary_util.notary_db import ndb
-from notary_util import notary_common
 from util.ssl_scan_sock import attempt_observation_for_service, SSLScanTimeoutException, SSLAlertException
 
-class NotaryHTTPServer:
+# track locks at the module level so we only use them once across all cherrypy threads
+PROBE_LIMIT = 10 # simultaneous scans for new services
+
+class NotaryHTTPServer(object):
 	"""
 	Network Notary server for the Perspectives project
 	( http://perspectives-project.org/ )
@@ -44,37 +48,45 @@ class NotaryHTTPServer:
 	# MAJOR version when you make large architectural changes,
 	# MINOR version when you add functionality in a backwards-compatible manner
 	# PATCH version when you make backwards-compatible bug fixes.
-	VERSION = "3.4.1"
+	VERSION = "3.5"
 
-	DEFAULT_WEB_PORT=8080
-	ENV_PORT_KEY_NAME='PORT'
+	DEFAULT_WEB_PORT = 8080
+	ENV_PORT_KEY_NAME = 'PORT'
 	STATIC_DIR = "notary_static"
 	STATIC_INDEX = "index.html"
-	LOG_DIR = 'logs'
 	LOG_FILE = 'webserver.log'
+	CHERRYPY_FILE = 'cherrypy.log'
 
-	CACHE_EXPIRY = 60 * 60 * 12 # seconds. see doc/advanced_notary_configuration.txt
+	CACHE_EXPIRY = 12 # hours. see doc/advanced_notary_configuration.txt
 
-	def __init__(self):
+	@classmethod
+	def get_parser(cls):
+		"""Return an argparser for NotaryHTTPServer."""
 		parser = argparse.ArgumentParser(parents=[keymanager.get_parser(), ndb.get_parser()],
-			description=self.__doc__, version=self.VERSION,
+			description=cls.__doc__, version=cls.VERSION,
 			epilog="If the database schema does not exist it will be automatically created on launch.")
 		portgroup = parser.add_mutually_exclusive_group()
-		portgroup.add_argument('--webport', '-p', default=self.DEFAULT_WEB_PORT, type=int,
+		portgroup.add_argument('--webport', '-p', default=cls.DEFAULT_WEB_PORT, type=int,
 			help="Port to use for the web server. Ignored if --envport is specified. Default: \'%(default)s\'.")
 		portgroup.add_argument('--envport', '-e', action='store_true', default=False,
-			help="Read which port to use from the environment variable '" + self.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
-		parser.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
-			action='store_true', default=False,
+			help="Read which port to use from the environment variable '" + cls.ENV_PORT_KEY_NAME + "'. Using this will override --webport. Default: \'%(default)s\'")
+		loggroup = parser.add_mutually_exclusive_group()
+		loggroup.add_argument('--echo-screen', '--echoscreen', '--screenecho', '--screen-echo',\
+			action='store_true', default=True,
 			help='Send web server output to stdout rather than a log file.')
-		parser.add_argument('--sni', action='store_true', default=False,
-			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
-			 Default: \'%(default)s\'")
+		loggroup.add_argument('--logfile', action='store_true', default=False,
+			help="Log to a file on disk rather than standard out.\
+			A rotating set of {0} logs will be used, each capturing up to {1} bytes.\
+			File will written to {2}\
+			Default: \'%(default)s\'".format(
+				notary_logs.LOGGING_BACKUP_COUNT + 1,
+				notary_logs.LOGGING_MAXBYTES,
+				notary_logs.get_log_file(cls.LOG_FILE)))
 
 		cachegroup = parser.add_mutually_exclusive_group()
 		cachegroup.add_argument('--memcache', '--memcached', action='store_true', default=False,
 			help="Use memcache to cache observation data, to increase performance and reduce load on the notary database.\
-				Cached info expires after " + str(self.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
+				Cached info expires after " + str(cls.CACHE_EXPIRY / 3600) + " hours. " + cache.Memcache.get_help())
 		cachegroup.add_argument('--memcachier', action='store_true', default=False,
 			help="Use memcachier to cache observation data. " + cache.Memcachier.get_help())
 		cachegroup.add_argument('--redis', action='store_true', default=False,
@@ -84,43 +96,50 @@ class NotaryHTTPServer:
 			help="Use RAM to cache observation data on the local machine only.\
 			If you don't use any other type of caching, use this! " + cache.Pycache.get_help())
 
+		parser.add_argument('--sni', action='store_true', default=False,
+			help="Use Server Name Indication when scanning sites. See section 3.1 of http://www.ietf.org/rfc/rfc4366.txt.\
+			 Default: \'%(default)s\'")
 		parser.add_argument('--cache-only', action='store_true', default=False,
 			help="When retrieving data, *only* read from the cache - do not read any database records. Default: %(default)s")
 
 		parser.add_argument('--cache-expiry', '--cache-duration',\
-			default=self.CACHE_EXPIRY, type=self.cache_duration,
+			default=cls.CACHE_EXPIRY, type=cls.cache_duration,
 			metavar="CACHE_EXPIRY[Ss|Mm|Hh]",
 			help="Expire cache entries after this many seconds / minutes / hours. " +\
 			"Hours is the default time unit if none is provided. " +\
 			"The default client settings ignore notary results that have not been updated in the past 48 hours, " +\
 			"so you may want your (scan frequency + scan duration + cache expiry) to be <= 48 hours. Default: " +\
-			str(self.CACHE_EXPIRY / 3600) + " hours.")
+			str(cls.CACHE_EXPIRY) + " hours.")
 
 		# socket_queue_size and thread_pool use the cherrypy defaults,
 		# but we hardcode them here rather than refer to the cherrypy variables directly
 		# just in case the cherrypy architecture changes.
 		parser.add_argument('--socket-queue-size', '--socket-queue',\
-			default=5, type=self.positive_integer,
+			default=5, type=cls.positive_integer,
 			help="The maximum number of queued connections. Must be a positive integer. Default: %(default)s.")
 
 		parser.add_argument('--thread-pool-size', '--thread-pool', '--threads',\
-			default=10, type=self.positive_integer,
+			default=10, type=cls.positive_integer,
 			help="The number of worker threads to start up in the pool. Must be a positive integer. Default: %(default)s.")
 
-		args = parser.parse_args()
+		return parser
+
+	def __init__(self):
+		args = self.get_parser().parse_args()
+		notary_logs.setup_logs(args.logfile, self.LOG_FILE)
 
 		# pass ndb the args so it can use any relevant ones from its own parser
 		try:
 			self.ndb = ndb(args)
 		except Exception as e:
 			self.ndb = None
-			print >> sys.stderr, "Database error: '%s'" % (str(e))
+			logging.error("Database error: '%s'" % (str(e)))
 
 		# same for keymanager
 		km = keymanager(args)
 		(self.notary_public_key, self.notary_priv_key) = km.get_keys()
 		if (self.notary_public_key == None or self.notary_priv_key == None):
-			print >> sys.stderr, "Could not get public and private keys."
+			logging.error("Could not get public and private keys.")
 			exit(1)
 
 		self.web_port = self.DEFAULT_WEB_PORT
@@ -143,13 +162,11 @@ class NotaryHTTPServer:
 		elif (args.pycache):
 			self.cache = cache.Pycache(args.pycache)
 
-		self.create_folder(self.LOG_DIR)
-
 		self.use_sni = args.sni
 		self.create_static_index()
 		self.args = args
 
-		print "Using public key\n" + self.notary_public_key
+		print("Using public key\n" + self.notary_public_key)
 
 
 	# function to help with argument validation.
@@ -158,6 +175,7 @@ class NotaryHTTPServer:
 	# "error: .. invalid positive_integer value: '1.3'".
 	# if the function name helps the user understand what type of argument they must supply
 	# this may be less confusing.
+	@classmethod
 	def positive_integer(self, value):
 		"""Convert value to a positive integer, or raise an exception if we cannot."""
 		ivalue = int(value)
@@ -165,10 +183,11 @@ class NotaryHTTPServer:
 			raise argparse.ArgumentTypeError("'{0}' is not a positive integer.".format(value))
 		return ivalue
 
+	@classmethod
 	def cache_duration(self, value):
 		"""Validate cache duration time, or raise an exception if we cannot."""
 		# let the user specify durations in seconds, minutes, or hours
-		if (re.search("[^0-9SsMmHh]+", value) != None):
+		if (re.search(r'[^0-9SsMmHh]', value) != None):
 			raise argparse.ArgumentTypeError("Invalid cache duration '{0}'.".format(value))
 
 		# remove non-numeric characters
@@ -176,12 +195,12 @@ class NotaryHTTPServer:
 		duration = int(duration)
 
 		time_units = 0
-		if (re.search("[Ss]", value)):
+		if (re.search(r"[Ss]", value)):
 			time_units += 1
-		if (re.search("[Mm]", value)):
+		if (re.search(r"[Mm]", value)):
 			time_units += 1
 			duration *= 60
-		if (re.search("[Hh]", value)):
+		if (re.search(r"[Hh]", value)):
 			time_units += 1
 			duration *= 3600
 
@@ -214,7 +233,7 @@ class NotaryHTTPServer:
 		STATIC_TEMPLATE = "static_template.html"
 
 		template = os.path.join(self.STATIC_DIR, STATIC_TEMPLATE)
-		with open(template,'r') as t:
+		with open(template, 'r') as t:
 			lines = str(t.read())
 
 		options = ""
@@ -252,20 +271,8 @@ class NotaryHTTPServer:
 		lines = lines.replace('<!-- ::OPTIONS:: -->', options)
 
 		index = os.path.join(self.STATIC_DIR, self.STATIC_INDEX)
-		with open (index, 'w') as i:
-			print >> i, lines
-
-	def create_folder(self, path):
-		"""Create a folder if it doesn't already exist."""
-		# use try/except here to avoid a race condition when checking for existance
-		try:
-			os.makedirs(path)
-		except OSError as e:
-			if (os.path.exists(path) and not os.path.isdir(path)):
-				print >> sys.stderr, "ERROR: Could not create log directory '{0}': a file with that name already exists.".format(path)
-				exit(1)
-			elif e.errno != errno.EEXIST:
-				raise
+		with open(index, 'w') as i:
+			print(lines, file=i)
 
 	def get_xml(self, host, port, service_type):
 		"""Fetch the xml response for a given service."""
@@ -281,13 +288,13 @@ class NotaryHTTPServer:
 				else:
 					self.ndb.report_metric('CacheMiss', service)
 			except Exception as e:
-				print >> sys.stderr, "ERROR getting service from cache: %s\n" % (e)
+				logging.error("Error getting service from cache: %s\n" % (e))
 
 		#TODO: don't reference session directly
 		if (not self.args.cache_only and self.ndb and (self.ndb._Session != None)):
 			return self.calculate_service_xml(service, service_type)
 		else:
-			print >> sys.stderr, "ERROR: Database is not available to retrieve data, and data not in the cache.\n"
+			logging.error("Database is not available to retrieve data, and data not in the cache.\n")
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
 	def calculate_service_xml(self, service, service_type):
@@ -306,19 +313,19 @@ class NotaryHTTPServer:
 			with self.ndb.get_session() as session:
 				obs = self.ndb.get_observations(session, service)
 				if (obs != None):
-					for (name, key, start, end) in obs:
+					for (_, key, start, end) in obs:
 						num_rows += 1
 						if key not in keys:
 							timestamps_by_key[key] = []
 							keys.append(key)
 						timestamps_by_key[key].append((start, end))
-		except Exception as e:
+		except Exception:
 			# error already logged inside get_observations.
 			# we can also see InterfaceError or AttributeError when looping through observation records
 			# if the database is under heavy load.
 			raise cherrypy.HTTPError(503) # 503 Service Unavailable
 
-		if num_rows == 0: 
+		if num_rows == 0:
 			# rate-limit on-demand probes
 			global scan_semaphore
 			global scan_sites
@@ -333,23 +340,23 @@ class NotaryHTTPServer:
 						do_scan = True
 
 				if (do_scan):
-					t = OnDemandScanThread(service, 10 , self.use_sni, self, self.ndb)
+					t = OnDemandScanThread(service, 10, self.use_sni, self, self.ndb)
 					t.start()
 					# report the metrics *after* launching so the scanning thread can get started
 					self.ndb.report_metric('ScanForNewService', service)
 				else:
 					scan_semaphore.release()
-			else: 
+			else:
 				self.ndb.report_metric('ProbeLimitExceeded', "CurrentProbleLimit: " + str(PROBE_LIMIT) + " Service: " + service)
 			# return 404, assume client will re-query
 			raise cherrypy.HTTPError(404) # 404 Not Found
 	
-		dom_impl = getDOMImplementation() 
-		new_doc = dom_impl.createDocument(None, "notary_reply", None) 
+		dom_impl = getDOMImplementation()
+		new_doc = dom_impl.createDocument(None, "notary_reply", None)
 		top_element = new_doc.documentElement
-		top_element.setAttribute("version","1") 
-		top_element.setAttribute("sig_type", "rsa-md5") 
-	
+		top_element.setAttribute("version", "1")
+		top_element.setAttribute("sig_type", "rsa-md5")
+
 		packed_data = ""
 
 		# create an XML response that we'll send back to the client
@@ -359,33 +366,33 @@ class NotaryHTTPServer:
 			key_elem.setAttribute("fp", k)
 			top_element.appendChild(key_elem)
 			num_timespans = len(timestamps_by_key[k])
-			head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16,3)
+			head = struct.pack("BBBBB", (num_timespans >> 8) & 255, num_timespans & 255, 0, 16, 3)
 
 			fp_bytes = ""
 			for hex_byte in k.split(":"):
-				fp_bytes += struct.pack("B", int(hex_byte,16))
+				fp_bytes += struct.pack("B", int(hex_byte, 16))
 
 			ts_bytes = ""
 			for ts in sorted(timestamps_by_key[k], key=lambda t_pair: t_pair[0]):
 				ts_start = ts[0]
-				ts_end  = ts[1]
+				ts_end = ts[1]
 				ts_elem = new_doc.createElement("timestamp")
-				ts_elem.setAttribute("end",str(ts_end))
+				ts_elem.setAttribute("end", str(ts_end))
 				ts_elem.setAttribute("start", str(ts_start))
-				key_elem.appendChild(ts_elem) 
+				key_elem.appendChild(ts_elem)
 				ts_bytes += struct.pack("BBBB", ts_start >> 24 & 255,
-											   ts_start >> 16 & 255,
-											   ts_start >> 8 & 255,
-											   ts_start & 255)
+					ts_start >> 16 & 255,
+					ts_start >> 8 & 255,
+					ts_start & 255)
 				ts_bytes += struct.pack("BBBB", ts_end >> 24 & 255,
-											   ts_end >> 16 & 255,
-											   ts_end >> 8 & 255,
-											   ts_end & 255)
-			packed_data =(head + fp_bytes + ts_bytes) + packed_data   
-	
+					ts_end >> 16 & 255,
+					ts_end >> 8 & 255,
+					ts_end & 255)
+			packed_data = (head + fp_bytes + ts_bytes) + packed_data
+
 		packed_data = service.encode() + struct.pack("B", 0) + packed_data
 		sig = crypto.sign_content(packed_data, self.notary_priv_key)
-		top_element.setAttribute("sig",sig)
+		top_element.setAttribute("sig", sig)
 		xml = top_element.toprettyxml()
 
 		if (self.cache != None):
@@ -426,12 +433,12 @@ class NotaryHTTPServer:
 		if (host == None or host == '' or port == None or \
 			service_type not in notary_common.SERVICE_TYPES):
 			raise cherrypy.HTTPError(400) # 400 Bad Request
-			
+
 		cherrypy.response.headers['Content-Type'] = 'text/xml'
 		return self.get_xml(host, port, service_type)
 
 
-class OnDemandScanThread(threading.Thread): 
+class OnDemandScanThread(threading.Thread):
 
 	def __init__(self, sid, timeout_sec, use_sni, server_obj, db):
 		self.sid = sid
@@ -445,7 +452,7 @@ class OnDemandScanThread(threading.Thread):
 		"""Clean up after scanning."""
 		del self.db
 
-	def run(self): 
+	def run(self):
 
 		try:
 			fp = attempt_observation_for_service(self.sid, self.timeout_sec, self.use_sni)
@@ -455,70 +462,78 @@ class OnDemandScanThread(threading.Thread):
 			# TODO: add internal blacklisting to remove sites that don't exist or stop working.
 		except (ValueError, SSLScanTimeoutException, SSLAlertException) as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
-			print >> sys.stderr, "Error scanning '{0}' - {1}".format(self.sid, e)
+			logging.error("Error scanning '{0}' - {1}".format(self.sid, e))
 		except Exception as e:
 			self.db.report_metric('OnDemandServiceScanFailure', self.sid + " " + str(e))
-			traceback.print_exc(file=sys.stdout)
+			logging.exception(e)
 		finally:
 			self.server_obj.scan_finished(self.sid)
 
+def main():
+	"""Run the main program: start the NotaryHTTPServer."""
+	# create an instance here so command-line args will be automatically passed and parsed
+	# before we start the web server
+	notary = NotaryHTTPServer()
 
-# track locks at the module level so we only use them once across all cherrypy threads
-PROBE_LIMIT = 10 # simultaneous scans for new services
-scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
-scan_sites = {}
-scan_sites_lock = threading.Lock()
+	# PATCH: cherrypy has problems binding to the port on hosted server spaces
+	# https://bitbucket.org/cherrypy/cherrypy/issue/1100/cherrypy-322-gives-engine-error-when
+	# TODO use this workaround until 1100 is available for release and we can upgrade
+	from cherrypy.process import servers
+	def fake_wait_for_occupied_port(host, port): return
+	servers.wait_for_occupied_port = fake_wait_for_occupied_port
 
+	# do not log any information about clients.
+	# if we don't override this function,
+	# access information is still logged when screen echoing is turned on.
+	def fake_access(): return
+	cherrypy.log.access = fake_access
 
-# create an instance here so command-line args will be automatically passed and parsed
-# before we start the web server
-notary = NotaryHTTPServer()
+	cherrypy.config.update({'server.socket_port' : notary.web_port,
+		'server.socket_host' : "0.0.0.0",
+		'server.socket_queue_size': notary.args.socket_queue_size,
+		'server.thread_pool': notary.args.thread_pool_size,
+		'request.show_tracebacks' : False,
+		# IMPORTANT PRIVACY SETTINGS!
+		# we do *not* want to record any information about clients
+		'log.access_file' : None,
+		# disable all locations of logging request headers
+		'server.log_request_headers': False,
+		'cherrypy.lib.cptools.log_request_headers': False,
+		'tools.log_headers.on': False,
+		# end of privacy settings
+		# log file is set up below
+		'log.error_file' : None,
+		'log.screen' : False})
 
-# PATCH: cherrypy has problems binding to the port on hosted server spaces
-# https://bitbucket.org/cherrypy/cherrypy/issue/1100/cherrypy-322-gives-engine-error-when
-# TODO use this workaround until 1100 is available for release and we can upgrade
-from cherrypy.process import servers
-def fake_wait_for_occupied_port(host, port): return
-servers.wait_for_occupied_port = fake_wait_for_occupied_port
+	if (notary.args.echo_screen):
+		cherrypy.config.update({
+				'log.screen' : True})
+	else:
+		# set up a rotating log handler
+		# to put a limit on the amount of disk space that will be used by logs
+		log_file = '{0}/{1}'.format(notary_logs.get_log_dir(), notary.CHERRYPY_FILE)
+		log_handler = logging.handlers.RotatingFileHandler(log_file,
+			maxBytes=notary_logs.LOGGING_MAXBYTES,
+			backupCount=notary_logs.LOGGING_BACKUP_COUNT)
+		log_handler.setFormatter(logging.Formatter(fmt=notary_logs.LOGGING_FORMAT))
+		cherrypy.log.error_log.addHandler(log_handler)
 
-# do not log any information about clients.
-# if we don't override this function,
-# access information is still logged when screen echoing is turned on.
-def fake_access(): return
-cherrypy.log.access = fake_access
+	static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
+	notary_config = {'/': {'tools.staticfile.root' : static_root,
+							'tools.staticdir.root' : static_root}}
 
-cherrypy.config.update({ 'server.socket_port' : notary.web_port,
-			 'server.socket_host' : "0.0.0.0",
-			 'server.socket_queue_size': notary.args.socket_queue_size,
-			 'server.thread_pool': notary.args.thread_pool_size,
-			 'request.show_tracebacks' : False,  
-			 # IMPORTANT PRIVACY SETTINGS!
-			 # we do *not* want to record any information about clients
-			 'log.access_file' : None,
-			 # disable all locations of logging request headers
-			 'server.log_request_headers': False,
-			 'cherrypy.lib.cptools.log_request_headers': False,
-			 'tools.log_headers.on': False,
-			 # end of privacy settings
-			 'log.error_file' : '{0}/{1}'.format(notary.LOG_DIR, notary.LOG_FILE),
-			 'log.screen' : False } ) 
+	app = cherrypy.tree.mount(notary, '/', config=notary_config)
+	app.merge("notary.cherrypy.config")
 
-if (notary.args.echo_screen):
-	cherrypy.config.update({
-			 'log.error_file' : None,
-			 'log.screen' : True } )
+	if hasattr(cherrypy.engine, "signal_handler"):
+		cherrypy.engine.signal_handler.subscribe()
+	if hasattr(cherrypy.engine, "console_control_handler"):
+		cherrypy.engine.console_control_handler.subscribe()
+	cherrypy.engine.start()
+	cherrypy.engine.block()
 
-static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), notary.STATIC_DIR)
-notary_config = { '/': {'tools.staticfile.root' : static_root,
-						'tools.staticdir.root' : static_root }}
-
-app = cherrypy.tree.mount(notary, '/', config=notary_config)
-app.merge("notary.cherrypy.config")
-
-if hasattr(cherrypy.engine, "signal_handler"):
-	cherrypy.engine.signal_handler.subscribe()
-if hasattr(cherrypy.engine, "console_control_handler"):
-	cherrypy.engine.console_control_handler.subscribe()
-cherrypy.engine.start()
-cherrypy.engine.block()
-
+if __name__ == "__main__":
+	scan_semaphore = threading.BoundedSemaphore(PROBE_LIMIT)
+	scan_sites = {}
+	scan_sites_lock = threading.Lock()
+	main()

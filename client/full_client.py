@@ -14,17 +14,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function
+
 import sys
 import traceback  
 from client_common import verify_notary_signature, notary_reply_as_text,fetch_notary_xml, parse_http_notary_list
 
 if len(sys.argv) != 3 and len(sys.argv) != 4: 
-	print "usage: %s <service-id> <notary-list-file> [text|xml]" % sys.argv[0]
-	exit(1)  
+	print("usage: %s <service-id> <notary-list-file> [text|xml]" % sys.argv[0])
+	exit(1)
 
 output_type = "text"
 if len(sys.argv) == 4: 
-	output_type = sys.argv[3] 
+	output_type = sys.argv[3]
 
 sid = sys.argv[1]
 server_list = parse_http_notary_list(sys.argv[2]) 
@@ -38,33 +40,31 @@ for s in server_list:
 		if code == 404: 
 			pass
 		if code != 200: 
-			print "'%s' returned error code: %s" % (s["host"],code)
+			print("'%s' returned error code: %s" % (s["host"],code))
 		elif not verify_notary_signature(sid, xml_text, s["public_key"]):
-			print "Signature from '%s' failed, ignoring results" % s["host"]
+			print("Signature from '%s' failed, ignoring results" % s["host"])
 		else: 
 			# results are good
 			s["results"] = xml_text
 			
 	except Exception, e:
-		print "Exception contacting notary server:" 
+		print("Exception contacting notary server:")
 		traceback.print_exc(e)
 
-if output_type == "text": 
-	for s in server_list: 
-		print 50 * "*"
-		print "Results for notary server '%s'" % s["host"]
+if output_type == "text":
+	for s in server_list:
+		print(50 * "*")
+		print("Results for notary server '%s'" % s["host"])
 		if s["results"] is None: 
-			print "<No notary results>" 
+			print("<No notary results>")
 		else: 
-			print notary_reply_as_text(s["results"])
+			print(notary_reply_as_text(s["results"]))
 elif output_type == "xml":
 	for s in server_list: 
-		print 50 * "*"
+		print(50 * "*")
 		if s["results"] is None: 
-			print "<No notary results>" 
+			print("<No notary results>")
 		else: 
-			print notary_reply_as_text(s["results"])
+			print(notary_reply_as_text(s["results"]))
 else:
-	print "Unknown output type '%s'" % output_type
- 
-	
+	print("Unknown output type '%s'" % output_type)

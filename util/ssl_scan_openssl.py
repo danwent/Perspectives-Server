@@ -18,12 +18,12 @@
 An SSL scanner that uses openssl.
 """
 
-from subprocess import *
-import re
-import sys
-import os
 import argparse
-import traceback
+import logging
+import os
+import re
+from subprocess import Popen, PIPE
+import sys
 
 # By default, we do not probe using TLS 'Server Name Indication' (SNI)
 # as it was only compiled into openssl by default since 0.9.8j .
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 	try:
 		fp = attempt_observation_for_service(service, 10)
 		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
-	except:
+	except Exception as e:
 		print "Error scanning for %s" % service
-		traceback.print_exc(file=sys.stdout)
+		logging.exception(e)
 

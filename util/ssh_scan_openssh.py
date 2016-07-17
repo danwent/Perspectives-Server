@@ -17,15 +17,15 @@
 """
 An SSH scanner that uses ssh-keyscan.
 """
+from __future__ import print_function
 
-from subprocess import *
+import argparse
+import logging
+import os
 import re
+import subprocess
 import sys
 import tempfile
-import os
-import argparse
-import traceback
-
 
 def attempt_observation_for_service(service, timeout):
 	# note: timeout is ignored for now
@@ -42,26 +42,26 @@ def attempt_observation_for_service(service, timeout):
 	# small and we plan on phasing it out anyway
 	for key_type in ("rsa","dsa","rsa1"):
 		fd = open(fname,'w')
-		p1 = Popen(["ssh-keyscan", "-t", key_type, "-p", port, dns_name ],
+		p1 = subprocess.Popen(["ssh-keyscan", "-t", key_type, "-p", port, dns_name ],
 			stdin=file(os.devnull, "r"), stdout=fd, stderr=None)
 		p1.wait()
 		if p1.returncode != 0:
-			print >> sys.stderr, "ERROR: error fetching ssh '%s' key for %s" % (key_type,dns_and_port)
+			logging.error("Error fetching ssh '%s' key for %s" % (key_type, dns_and_port))
 			continue
 
-		p2 = Popen(["ssh-keygen","-l","-f", fname],
-			stdin=file(os.devnull, "r"), stdout=PIPE, stderr=None)
+		p2 = subprocess.Popen(["ssh-keygen","-l","-f", fname],
+			stdin=file(os.devnull, "r"), stdout=subprocess.PIPE, stderr=None)
 		output = p2.communicate()[0].strip()
 		p2.wait()
 
 		if p2.returncode != 0:
-			print >> sys.stderr, "ERROR: error fetching ssh key of type '%s' for '%s'" % (key_type,dns_and_port)
+			logging.error("Error fetching ssh key of type '%s' for '%s'" % (key_type, dns_and_port))
 			continue
 
 		fp = output.split()[1]
 		fp_regex = re.compile("^[a-f0-9]{2}(:([a-f0-9]){2}){15}$")
 		if not fp_regex.match(fp):
-			print >> sys.stderr, "ERROR: invalid fingerprint '%s'" % output
+			logging.error("Invalid fingerprint '%s'" % output)
 			continue
 		
 		return fp 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
 	try: 
 		fp = attempt_observation_for_service(service, 10)
-		print "Successful scan complete: '%s' has key '%s' " % (service,fp)
-	except:
-		print "Error scanning for %s" % service
-		traceback.print_exc(file=sys.stdout)
+		print("Successful scan complete: '%s' has key '%s' " % (service, fp))
+	except Exception as e:
+		print("Error scanning for %s" % service)
+		logging.exception(e)
